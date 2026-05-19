@@ -586,6 +586,7 @@
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
     <div class="sync-dot offline" id="syncDot" title="동기화 상태" style="display:none"></div>
     <button class="copy-url-btn" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
+    <button class="copy-url-btn" id="forceSyncBtn" style="display:none">☁️ <span>저장</span></button>
     <button class="copy-url-btn" id="switchUserBtn" style="display:none" title="다른 사용자로 전환">↩ <span>전환</span></button>
     <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
@@ -804,6 +805,25 @@ if (!USER_ID) {
       btn.innerHTML = '✅ <span>복사됨!</span>';
       setTimeout(() => { btn.innerHTML = orig; }, 1800);
     });
+  };
+  document.getElementById('forceSyncBtn').style.display = 'flex';
+  document.getElementById('forceSyncBtn').onclick = () => {
+    const ref = fbRef();
+    if (!ref) return;
+    const btn = document.getElementById('forceSyncBtn');
+    btn.innerHTML = '⏳ <span>저장 중...</span>';
+    btn.disabled = true;
+    ref.set(tasks)
+      .then(() => {
+        setSyncStatus('synced');
+        btn.innerHTML = '✅ <span>저장됨</span>';
+        setTimeout(() => { btn.innerHTML = '☁️ <span>저장</span>'; btn.disabled = false; }, 2000);
+      })
+      .catch(() => {
+        setSyncStatus('offline');
+        btn.innerHTML = '❌ <span>실패</span>';
+        setTimeout(() => { btn.innerHTML = '☁️ <span>저장</span>'; btn.disabled = false; }, 2000);
+      });
   };
   document.getElementById('switchUserBtn').style.display = 'flex';
   document.getElementById('switchUserBtn').onclick = () => {
