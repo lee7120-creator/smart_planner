@@ -1367,8 +1367,11 @@ function buildSearchView(query){
   const q=query.toLowerCase();
   const results=[];
   Object.entries(tasks).forEach(([dk,list])=>{
+    if(!Array.isArray(list)) return;
     list.forEach(t=>{
-      if(t.text.toLowerCase().includes(q)||t.subs.some(s=>s.text.toLowerCase().includes(q)))
+      if(!t) return;
+      const subsMatch=Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q));
+      if(t.text&&t.text.toLowerCase().includes(q)||subsMatch)
         results.push({dk,task:t});
     });
   });
