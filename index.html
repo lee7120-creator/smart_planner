@@ -287,23 +287,34 @@
     .shortcuts-hint:hover { opacity:1; }
     .shortcut-key { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-family:monospace; font-size:10px; color:var(--text2); }
 
-    /* ─── News feed ─── */
-    .news-section { padding:0 16px 24px; max-width:1400px; margin:0 auto; }
-    .news-section-header { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
-    .news-section-title { font-size:13px; font-weight:700; color:var(--text2); letter-spacing:.5px; text-transform:uppercase; }
-    .news-source-tabs { display:flex; gap:6px; flex-wrap:wrap; }
-    .news-tab { font-size:11px; padding:3px 10px; border-radius:20px; border:1px solid var(--border); background:var(--surface); color:var(--text2); cursor:pointer; transition:all .15s; }
-    .news-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
-    .news-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
-    .news-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px; cursor:pointer; transition:box-shadow .15s, transform .15s; display:flex; flex-direction:column; gap:6px; text-decoration:none; }
-    .news-card:hover { box-shadow:var(--shadow-md); transform:translateY(-2px); }
-    .news-card-source { font-size:10px; font-weight:700; color:var(--primary); letter-spacing:.4px; }
-    .news-card-title { font-size:12px; font-weight:600; color:var(--text); line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-    .news-card-date { font-size:10px; color:var(--text3); margin-top:auto; }
-    .news-skeleton { height:90px; background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:10px; }
-    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-    .news-empty { font-size:12px; color:var(--text3); padding:16px; text-align:center; }
-    @media(max-width:768px){ .news-section { display:none; } }
+    /* ─── Dashboard ─── */
+    .dashboard { display:none; padding:0 16px 32px; max-width:1400px; margin:0 auto; gap:16px; grid-template-columns:1fr 1fr; }
+    @media(min-width:769px){ .dashboard { display:grid; } }
+    .dash-panel { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px 20px; }
+    .dash-panel-title { font-size:11px; font-weight:700; color:var(--text3); letter-spacing:.8px; text-transform:uppercase; margin-bottom:14px; }
+    .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+    .stat-box { background:var(--surface2); border-radius:10px; padding:12px 10px; text-align:center; }
+    .stat-num { font-size:22px; font-weight:800; color:var(--primary); line-height:1; }
+    .stat-label { font-size:10px; color:var(--text3); margin-top:4px; }
+    .upcoming-list { display:flex; flex-direction:column; gap:6px; }
+    .upcoming-item { display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--surface2); border-radius:8px; }
+    .upcoming-dday { font-size:11px; font-weight:700; min-width:44px; text-align:center; padding:2px 6px; border-radius:6px; }
+    .upcoming-dday.today { background:#ff4d4f22; color:#ff4d4f; }
+    .upcoming-dday.soon  { background:#fa8c1622; color:#fa8c16; }
+    .upcoming-dday.far   { background:#1677ff22; color:#1677ff; }
+    .upcoming-dday.past  { background:var(--border); color:var(--text3); }
+    .upcoming-info { flex:1; min-width:0; }
+    .upcoming-name { font-size:12px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .upcoming-date { font-size:10px; color:var(--text3); margin-top:1px; }
+    .upcoming-tag { font-size:10px; padding:2px 7px; border-radius:20px; background:var(--surface); border:1px solid var(--border); color:var(--text3); white-space:nowrap; }
+    .tip-box { background:linear-gradient(135deg,var(--primary-l),var(--surface2)); border-radius:10px; padding:14px; border-left:3px solid var(--primary); }
+    .tip-label { font-size:10px; font-weight:700; color:var(--primary); margin-bottom:6px; }
+    .tip-text { font-size:12px; color:var(--text); line-height:1.6; }
+    .week-bar-wrap { display:flex; gap:6px; align-items:flex-end; height:60px; margin-top:4px; }
+    .week-bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
+    .week-bar { width:100%; border-radius:4px 4px 0 0; background:var(--primary); opacity:.7; min-height:4px; transition:height .3s; }
+    .week-bar.today { opacity:1; }
+    .week-bar-day { font-size:9px; color:var(--text3); }
 
     /* ─── Mobile bottom nav ─── */
     .mobile-nav { display:none; }
@@ -615,13 +626,10 @@
 
 <div id="mainView"></div>
 
-<section class="news-section" id="newsSection" style="display:none">
-  <div class="news-section-header">
-    <span class="news-section-title">📰 패션 · 리테일 업계 소식</span>
-    <div class="news-source-tabs" id="newsTabs"></div>
-  </div>
-  <div class="news-grid" id="newsGrid"></div>
-</section>
+<div class="dashboard" id="dashboard">
+  <div class="dash-panel" id="dashStats"></div>
+  <div class="dash-panel" id="dashCalendar"></div>
+</div>
 
 <!-- Memo Popup -->
 <div class="memo-overlay hidden" id="memoOverlay">
@@ -1549,123 +1557,152 @@ setInterval(()=>{ if(fbRef()) fbUpload(); }, 5*60*1000);
 window.addEventListener('online', ()=>{ if(pendingUpload && fbRef()){ pendingUpload=false; fbUpload(); } });
 window.addEventListener('offline', ()=>setSyncStatus('offline'));
 
-// ── News feed ──
-const GN = (q) => `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=ko&gl=KR&ceid=KR:ko`;
-const NEWS_SOURCES = [
-  { label:'패션 트렌드',   url: GN('패션 트렌드') },
-  { label:'리테일·커머스', url: GN('리테일 이커머스 쇼핑몰') },
-  { label:'LF·브랜드',    url: GN('LF 패션 브랜드') },
-  { label:'마케팅·광고',   url: GN('패션 마케팅 광고') },
+// ── Dashboard ──
+const MARKETING_EVENTS = [
+  { name:'설 시즌 캠페인',      month:1,  day:15 },
+  { name:'발렌타인 프로모',      month:2,  day:10 },
+  { name:'봄 신상 론칭',        month:3,  day:1  },
+  { name:'봄 세일 시작',        month:3,  day:15 },
+  { name:'화이트데이 프로모',    month:3,  day:13 },
+  { name:'SS 시즌 피크',        month:4,  day:1  },
+  { name:'어린이날 프로모',      month:5,  day:2  },
+  { name:'가정의달 기획전',      month:5,  day:8  },
+  { name:'여름 시즌 준비',       month:6,  day:1  },
+  { name:'여름 세일 / 창고대방출',month:7,  day:1  },
+  { name:'블프 기획 시작 (내부)',  month:9,  day:15 },
+  { name:'FW 신상 론칭',        month:9,  day:1  },
+  { name:'추석 시즌 캠페인',     month:9,  day:20 },
+  { name:'FW 세일 피크',        month:10, day:15 },
+  { name:'블랙프라이데이',       month:11, day:24 },
+  { name:'사이버먼데이',         month:12, day:1  },
+  { name:'연말 기획전',          month:12, day:10 },
+  { name:'크리스마스 프로모',    month:12, day:20 },
 ];
-let newsActiveIdx = 0;
-let newsCache = {};
 
-function timeAgo(dateStr){
-  if(!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff/60000);
-  if(m < 1) return '방금 전';
-  if(m < 60) return m+'분 전';
-  const h = Math.floor(m/60);
-  if(h < 24) return h+'시간 전';
-  return Math.floor(h/24)+'일 전';
+const DAILY_TIPS = [
+  '고객의 구매 여정을 단계별로 시각화하면 전환율 개선 포인트를 빠르게 찾을 수 있습니다.',
+  '상품 상세페이지에 고객 리뷰와 UGC를 배치하면 신뢰도와 전환율이 함께 올라갑니다.',
+  '세그먼트별 타겟 메시지 A/B 테스트는 최소 2주 이상 운영해야 유의미한 데이터가 나옵니다.',
+  '재구매 고객 LTV 분석을 통해 VIP 등급 기준을 재점검해보세요.',
+  '모바일 첫 화면 진입 후 3초 안에 핵심 가치를 전달해야 이탈률을 줄일 수 있습니다.',
+  '카카오 친구톡과 앱 푸시의 발송 시간대를 요일별로 최적화하면 CTR이 달라집니다.',
+  '시즌 기획전은 최소 3주 전 소재 제작을 완료해야 QA·수정 여유가 생깁니다.',
+  '검색 광고 키워드에서 브랜드명 검색 비율을 주기적으로 체크하면 브랜드 인지도 추이를 파악할 수 있습니다.',
+  '쿠폰 다운로드율과 실제 사용률 격차가 크면 유효기간·조건을 재검토할 필요가 있습니다.',
+  '콘텐츠 마케팅의 성과는 단기보다 3개월 이상 누적 트래픽으로 평가하는 것이 정확합니다.',
+];
+
+function getDday(month, day){
+  const now = new Date(); now.setHours(0,0,0,0);
+  const target = new Date(now.getFullYear(), month-1, day);
+  if(target < now) target.setFullYear(now.getFullYear()+1);
+  return Math.round((target - now) / 86400000);
 }
 
-function parseRSS(xmlText){
-  const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
-  return [...xml.querySelectorAll('item')].map(item=>{
-    const get = tag => item.querySelector(tag)?.textContent?.trim() || '';
-    // Google News puts URL in <link> as a sibling text node, fallback to guid
-    let link = '';
-    const linkEl = item.querySelector('link');
-    if(linkEl){
-      link = linkEl.textContent.trim();
-      if(!link) link = linkEl.nextSibling?.nodeValue?.trim() || '';
+function buildDashStats(){
+  const panel = document.getElementById('dashStats');
+  panel.innerHTML = '';
+  const title = document.createElement('div'); title.className='dash-panel-title'; title.textContent='📊 이번 주 업무 현황';
+  panel.appendChild(title);
+
+  // stat boxes
+  const now = new Date(); now.setHours(0,0,0,0);
+  const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay()+6)%7));
+  let weekTotal=0, weekDone=0, totalAll=0, doneAll=0;
+  const dayTotals = [0,0,0,0,0,0,0];
+  Object.entries(tasks).forEach(([dk, list])=>{
+    if(!Array.isArray(list)) return;
+    list.forEach(t=>{
+      if(!t) return;
+      totalAll++; if(t.checked) doneAll++;
+      const d = new Date(dk); d.setHours(0,0,0,0);
+      const diff = Math.round((d-monday)/86400000);
+      if(diff>=0 && diff<7){ weekTotal++; if(t.checked) weekDone++; dayTotals[diff]+=1; }
+    });
+  });
+  const streak = (()=>{
+    let s=0, d=new Date(now);
+    for(let i=0;i<60;i++){
+      const dk=dateKey(d);
+      const list=tasks[dk];
+      if(Array.isArray(list)&&list.length&&list.every(t=>t&&t.checked)) s++;
+      else if(i>0) break;
+      d.setDate(d.getDate()-1);
     }
-    if(!link) link = get('guid');
-    // Strip Google redirect wrapper if present
-    if(link.includes('news.google.com/rss/articles')){
-      try{ link = new URL(get('guid')).href; }catch(e){}
-    }
-    const source = item.querySelector('source')?.textContent?.trim() || '';
-    return { title: get('title'), link, pubDate: get('pubDate'), source };
-  }).filter(i=>i.title);
-}
+    return s;
+  })();
 
-function renderNewsSkeletons(){
-  const grid = document.getElementById('newsGrid');
-  grid.innerHTML = '';
-  for(let i=0;i<6;i++){const s=document.createElement('div');s.className='news-skeleton';grid.appendChild(s);}
-}
-
-function renderNewsCards(items, sourceLabel){
-  const grid = document.getElementById('newsGrid');
-  grid.innerHTML = '';
-  if(!items || !items.length){
-    const e = document.createElement('div');
-    e.className='news-empty'; e.textContent='기사를 불러올 수 없습니다.';
-    grid.appendChild(e); return;
-  }
-  items.slice(0,12).forEach(item=>{
-    const a = document.createElement('a');
-    a.className = 'news-card';
-    a.href = item.link || '#';
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    const src = document.createElement('div'); src.className='news-card-source'; src.textContent=item.source||sourceLabel;
-    const title = document.createElement('div'); title.className='news-card-title'; title.textContent=item.title;
-    const date = document.createElement('div'); date.className='news-card-date'; date.textContent=timeAgo(item.pubDate);
-    a.appendChild(src); a.appendChild(title); a.appendChild(date);
-    grid.appendChild(a);
+  const sg = document.createElement('div'); sg.className='stat-grid';
+  [[weekDone+'/'+weekTotal,'이번 주 완료'],[Math.round(totalAll?doneAll/totalAll*100:0)+'%','전체 달성률'],[streak+'일','완료 연속']].forEach(([n,l])=>{
+    const box=document.createElement('div'); box.className='stat-box';
+    const num=document.createElement('div'); num.className='stat-num'; num.textContent=n;
+    const lab=document.createElement('div'); lab.className='stat-label'; lab.textContent=l;
+    box.appendChild(num); box.appendChild(lab); sg.appendChild(box);
   });
-}
+  panel.appendChild(sg);
 
-async function fetchNewsWithFallback(rssUrl){
-  const proxies = [
-    u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
-    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-  ];
-  for(const makeUrl of proxies){
-    try{
-      const res = await fetch(makeUrl(rssUrl), {signal: AbortSignal.timeout(8000)});
-      if(!res.ok) continue;
-      const data = await res.json().catch(()=>null);
-      const xmlText = data ? (data.contents || data) : await res.text();
-      if(typeof xmlText !== 'string') continue;
-      const items = parseRSS(xmlText);
-      if(items.length) return items;
-    }catch(e){ continue; }
-  }
-  return [];
-}
-
-function loadNews(idx){
-  newsActiveIdx = idx;
-  document.querySelectorAll('.news-tab').forEach((t,i)=>t.classList.toggle('active', i===idx));
-  const src = NEWS_SOURCES[idx];
-  if(newsCache[idx]){ renderNewsCards(newsCache[idx], src.label); return; }
-  renderNewsSkeletons();
-  fetchNewsWithFallback(src.url).then(items=>{
-    newsCache[idx] = items;
-    renderNewsCards(items, src.label);
+  // week bar chart
+  const barTitle=document.createElement('div'); barTitle.className='dash-panel-title'; barTitle.style.marginBottom='6px'; barTitle.textContent='요일별 태스크';
+  panel.appendChild(barTitle);
+  const barWrap=document.createElement('div'); barWrap.className='week-bar-wrap';
+  const max=Math.max(...dayTotals,1);
+  ['월','화','수','목','금','토','일'].forEach((d,i)=>{
+    const col=document.createElement('div'); col.className='week-bar-col';
+    const bar=document.createElement('div'); bar.className='week-bar'+(i===((now.getDay()+6)%7)?' today':'');
+    bar.style.height=Math.round((dayTotals[i]/max)*50+4)+'px';
+    const lbl=document.createElement('div'); lbl.className='week-bar-day'; lbl.textContent=d;
+    col.appendChild(bar); col.appendChild(lbl); barWrap.appendChild(col);
   });
+  panel.appendChild(barWrap);
+
+  // tip
+  const tipWrap=document.createElement('div'); tipWrap.className='tip-box'; tipWrap.style.marginTop='14px';
+  const tipLbl=document.createElement('div'); tipLbl.className='tip-label'; tipLbl.textContent='💡 오늘의 마케팅 인사이트';
+  const tipTxt=document.createElement('div'); tipTxt.className='tip-text';
+  tipTxt.textContent=DAILY_TIPS[new Date().getDate()%DAILY_TIPS.length];
+  tipWrap.appendChild(tipLbl); tipWrap.appendChild(tipTxt);
+  panel.appendChild(tipWrap);
 }
 
-function initNews(){
-  if(window.innerWidth <= 768) return;
-  const section = document.getElementById('newsSection');
-  const tabs = document.getElementById('newsTabs');
-  section.style.display = 'block';
-  NEWS_SOURCES.forEach((src,i)=>{
-    const btn = document.createElement('button');
-    btn.className = 'news-tab' + (i===0?' active':'');
-    btn.textContent = src.label;
-    btn.onclick = ()=>loadNews(i);
-    tabs.appendChild(btn);
+function buildDashCalendar(){
+  const panel = document.getElementById('dashCalendar');
+  panel.innerHTML = '';
+  const title = document.createElement('div'); title.className='dash-panel-title'; title.textContent='🗓 패션·리테일 마케팅 캘린더';
+  panel.appendChild(title);
+
+  const upcoming = MARKETING_EVENTS
+    .map(e=>({ ...e, dday: getDday(e.month, e.day) }))
+    .sort((a,b)=>a.dday-b.dday)
+    .slice(0,8);
+
+  const list = document.createElement('div'); list.className='upcoming-list';
+  upcoming.forEach(e=>{
+    const item=document.createElement('div'); item.className='upcoming-item';
+    const dd=document.createElement('div');
+    dd.className='upcoming-dday '+(e.dday===0?'today':e.dday<=14?'soon':'far');
+    dd.textContent=e.dday===0?'D-DAY':'D-'+e.dday;
+    const info=document.createElement('div'); info.className='upcoming-info';
+    const name=document.createElement('div'); name.className='upcoming-name'; name.textContent=e.name;
+    const date=document.createElement('div'); date.className='upcoming-date';
+    const yr=new Date().getFullYear(); const target=new Date(yr,e.month-1,e.day);
+    if(getDday(e.month,e.day)!==Math.round((target-new Date().setHours(0,0,0,0))/86400000)) target.setFullYear(yr+1);
+    date.textContent=`${target.getMonth()+1}월 ${target.getDate()}일`;
+    info.appendChild(name); info.appendChild(date);
+    const tag=document.createElement('div'); tag.className='upcoming-tag';
+    tag.textContent=e.dday<=7?'⚡ 임박':e.dday<=30?'📌 준비':'📋 예정';
+    item.appendChild(dd); item.appendChild(info); item.appendChild(tag);
+    list.appendChild(item);
   });
-  loadNews(0);
-  setInterval(()=>{ newsCache={}; loadNews(newsActiveIdx); }, 30*60*1000);
+  panel.appendChild(list);
 }
+
+function initDashboard(){
+  if(window.innerWidth<=768) return;
+  buildDashStats();
+  buildDashCalendar();
+}
+
+initDashboard();
 
 initNews();
 </script>
