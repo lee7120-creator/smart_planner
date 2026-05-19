@@ -844,7 +844,7 @@ let _editColor = null, _editStarred = false, _editRepeat = 'none';
 function loadTasks() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    if (USER_ID === 'demo' && Object.keys(stored).length === 0) {
+    if (Object.keys(stored).length === 0) {
       return JSON.parse(JSON.stringify(SEED_TASKS));
     }
     return stored;
