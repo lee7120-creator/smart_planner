@@ -656,12 +656,14 @@ const FB_CONFIG = {
   projectId: "my-calendar-1a589",
   storageBucket: "my-calendar-1a589.firebasestorage.app",
   messagingSenderId: "75434783601",
-  appId: "1:75434783601:web:9144bb9f91f90aa4ab3cd0",
-  measurementId: "G-SDMYBKDND0"
+  appId: "1:75434783601:web:9144bb9f91f90aa4ab3cd0"
 };
-firebase.initializeApp(FB_CONFIG);
-const fbDb = firebase.database();
+let fbDb = null;
 let fbSaveTimer = null;
+try {
+  firebase.initializeApp(FB_CONFIG);
+  fbDb = firebase.database();
+} catch(e) { console.warn('Firebase 초기화 실패:', e); }
 
 function setSyncStatus(s) {
   const dot = document.getElementById('syncDot');
@@ -671,7 +673,7 @@ function setSyncStatus(s) {
 }
 
 function fbRef() {
-  return USER_ID && USER_ID !== 'demo' ? fbDb.ref(`users/${USER_ID}/tasks`) : null;
+  return fbDb && USER_ID && USER_ID !== 'demo' ? fbDb.ref(`users/${USER_ID}/tasks`) : null;
 }
 
 // ── Constants ──
@@ -808,22 +810,13 @@ if (!USER_ID) {
   };
   document.getElementById('forceSyncBtn').style.display = 'flex';
   document.getElementById('forceSyncBtn').onclick = () => {
-    const ref = fbRef();
-    if (!ref) return;
     const btn = document.getElementById('forceSyncBtn');
     btn.innerHTML = '⏳ <span>저장 중...</span>';
     btn.disabled = true;
-    ref.set(tasks)
-      .then(() => {
-        setSyncStatus('synced');
-        btn.innerHTML = '✅ <span>저장됨</span>';
-        setTimeout(() => { btn.innerHTML = '☁️ <span>저장</span>'; btn.disabled = false; }, 2000);
-      })
-      .catch(() => {
-        setSyncStatus('offline');
-        btn.innerHTML = '❌ <span>실패</span>';
-        setTimeout(() => { btn.innerHTML = '☁️ <span>저장</span>'; btn.disabled = false; }, 2000);
-      });
+    fbUpload()
+      .then(() => { btn.innerHTML = '✅ <span>저장됨</span>'; })
+      .catch(() => { btn.innerHTML = '❌ <span>실패</span>'; })
+      .finally(() => setTimeout(() => { btn.innerHTML = '☁️ <span>저장</span>'; btn.disabled = false; }, 2000));
   };
   document.getElementById('switchUserBtn').style.display = 'flex';
   document.getElementById('switchUserBtn').onclick = () => {
@@ -858,12 +851,10 @@ function loadTasks() {
 }
 
 function saveTasks() {
-  // Always write to localStorage immediately (offline cache)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   const ref = fbRef();
   if (!ref) return;
   setSyncStatus('syncing');
-  // Debounce Firebase writes (300ms) to avoid hammering on rapid edits
   clearTimeout(fbSaveTimer);
   fbSaveTimer = setTimeout(() => {
     ref.set(tasks)
@@ -872,28 +863,46 @@ function saveTasks() {
   }, 300);
 }
 
+function fbUpload() {
+  const ref = fbRef();
+  if (!ref) return Promise.reject('no ref');
+  setSyncStatus('syncing');
+  return ref.set(tasks)
+    .then(() => setSyncStatus('synced'))
+    .catch(e => { setSyncStatus('offline'); throw e; });
+}
+
 function initFirebaseSync() {
   const ref = fbRef();
   if (!ref) return;
   const dot = document.getElementById('syncDot');
   if (dot) dot.style.display = 'block';
   setSyncStatus('syncing');
-  // Real-time listener: fires on load + whenever another device saves
-  ref.on('value', snapshot => {
+  // 1) 먼저 한 번 읽어서 Firebase 데이터 유무 확인
+  ref.once('value').then(snapshot => {
     const remote = snapshot.val();
-    if (remote && typeof remote === 'object') {
+    if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
+      // Firebase에 데이터 있음 → 로컬에 덮어쓰기
       tasks = remote;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
       render();
-    } else if (!remote && Object.keys(tasks).length > 0) {
-      // Firebase empty but local data exists → upload local data
-      ref.set(tasks)
-        .then(() => setSyncStatus('synced'))
-        .catch(() => setSyncStatus('offline'));
-      return;
+      setSyncStatus('synced');
+    } else if (Object.keys(tasks).length > 0) {
+      // Firebase 비어있고 로컬에 데이터 있음 → Firebase로 업로드
+      fbUpload();
+    } else {
+      setSyncStatus('synced');
     }
-    setSyncStatus('synced');
-  }, () => setSyncStatus('offline'));
+    // 2) 이후 다른 기기 변경사항 실시간 반영
+    ref.on('value', snapshot => {
+      const remote = snapshot.val();
+      if (remote && typeof remote === 'object') {
+        tasks = remote;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+        render();
+      }
+    });
+  }).catch(() => setSyncStatus('offline'));
 }
 
 // ── Date helpers ──
