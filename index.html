@@ -851,10 +851,13 @@ function loadTasks() {
   } catch { return {}; }
 }
 
+let pendingUpload = false;
+
 function saveTasks(dk) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   const ref = fbRef();
   if (!ref) return;
+  if (!navigator.onLine) { pendingUpload = true; setSyncStatus('offline'); return; }
   setSyncStatus('syncing');
   clearTimeout(fbSaveTimer);
   fbSaveTimer = setTimeout(() => {
@@ -862,7 +865,7 @@ function saveTasks(dk) {
     const saveData = dk ? (tasks[dk] || null) : tasks;
     saveRef.set(saveData)
       .then(() => setSyncStatus('synced'))
-      .catch(() => setSyncStatus('offline'));
+      .catch(() => { pendingUpload = true; setSyncStatus('offline'); });
   }, 300);
 }
 
@@ -1515,6 +1518,8 @@ render();
 fetchWeather(weatherLoc.lat,weatherLoc.lon);
 initFirebaseSync();
 setInterval(()=>{ if(fbRef()) fbUpload(); }, 5*60*1000);
+window.addEventListener('online', ()=>{ if(pendingUpload && fbRef()){ pendingUpload=false; fbUpload(); } });
+window.addEventListener('offline', ()=>setSyncStatus('offline'));
 </script>
 </body>
 </html>
