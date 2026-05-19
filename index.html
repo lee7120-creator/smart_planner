@@ -287,6 +287,24 @@
     .shortcuts-hint:hover { opacity:1; }
     .shortcut-key { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-family:monospace; font-size:10px; color:var(--text2); }
 
+    /* ─── News feed ─── */
+    .news-section { padding:0 16px 24px; max-width:1400px; margin:0 auto; }
+    .news-section-header { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+    .news-section-title { font-size:13px; font-weight:700; color:var(--text2); letter-spacing:.5px; text-transform:uppercase; }
+    .news-source-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+    .news-tab { font-size:11px; padding:3px 10px; border-radius:20px; border:1px solid var(--border); background:var(--surface); color:var(--text2); cursor:pointer; transition:all .15s; }
+    .news-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .news-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+    .news-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px; cursor:pointer; transition:box-shadow .15s, transform .15s; display:flex; flex-direction:column; gap:6px; text-decoration:none; }
+    .news-card:hover { box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .news-card-source { font-size:10px; font-weight:700; color:var(--primary); letter-spacing:.4px; }
+    .news-card-title { font-size:12px; font-weight:600; color:var(--text); line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .news-card-date { font-size:10px; color:var(--text3); margin-top:auto; }
+    .news-skeleton { height:90px; background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:10px; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .news-empty { font-size:12px; color:var(--text3); padding:16px; text-align:center; }
+    @media(max-width:768px){ .news-section { display:none; } }
+
     /* ─── Mobile bottom nav ─── */
     .mobile-nav { display:none; }
 
@@ -581,7 +599,7 @@
   </div>
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
-    <input class="search-input" id="searchInput" placeholder="태스크 검색... (/)">
+    <input class="search-input" id="searchInput" placeholder="🔍  찾기... (/)">
   </div>
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
@@ -596,6 +614,14 @@
 </header>
 
 <div id="mainView"></div>
+
+<section class="news-section" id="newsSection" style="display:none">
+  <div class="news-section-header">
+    <span class="news-section-title">📰 패션 · 리테일 업계 소식</span>
+    <div class="news-source-tabs" id="newsTabs"></div>
+  </div>
+  <div class="news-grid" id="newsGrid"></div>
+</section>
 
 <!-- Memo Popup -->
 <div class="memo-overlay hidden" id="memoOverlay">
@@ -1522,6 +1548,93 @@ initFirebaseSync();
 setInterval(()=>{ if(fbRef()) fbUpload(); }, 5*60*1000);
 window.addEventListener('online', ()=>{ if(pendingUpload && fbRef()){ pendingUpload=false; fbUpload(); } });
 window.addEventListener('offline', ()=>setSyncStatus('offline'));
+
+// ── News feed ──
+const NEWS_SOURCES = [
+  { label:'패션비즈', url:'https://www.fashionbiz.co.kr/rss/rss.xml' },
+  { label:'어패럴뉴스', url:'https://www.apparelnews.co.kr/rss/rss.xml' },
+  { label:'한국섬유신문', url:'http://www.textoday.co.kr/rss/allArticle.xml' },
+  { label:'패션인사이트', url:'https://www.fi.co.kr/main/rss.xml' },
+];
+let newsActiveIdx = 0;
+let newsCache = {};
+
+function timeAgo(dateStr){
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff/60000);
+  if(m < 60) return m+'분 전';
+  const h = Math.floor(m/60);
+  if(h < 24) return h+'시간 전';
+  return Math.floor(h/24)+'일 전';
+}
+
+function renderNewsSkeletons(){
+  const grid = document.getElementById('newsGrid');
+  grid.innerHTML = '';
+  for(let i=0;i<6;i++){const s=document.createElement('div');s.className='news-skeleton';grid.appendChild(s);}
+}
+
+function renderNewsCards(items, sourceLabel){
+  const grid = document.getElementById('newsGrid');
+  grid.innerHTML = '';
+  if(!items || !items.length){
+    const e = document.createElement('div');
+    e.className='news-empty'; e.textContent='기사를 불러올 수 없습니다.';
+    grid.appendChild(e); return;
+  }
+  items.slice(0,12).forEach(item=>{
+    const a = document.createElement('a');
+    a.className = 'news-card';
+    a.href = item.link || '#';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    const src = document.createElement('div'); src.className='news-card-source'; src.textContent=sourceLabel;
+    const title = document.createElement('div'); title.className='news-card-title'; title.textContent=item.title||'';
+    const date = document.createElement('div'); date.className='news-card-date'; date.textContent=item.pubDate?timeAgo(item.pubDate):'';
+    a.appendChild(src); a.appendChild(title); a.appendChild(date);
+    grid.appendChild(a);
+  });
+}
+
+function loadNews(idx){
+  newsActiveIdx = idx;
+  // update tab styles
+  document.querySelectorAll('.news-tab').forEach((t,i)=>t.classList.toggle('active', i===idx));
+  const src = NEWS_SOURCES[idx];
+  if(newsCache[idx]){ renderNewsCards(newsCache[idx], src.label); return; }
+  renderNewsSkeletons();
+  const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(src.url)}&count=12`;
+  fetch(apiUrl)
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.status==='ok' && data.items){
+        newsCache[idx] = data.items;
+        renderNewsCards(data.items, src.label);
+      } else {
+        renderNewsCards([], src.label);
+      }
+    })
+    .catch(()=>renderNewsCards([], src.label));
+}
+
+function initNews(){
+  if(window.innerWidth <= 768) return;
+  const section = document.getElementById('newsSection');
+  const tabs = document.getElementById('newsTabs');
+  section.style.display = 'block';
+  NEWS_SOURCES.forEach((src,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'news-tab' + (i===0?' active':'');
+    btn.textContent = src.label;
+    btn.onclick = ()=>loadNews(i);
+    tabs.appendChild(btn);
+  });
+  loadNews(0);
+  // refresh every 30 minutes
+  setInterval(()=>{ newsCache={}; loadNews(newsActiveIdx); }, 30*60*1000);
+}
+
+initNews();
 </script>
 </body>
 </html>
