@@ -851,14 +851,16 @@ function loadTasks() {
   } catch { return {}; }
 }
 
-function saveTasks() {
+function saveTasks(dk) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   const ref = fbRef();
   if (!ref) return;
   setSyncStatus('syncing');
   clearTimeout(fbSaveTimer);
   fbSaveTimer = setTimeout(() => {
-    ref.set(tasks)
+    const saveRef = dk ? ref.child(dk) : ref;
+    const saveData = dk ? (tasks[dk] || null) : tasks;
+    saveRef.set(saveData)
       .then(() => setSyncStatus('synced'))
       .catch(() => setSyncStatus('offline'));
   }, 300);
@@ -926,11 +928,15 @@ function getRepeatTasksForDate(date, dayIdx) {
     if (!Array.isArray(list)) return;
     list.forEach(t => {
       if (!t||!t.repeat||t.repeat==='none') return;
+      const originDate = new Date(oDk);
+      const limitDate = new Date(oDk);
+      limitDate.setFullYear(limitDate.getFullYear() + 1);
+      if (date > limitDate) return; // 생성일로부터 1년 초과 시 반복 종료
       if (t.repeat==='weekly' && dateToDayIdx(oDk)===dayIdx) {
         out.push({task:t, originDk:oDk, instanceDk:dk});
       }
       if (t.repeat==='monthly') {
-        const originDay = new Date(oDk).getDate();
+        const originDay = originDate.getDate();
         const adj = adjustedMonthlyDate(date.getFullYear(), date.getMonth(), originDay);
         if (adj && dateKey(adj) === dk) out.push({task:t, originDk:oDk, instanceDk:dk, adjusted: adj.getDate()!==originDay});
       }
@@ -946,7 +952,7 @@ function toggleRepeatInst(originDk, taskId, instanceDk) {
   const t=(tasks[originDk]||[]).find(x=>x.id===taskId); if(!t)return;
   if(!t.completions) t.completions={};
   t.completions[instanceDk]=!isRepeatChecked(t,instanceDk);
-  saveTasks(); render();
+  saveTasks(originDk); render();
 }
 
 // ── Task mutations ──
@@ -956,20 +962,20 @@ function addTask(dk,text,color,starred,repeat,parentId) {
   const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',completions:{},subs:[]};
   if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p)p.subs.push(t);}
   else tasks[dk].push(t);
-  saveTasks(); activeInput=null; render();
+  saveTasks(dk); activeInput=null; render();
 }
 function toggleTask(dk,id,subId) {
   const list=tasks[dk]||[];
   if(subId){const p=list.find(x=>x.id===id);if(p){const s=p.subs.find(x=>x.id===subId);if(s)s.checked=!s.checked;}}
   else{const t=list.find(x=>x.id===id);if(t)t.checked=!t.checked;}
-  saveTasks(); render();
+  saveTasks(dk); render();
 }
-function toggleStar(dk,id){const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks();render();}}
+function toggleStar(dk,id){const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks(dk);render();}}
 function deleteTask(dk,id,subId) {
   if(!tasks[dk])return;
   if(subId){const p=tasks[dk].find(x=>x.id===id);if(p)p.subs=p.subs.filter(x=>x.id!==subId);}
   else tasks[dk]=tasks[dk].filter(x=>x.id!==id);
-  saveTasks(); render();
+  saveTasks(dk); render();
 }
 
 // ── Edit modal ──
@@ -1025,7 +1031,7 @@ document.getElementById('editSaveBtn').onclick=()=>{
   if(!text)return;
   const t=(tasks[editCtx.dk]||[]).find(x=>x.id===editCtx.taskId);
   if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;if(!t.completions)t.completions={};}
-  saveTasks(); closeEdit(); render();
+  saveTasks(editCtx.dk); closeEdit(); render();
 };
 document.getElementById('editCancelBtn').onclick=closeEdit;
 document.getElementById('editModal').onclick=e=>{if(e.target===document.getElementById('editModal'))closeEdit();};
@@ -1074,7 +1080,7 @@ function saveMemoNow() {
   const task = (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId);
   if (task) {
     task.memo = document.getElementById('memoTextarea').value;
-    saveTasks();
+    saveTasks(memoCtx.dk);
     render();
   }
 }
