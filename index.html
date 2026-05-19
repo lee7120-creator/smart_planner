@@ -1289,6 +1289,7 @@ function buildMonthView(){
 }
 function buildMonthCell(date,curMonth){
   const dk=dateKey(date);
+  const dayIdx=dateToDayIdx(date);
   const isToday=date.getTime()===today().getTime();
   const isOther=date.getMonth()!==curMonth;
   const isWeekend=date.getDay()===0||date.getDay()===6;
@@ -1297,14 +1298,19 @@ function buildMonthCell(date,curMonth){
   if(isToday){const c=el('div','month-today-circle',{textContent:date.getDate()});cell.appendChild(c);}
   else cell.appendChild(el('div','month-date-num',{textContent:date.getDate()}));
   if(holiday) cell.appendChild(el('div','month-holiday-label',{textContent:'🎌 '+holiday}));
-  const list=tasks[dk]||[];
-  list.slice(0,3).forEach(t=>{
-    const pill=el('div',`month-pill${t.checked?' done':''}${t.color?' colored':''}`);
-    if(t.color){pill.style.background=t.color;pill.style.opacity=t.checked?'.5':'1';}
+  const directList=tasks[dk]||[];
+  const repeatEntries=getRepeatTasksForDate(date,dayIdx);
+  const allItems=[
+    ...directList.map(t=>({t,checked:t.checked})),
+    ...repeatEntries.map(({task,instanceDk})=>({t:task,checked:isRepeatChecked(task,instanceDk)}))
+  ];
+  allItems.slice(0,3).forEach(({t,checked})=>{
+    const pill=el('div',`month-pill${checked?' done':''}${t.color?' colored':''}`);
+    if(t.color){pill.style.background=t.color;pill.style.opacity=checked?'.5':'1';}
     pill.textContent=(t.starred?'★ ':'')+t.text;
     cell.appendChild(pill);
   });
-  if(list.length>3) cell.appendChild(el('div','month-more',{textContent:`+${list.length-3}개 더`}));
+  if(allItems.length>3) cell.appendChild(el('div','month-more',{textContent:`+${allItems.length-3}개 더`}));
   cell.onclick=()=>{currentView='week';weekStart=getMonday(date);document.getElementById('btnWeek').classList.add('active');document.getElementById('btnMonth').classList.remove('active');render();};
   return cell;
 }
