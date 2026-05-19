@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>캘린더 태스크</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     :root {
       --bg:#f0f2f5; --surface:#fff; --surface2:#f8f9fa; --surface3:#f0f2f5;
@@ -528,6 +530,14 @@
     }
     .copy-url-btn:hover { background:var(--primary-l); color:var(--primary); border-color:var(--primary); }
     @media (max-width:768px) { .copy-url-btn span { display:none; } }
+    .sync-dot {
+      width:8px; height:8px; border-radius:50%; flex-shrink:0;
+      transition:background .3s;
+    }
+    .sync-dot.synced { background:var(--green); }
+    .sync-dot.syncing { background:var(--orange); animation:pulse .8s infinite; }
+    .sync-dot.offline { background:var(--red); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
   </style>
 </head>
 <body>
@@ -574,6 +584,7 @@
   </div>
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
+    <div class="sync-dot offline" id="syncDot" title="동기화 상태" style="display:none"></div>
     <button class="copy-url-btn" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
     <button class="copy-url-btn" id="switchUserBtn" style="display:none" title="다른 사용자로 전환">↩ <span>전환</span></button>
     <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
@@ -636,6 +647,31 @@
 </div>
 
 <script>
+// ── Firebase ──
+const FB_CONFIG = {
+  apiKey: "AIzaSyC4u_IF5_UMygKI8JGt88P1yQFJg9rbSt0",
+  authDomain: "my-calendar-1a589.firebaseapp.com",
+  databaseURL: "https://my-calendar-1a589-default-rtdb.firebaseio.com",
+  projectId: "my-calendar-1a589",
+  storageBucket: "my-calendar-1a589.firebasestorage.app",
+  messagingSenderId: "75434783601",
+  appId: "1:75434783601:web:9144bb9f91f90aa4ab3cd0"
+};
+firebase.initializeApp(FB_CONFIG);
+const fbDb = firebase.database();
+let fbSaveTimer = null;
+
+function setSyncStatus(s) {
+  const dot = document.getElementById('syncDot');
+  if (!dot) return;
+  dot.className = 'sync-dot ' + s;
+  dot.title = s === 'synced' ? '✅ 동기화됨' : s === 'syncing' ? '🔄 동기화 중...' : '❌ 오프라인';
+}
+
+function fbRef() {
+  return USER_ID && USER_ID !== 'demo' ? fbDb.ref(`users/${USER_ID}/tasks`) : null;
+}
+
 // ── Constants ──
 const DAY_NAMES = ['월','화','수','목','금','토','일'];
 const COLORS = [
@@ -793,14 +829,45 @@ let _editColor = null, _editStarred = false, _editRepeat = 'none';
 function loadTasks() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    // demo user gets seed data on first visit
     if (USER_ID === 'demo' && Object.keys(stored).length === 0) {
       return JSON.parse(JSON.stringify(SEED_TASKS));
     }
     return stored;
   } catch { return {}; }
 }
-function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
+
+function saveTasks() {
+  // Always write to localStorage immediately (offline cache)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  const ref = fbRef();
+  if (!ref) return;
+  setSyncStatus('syncing');
+  // Debounce Firebase writes (300ms) to avoid hammering on rapid edits
+  clearTimeout(fbSaveTimer);
+  fbSaveTimer = setTimeout(() => {
+    ref.set(tasks)
+      .then(() => setSyncStatus('synced'))
+      .catch(() => setSyncStatus('offline'));
+  }, 300);
+}
+
+function initFirebaseSync() {
+  const ref = fbRef();
+  if (!ref) return;
+  const dot = document.getElementById('syncDot');
+  if (dot) dot.style.display = 'block';
+  setSyncStatus('syncing');
+  // Real-time listener: fires on load + whenever another device saves
+  ref.on('value', snapshot => {
+    const remote = snapshot.val();
+    if (remote && typeof remote === 'object') {
+      tasks = remote;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      render();
+    }
+    setSyncStatus('synced');
+  }, () => setSyncStatus('offline'));
+}
 
 // ── Date helpers ──
 function getMonday(d) {
@@ -1391,6 +1458,7 @@ document.addEventListener('keydown',e=>{
 // ── Init ──
 render();
 fetchWeather(weatherLoc.lat,weatherLoc.lon);
+initFirebaseSync();
 </script>
 </body>
 </html>
