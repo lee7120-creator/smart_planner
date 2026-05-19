@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Task 관리 캘린더</title>
+  <title>마이플래너</title>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
@@ -548,7 +548,7 @@
   <button class="landing-dark-btn" id="landingDarkBtn">🌙</button>
   <div class="landing-card">
     <div class="landing-icon">📅</div>
-    <div class="landing-title">캘린더 태스크</div>
+    <div class="landing-title">마이플래너</div>
     <div class="landing-sub">이름을 입력하면 나만의 캘린더 URL이 생성됩니다</div>
     <div class="landing-input-wrap">
       <input class="landing-input" id="landingInput" type="text" placeholder="이름 입력 (예: 홍길동)" maxlength="30">
@@ -568,7 +568,7 @@
 </div>
 
 <header class="header">
-  <span class="header-title">📅 태스크</span>
+  <span class="header-title">🗓 마이플래너</span>
   <div class="view-toggle">
     <button class="view-btn active" id="btnWeek">주간</button>
     <button class="view-btn" id="btnMonth">월간</button>
@@ -960,7 +960,7 @@ function uid() { return Date.now().toString(36)+Math.random().toString(36).slice
 function addTask(dk,text,color,starred,repeat,parentId) {
   if(!tasks[dk]) tasks[dk]=[];
   const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',completions:{},subs:[]};
-  if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p)p.subs.push(t);}
+  if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p){if(!Array.isArray(p.subs))p.subs=[];p.subs.push(t);}}
   else tasks[dk].push(t);
   saveTasks(dk); activeInput=null; render();
 }
@@ -973,7 +973,7 @@ function toggleTask(dk,id,subId) {
 function toggleStar(dk,id){const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks(dk);render();}}
 function deleteTask(dk,id,subId) {
   if(!tasks[dk])return;
-  if(subId){const p=tasks[dk].find(x=>x.id===id);if(p)p.subs=p.subs.filter(x=>x.id!==subId);}
+  if(subId){const p=tasks[dk].find(x=>x.id===id);if(p&&Array.isArray(p.subs))p.subs=p.subs.filter(x=>x.id!==subId);}
   else tasks[dk]=tasks[dk].filter(x=>x.id!==id);
   saveTasks(dk); render();
 }
@@ -1157,7 +1157,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   if(!isSub&&adjusted){
     body.appendChild(el('div','repeat-adjusted-badge',{textContent:'📅 일정 앞당김'}));
   }
-  if(!isSub&&task.subs&&task.subs.length){
+  if(!isSub&&Array.isArray(task.subs)&&task.subs.length){
     const sl=el('div','subtask-list');
     task.subs.forEach(s=>sl.appendChild(buildTaskItem(dk,s,true,task.id,false,null,null)));
     body.appendChild(sl);
