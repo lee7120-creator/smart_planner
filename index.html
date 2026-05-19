@@ -1180,7 +1180,8 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     const msg=(isRepeatInst||(task.repeat&&task.repeat!=='none'))?'반복 태스크를 전체 삭제할까요?':'삭제할까요?';
     if(confirm(msg)) {
       const tDk=isRepeatInst?originDk:dk;
-      deleteTask(tDk,task.id,null);
+      if(isSub) deleteTask(tDk,parentId,task.id);
+      else deleteTask(tDk,task.id,null);
     }
   };
   actions.appendChild(delBtn);
