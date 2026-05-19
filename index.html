@@ -1286,9 +1286,9 @@ function buildDayCol(date,dayIdx){
   col.appendChild(hdr);
   // tasks
   const list=el('div','tasks-list');
-  const sorted=[...dayTasks].sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
+  const sorted=[...dayTasks].sort((a,b)=>(b.starred?1:0)-(a.starred?1:0)).filter(matchesQuery);
   sorted.forEach(t=>list.appendChild(buildTaskItem(dk,t,false,null,false,null,null)));
-  getRepeatTasksForDate(date,dayIdx).forEach(({task,originDk,instanceDk,adjusted})=>{
+  getRepeatTasksForDate(date,dayIdx).filter(({task})=>matchesQuery(task)).forEach(({task,originDk,instanceDk,adjusted})=>{
     list.appendChild(buildTaskItem(dk,task,false,null,true,originDk,instanceDk,adjusted));
   });
   if(total===0){
@@ -1349,8 +1349,8 @@ function buildMonthCell(date,curMonth){
   let repeatEntries=[];
   try{repeatEntries=getRepeatTasksForDate(date,dayIdx);}catch(e){}
   const allItems=[
-    ...directList.map(t=>({t,checked:t.checked})),
-    ...repeatEntries.map(({task,instanceDk})=>({t:task,checked:isRepeatChecked(task,instanceDk)}))
+    ...directList.filter(matchesQuery).map(t=>({t,checked:t.checked})),
+    ...repeatEntries.filter(({task})=>matchesQuery(task)).map(({task,instanceDk})=>({t:task,checked:isRepeatChecked(task,instanceDk)}))
   ];
   allItems.slice(0,3).forEach(({t,checked})=>{
     const pill=el('div',`month-pill${checked?' done':''}${t.color?' colored':''}`);
@@ -1364,6 +1364,12 @@ function buildMonthCell(date,curMonth){
 }
 
 // ── Search ──
+function matchesQuery(t){
+  if(!searchQuery) return true;
+  const q=searchQuery.toLowerCase();
+  return (t.text&&t.text.toLowerCase().includes(q))||(Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q)));
+}
+
 function buildSearchView(query){
   const wrap=el('div','search-results-wrap');
   if(!query.trim()){wrap.appendChild(el('div','search-empty',{textContent:'검색어를 입력하세요'}));return wrap;}
@@ -1420,15 +1426,11 @@ function render(){
   if(currentView==='week'){
     const end=new Date(weekStart);end.setDate(end.getDate()+6);
     document.getElementById('weekLabel').textContent=`${weekStart.getFullYear()}년 ${weekStart.getMonth()+1}월 ${weekStart.getDate()}일 ~ ${end.getMonth()+1}월 ${end.getDate()}일`;
-  } else if(currentView==='month'){
-    document.getElementById('weekLabel').textContent=`${monthDate.getFullYear()}년 ${monthDate.getMonth()+1}월`;
   } else {
-    document.getElementById('weekLabel').textContent='검색 결과';
+    document.getElementById('weekLabel').textContent=`${monthDate.getFullYear()}년 ${monthDate.getMonth()+1}월`;
   }
   // main content
-  if(searchQuery){
-    view.appendChild(buildSearchView(searchQuery));
-  } else if(currentView==='week'){
+  if(currentView==='week'){
     const wrap=el('div','calendar-wrap');
     // scroll hint on mobile
     if(window.innerWidth<=768){
