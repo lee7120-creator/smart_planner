@@ -1,485 +1,408 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>캘린더 태스크</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-      background: #f0f2f5;
-      min-height: 100vh;
-      color: #333;
+    :root {
+      --bg:#f0f2f5; --surface:#fff; --surface2:#f8f9fa; --surface3:#f0f2f5;
+      --border:#e0e0e0; --border2:#f0f0f0;
+      --text:#1a1a1a; --text2:#555; --text3:#999;
+      --primary:#1a73e8; --primary-h:#1557b0; --primary-l:#e8f0fe;
+      --green:#43a047; --red:#e53935; --orange:#fb8c00; --yellow:#f9a825;
+      --shadow:0 1px 4px rgba(0,0,0,.08); --shadow-md:0 4px 16px rgba(0,0,0,.12);
+    }
+    [data-theme="dark"] {
+      --bg:#111827; --surface:#1f2937; --surface2:#374151; --surface3:#111827;
+      --border:#374151; --border2:#2d3748;
+      --text:#f3f4f6; --text2:#9ca3af; --text3:#4b5563;
+      --primary:#60a5fa; --primary-h:#3b82f6; --primary-l:#1e3a5f;
+      --green:#4ade80; --red:#f87171; --orange:#fb923c; --yellow:#fbbf24;
+      --shadow:0 1px 4px rgba(0,0,0,.3); --shadow-md:0 4px 16px rgba(0,0,0,.4);
     }
 
-    /* ── Header ── */
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Gothic Neo',sans-serif; background:var(--bg); min-height:100vh; color:var(--text); transition:background .2s,color .2s; }
+
+    /* ─── Header ─── */
     .header {
-      background: #fff;
-      border-bottom: 1px solid #e0e0e0;
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 200;
-      gap: 12px;
-      flex-wrap: wrap;
+      background:var(--surface); border-bottom:1px solid var(--border);
+      padding:0 20px; height:56px; display:flex; align-items:center; gap:12px;
+      position:sticky; top:0; z-index:300; box-shadow:var(--shadow);
     }
-    .header-title { font-size: 18px; font-weight: 700; color: #1a73e8; white-space: nowrap; }
-    .week-nav { display: flex; align-items: center; gap: 8px; }
+    .header-title { font-size:17px; font-weight:700; color:var(--primary); white-space:nowrap; margin-right:4px; }
+    .view-toggle { display:flex; background:var(--surface2); border-radius:8px; padding:3px; gap:2px; }
+    .view-btn {
+      padding:4px 12px; border:none; border-radius:6px; font-size:12px; font-weight:500;
+      cursor:pointer; color:var(--text2); background:transparent; font-family:inherit; transition:all .15s;
+    }
+    .view-btn.active { background:var(--surface); color:var(--primary); box-shadow:var(--shadow); }
+    .nav-group { display:flex; align-items:center; gap:6px; }
     .nav-btn {
-      background: #fff; border: 1px solid #dadce0; border-radius: 6px;
-      padding: 6px 14px; font-size: 13px; cursor: pointer; color: #444;
-      transition: background 0.15s; font-family: inherit;
+      background:var(--surface); border:1px solid var(--border); border-radius:7px;
+      padding:5px 12px; font-size:13px; cursor:pointer; color:var(--text2);
+      transition:background .15s; font-family:inherit;
     }
-    .nav-btn:hover { background: #f5f5f5; }
-    .today-btn { background: #1a73e8; color: #fff; border-color: #1a73e8; }
-    .today-btn:hover { background: #1557b0; }
-    .week-label { font-size: 14px; font-weight: 600; min-width: 180px; text-align: center; color: #444; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
-    .progress-info { font-size: 12px; color: #888; white-space: nowrap; }
-    .progress-bar-wrap {
-      width: 80px; height: 6px; background: #e8eaed; border-radius: 3px;
-      overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px;
+    .nav-btn:hover { background:var(--surface2); }
+    .today-btn { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .today-btn:hover { background:var(--primary-h); }
+    .week-label { font-size:13px; font-weight:600; min-width:160px; text-align:center; color:var(--text); white-space:nowrap; }
+    .search-wrap { flex:1; max-width:260px; position:relative; }
+    .search-input {
+      width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+      padding:6px 12px 6px 32px; font-size:13px; outline:none; color:var(--text); font-family:inherit;
+      transition:border-color .15s, box-shadow .15s;
     }
-    .progress-bar-fill { height: 100%; background: #43a047; border-radius: 3px; transition: width 0.3s; }
-    .location-btn {
-      background: none; border: 1px solid #dadce0; border-radius: 6px;
-      padding: 5px 10px; font-size: 12px; cursor: pointer; color: #666;
-      display: flex; align-items: center; gap: 4px; font-family: inherit;
+    .search-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-l); }
+    .search-icon { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text3); font-size:14px; pointer-events:none; }
+    .header-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
+    .icon-btn {
+      background:none; border:1px solid var(--border); border-radius:7px;
+      width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+      cursor:pointer; font-size:15px; color:var(--text2); transition:all .15s;
     }
-    .location-btn:hover { background: #f5f5f5; }
+    .icon-btn:hover { background:var(--surface2); }
+    .progress-pill {
+      font-size:11px; color:var(--text2); white-space:nowrap;
+      display:flex; align-items:center; gap:6px;
+    }
+    .progress-bar-wrap { width:60px; height:5px; background:var(--border); border-radius:3px; overflow:hidden; }
+    .progress-bar-fill { height:100%; background:var(--green); border-radius:3px; transition:width .4s; }
 
-    /* ── Calendar grid ── */
-    .calendar-wrap { padding: 16px; overflow-x: auto; }
-    .calendar-grid {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(140px, 1fr));
-      gap: 8px;
-      min-width: 1000px;
-    }
-    .day-col {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 10px;
-      display: flex;
-      flex-direction: column;
-      min-height: 540px;
-      overflow: hidden;
-    }
-    .day-col.is-today { border: 2px solid #1a73e8; }
-    .day-col.is-weekend { background: #fafafa; }
+    /* ─── Week view ─── */
+    .calendar-wrap { padding:16px; overflow-x:auto; }
+    .calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(148px,1fr)); gap:8px; min-width:1060px; }
+    .day-col { background:var(--surface); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; min-height:560px; overflow:hidden; transition:box-shadow .15s; }
+    .day-col:hover { box-shadow:var(--shadow-md); }
+    .day-col.is-today { border:2px solid var(--primary); }
+    .day-col.is-weekend { background:color-mix(in srgb, var(--surface) 95%, var(--red) 5%); }
 
-    /* ── Day header ── */
-    .day-header { padding: 10px 10px 8px; text-align: center; border-bottom: 1px solid #f0f0f0; }
-    .day-name { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; color: #888; text-transform: uppercase; margin-bottom: 4px; }
-    .is-weekend .day-name { color: #e05252; }
-    .day-num-wrap {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 34px; height: 34px; border-radius: 50%;
+    .day-header { padding:10px 12px 8px; text-align:center; border-bottom:1px solid var(--border2); }
+    .day-name { font-size:10px; font-weight:700; letter-spacing:.8px; color:var(--text3); text-transform:uppercase; margin-bottom:4px; }
+    .is-weekend .day-name { color:var(--red); opacity:.7; }
+    .day-num-wrap { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; }
+    .is-today .day-num-wrap { background:var(--primary); }
+    .day-num { font-size:19px; font-weight:700; color:var(--text); }
+    .is-today .day-num { color:#fff; }
+    .is-weekend:not(.is-today) .day-num { color:var(--red); }
+    .day-month { font-size:10px; color:var(--text3); margin-top:1px; }
+    .day-meta { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:5px; }
+    .task-count-badge {
+      font-size:10px; font-weight:600; padding:1px 7px; border-radius:10px;
+      background:var(--primary-l); color:var(--primary);
     }
-    .is-today .day-num-wrap { background: #1a73e8; }
-    .day-num { font-size: 20px; font-weight: 700; line-height: 1; color: #333; }
-    .is-today .day-num { color: #fff; }
-    .is-weekend:not(.is-today) .day-num { color: #e05252; }
-    .day-month { font-size: 10px; color: #bbb; margin-top: 2px; }
+    .day-progress { width:40px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+    .day-progress-fill { height:100%; background:var(--green); border-radius:2px; transition:width .3s; }
 
-    /* ── Tasks list ── */
-    .tasks-list { flex: 1; padding: 6px 6px 0; overflow-y: auto; }
+    /* ─── Tasks ─── */
+    .tasks-list { flex:1; padding:6px; overflow-y:auto; }
     .task-item {
-      display: flex; align-items: flex-start; gap: 5px;
-      padding: 4px 3px; border-radius: 5px; position: relative;
+      display:flex; align-items:flex-start; gap:5px; padding:5px 4px;
+      border-radius:7px; position:relative; transition:background .12s;
     }
-    .task-item:hover { background: #f8f9fa; }
-    .task-item:hover .task-del { opacity: 1; }
-    .task-star {
-      font-size: 13px; cursor: pointer; color: #ddd; flex-shrink: 0;
-      margin-top: 1px; transition: color 0.15s; user-select: none;
-    }
-    .task-star.on { color: #f9a825; }
-    .task-star:hover { color: #f9a825; }
-    .color-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+    .task-item:hover { background:var(--surface2); }
+    .task-item:hover .task-actions { opacity:1; }
+
+    .task-star { font-size:12px; cursor:pointer; color:var(--border); flex-shrink:0; margin-top:2px; transition:color .15s,transform .15s; user-select:none; }
+    .task-star.on { color:var(--yellow); }
+    .task-star:hover { transform:scale(1.2); color:var(--yellow); }
+
+    .color-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+
     .task-cb {
-      width: 14px; height: 14px; border: 1.5px solid #bbb; border-radius: 3px;
-      flex-shrink: 0; margin-top: 2px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      background: #fff; transition: background 0.15s, border-color 0.15s;
+      width:15px; height:15px; border:1.5px solid var(--border); border-radius:4px;
+      flex-shrink:0; margin-top:1px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      background:var(--surface); transition:all .15s;
     }
-    .task-cb.checked { background: #43a047; border-color: #43a047; }
-    .task-cb.checked::after { content: '✓'; color: #fff; font-size: 9px; font-weight: 700; }
-    .task-body { flex: 1; min-width: 0; }
-    .task-text { font-size: 12px; line-height: 1.45; word-break: break-word; }
-    .task-text.done { text-decoration: line-through; color: #bbb; }
-    .task-del {
-      font-size: 11px; color: #f44336; cursor: pointer; opacity: 0;
-      flex-shrink: 0; padding: 0 2px; transition: opacity 0.15s; user-select: none;
-    }
+    .task-cb:hover { border-color:var(--green); }
+    .task-cb.checked { background:var(--green); border-color:var(--green); }
+    .task-cb.checked::after { content:'✓'; color:#fff; font-size:9px; font-weight:700; }
 
-    /* Repeat badge */
+    .task-body { flex:1; min-width:0; }
+    .task-text { font-size:12px; line-height:1.45; word-break:break-word; color:var(--text); }
+    .task-text.done { text-decoration:line-through; color:var(--text3); }
+
     .repeat-badge {
-      display: inline-flex; align-items: center; gap: 2px;
-      font-size: 9px; color: #1a73e8; background: #e8f0fe;
-      border-radius: 3px; padding: 1px 4px; margin-top: 2px;
-      font-weight: 600;
+      display:inline-flex; align-items:center; gap:2px; font-size:9px;
+      color:var(--primary); background:var(--primary-l); border-radius:4px;
+      padding:1px 5px; margin-top:2px; font-weight:600;
     }
 
-    /* sub-tasks */
-    .subtask-list { margin-top: 2px; }
-    .task-item.sub { margin-left: 18px; }
-    .task-item.sub .task-cb { width: 12px; height: 12px; }
-    .task-item.sub .task-text { font-size: 11px; color: #555; }
+    .subtask-list { margin-top:2px; }
+    .task-item.sub { margin-left:20px; }
+    .task-item.sub .task-cb { width:13px; height:13px; }
+    .task-item.sub .task-text { font-size:11px; color:var(--text2); }
+
+    .task-actions { display:flex; gap:2px; opacity:0; transition:opacity .12s; flex-shrink:0; }
+    .task-act-btn {
+      width:20px; height:20px; border:none; background:none; cursor:pointer;
+      border-radius:4px; font-size:11px; color:var(--text3); display:flex;
+      align-items:center; justify-content:center; transition:all .12s;
+    }
+    .task-act-btn:hover { background:var(--border); color:var(--text); }
+    .task-act-btn.del:hover { background:var(--red); color:#fff; }
+
     .add-sub-btn {
-      display: none; align-items: center; gap: 3px; font-size: 10px;
-      color: #aaa; cursor: pointer; margin: 2px 0 0 18px;
-      background: none; border: none; padding: 1px 4px; font-family: inherit;
+      display:none; align-items:center; gap:2px; font-size:10px; color:var(--text3);
+      cursor:pointer; margin:2px 0 0 20px; background:none; border:none;
+      padding:1px 4px; border-radius:4px; font-family:inherit; transition:color .12s;
     }
-    .task-item:hover .add-sub-btn { display: flex; }
-    .add-sub-btn:hover { color: #1a73e8; }
+    .task-item:hover .add-sub-btn { display:flex; }
+    .add-sub-btn:hover { color:var(--primary); }
 
-    /* ── Add task button ── */
+    /* empty state */
+    .day-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 8px; color:var(--text3); gap:4px; }
+    .day-empty-icon { font-size:22px; opacity:.4; }
+    .day-empty-text { font-size:11px; }
+
+    /* add task btn */
     .add-task-btn {
-      display: flex; align-items: center; gap: 4px;
-      width: calc(100% - 12px); margin: 6px;
-      padding: 5px 8px; border: 1.5px dashed #ddd; border-radius: 6px;
-      background: none; font-size: 12px; color: #bbb; cursor: pointer;
-      transition: all 0.15s; font-family: inherit;
+      display:flex; align-items:center; gap:4px; width:calc(100% - 12px); margin:6px;
+      padding:5px 8px; border:1.5px dashed var(--border); border-radius:8px;
+      background:none; font-size:12px; color:var(--text3); cursor:pointer;
+      transition:all .15s; font-family:inherit;
     }
-    .add-task-btn:hover { border-color: #1a73e8; color: #1a73e8; background: #f0f6ff; }
+    .add-task-btn:hover { border-color:var(--primary); color:var(--primary); background:var(--primary-l); }
 
-    /* ── Input form ── */
-    .input-form { padding: 6px 8px 8px; border-top: 1px solid #f0f0f0; }
-    .input-row { display: flex; gap: 4px; margin-bottom: 5px; }
+    /* input form */
+    .input-form { padding:6px 8px 10px; border-top:1px solid var(--border2); }
+    .input-row { display:flex; gap:4px; margin-bottom:5px; }
     .task-input {
-      flex: 1; border: 1px solid #dadce0; border-radius: 5px;
-      padding: 5px 8px; font-size: 12px; font-family: inherit; outline: none;
+      flex:1; border:1px solid var(--border); border-radius:7px; padding:6px 10px;
+      font-size:12px; font-family:inherit; outline:none; background:var(--surface);
+      color:var(--text); transition:border-color .15s, box-shadow .15s;
     }
-    .task-input:focus { border-color: #1a73e8; }
-    .star-toggle {
-      background: none; border: none; font-size: 18px; cursor: pointer;
-      color: #ddd; line-height: 1; transition: color 0.15s; padding: 0 2px;
-    }
-    .star-toggle.on { color: #f9a825; }
-    .color-picker { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
-    .cp-dot {
-      width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
-      border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s;
-    }
-    .cp-dot:hover { transform: scale(1.15); }
-    .cp-dot.selected { border-color: #333; }
-
-    /* Repeat selector */
-    .repeat-selector { display: flex; gap: 4px; margin-bottom: 5px; }
+    .task-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-l); }
+    .star-toggle { background:none; border:none; font-size:18px; cursor:pointer; color:var(--border); line-height:1; transition:color .15s; padding:0 2px; }
+    .star-toggle.on { color:var(--yellow); }
+    .color-picker { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:5px; }
+    .cp-dot { width:18px; height:18px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:transform .1s; }
+    .cp-dot:hover { transform:scale(1.15); }
+    .cp-dot.selected { border-color:var(--text); }
+    .repeat-selector { display:flex; gap:3px; margin-bottom:5px; }
     .repeat-opt {
-      flex: 1; padding: 3px 0; font-size: 11px; border: 1px solid #dadce0;
-      border-radius: 4px; cursor: pointer; text-align: center; color: #666;
-      background: #fff; transition: all 0.15s; font-family: inherit;
+      flex:1; padding:4px 0; font-size:11px; border:1px solid var(--border);
+      border-radius:6px; cursor:pointer; text-align:center; color:var(--text2);
+      background:var(--surface); transition:all .15s; font-family:inherit; font-weight:500;
     }
-    .repeat-opt.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+    .repeat-opt.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .form-actions { display:flex; gap:5px; }
+    .btn-add { background:var(--primary); color:#fff; border:none; border-radius:7px; padding:5px 14px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:600; }
+    .btn-add:hover { background:var(--primary-h); }
+    .btn-cancel { background:var(--surface); color:var(--text2); border:1px solid var(--border); border-radius:7px; padding:5px 10px; font-size:12px; cursor:pointer; font-family:inherit; }
+    .btn-cancel:hover { background:var(--surface2); }
 
-    .form-actions { display: flex; gap: 5px; }
-    .btn-add {
-      background: #1a73e8; color: #fff; border: none; border-radius: 5px;
-      padding: 4px 12px; font-size: 12px; cursor: pointer; font-family: inherit;
-    }
-    .btn-add:hover { background: #1557b0; }
-    .btn-cancel {
-      background: #fff; color: #666; border: 1px solid #dadce0; border-radius: 5px;
-      padding: 4px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
-    }
-    .btn-cancel:hover { background: #f5f5f5; }
-
-    /* ── Weather bar ── */
+    /* ─── Weather bar ─── */
     .weather-bar {
-      border-top: 1px solid #f0f0f0;
-      padding: 8px 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      background: linear-gradient(to bottom, #fff, #f8faff);
-      min-height: 46px;
+      border-top:1px solid var(--border2); padding:8px 10px;
+      display:flex; align-items:center; justify-content:center; gap:6px;
+      background:linear-gradient(to bottom, var(--surface), var(--surface2));
+      min-height:46px;
     }
-    .weather-emoji { font-size: 20px; line-height: 1; }
-    .weather-info { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-    .weather-temp { font-size: 12px; font-weight: 600; color: #333; }
-    .weather-temp .temp-max { color: #e53935; }
-    .weather-temp .temp-min { color: #1a73e8; }
-    .weather-desc { font-size: 10px; color: #888; }
-    .weather-loading { font-size: 11px; color: #bbb; }
-    .weather-rain { font-size: 10px; color: #1a73e8; }
+    .weather-emoji { font-size:20px; }
+    .weather-info { display:flex; flex-direction:column; align-items:center; gap:1px; }
+    .weather-temp { font-size:12px; font-weight:600; }
+    .weather-temp .hi { color:var(--red); }
+    .weather-temp .lo { color:var(--primary); }
+    .weather-desc { font-size:10px; color:var(--text3); }
+    .weather-rain { font-size:10px; color:var(--primary); }
+    .weather-skeleton { font-size:11px; color:var(--text3); }
+
+    /* ─── Month view ─── */
+    .month-wrap { padding:16px; }
+    .month-day-headers { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:4px; }
+    .month-day-header { text-align:center; font-size:11px; font-weight:700; color:var(--text3); letter-spacing:.5px; padding:4px 0; text-transform:uppercase; }
+    .month-day-header:nth-child(6), .month-day-header:nth-child(7) { color:var(--red); opacity:.7; }
+    .month-grid { display:flex; flex-direction:column; gap:2px; }
+    .month-week { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+    .month-cell {
+      background:var(--surface); border:1px solid var(--border2); border-radius:8px;
+      min-height:90px; padding:6px; cursor:pointer; transition:all .12s;
+      display:flex; flex-direction:column; gap:2px; overflow:hidden;
+    }
+    .month-cell:hover { border-color:var(--primary); box-shadow:var(--shadow); }
+    .month-cell.is-today { border-color:var(--primary); border-width:2px; }
+    .month-cell.other-month { opacity:.45; }
+    .month-cell.is-weekend { background:color-mix(in srgb, var(--surface) 97%, var(--red) 3%); }
+    .month-date-num { font-size:13px; font-weight:600; color:var(--text2); margin-bottom:2px; }
+    .month-today-circle {
+      width:24px; height:24px; border-radius:50%; background:var(--primary);
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:700; color:#fff; margin-bottom:2px;
+    }
+    .month-pill {
+      font-size:10px; padding:1px 5px; border-radius:4px; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; background:var(--primary-l);
+      color:var(--primary); font-weight:500; line-height:1.4;
+    }
+    .month-pill.done { text-decoration:line-through; opacity:.5; }
+    .month-pill.colored { color:#fff; }
+    .month-more { font-size:10px; color:var(--text3); padding-left:2px; }
+
+    /* ─── Search results ─── */
+    .search-results-wrap { padding:16px; }
+    .search-result-group { margin-bottom:20px; }
+    .search-result-date { font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--border2); }
+    .search-result-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px; background:var(--surface); margin-bottom:4px; cursor:pointer; box-shadow:var(--shadow); }
+    .search-result-item:hover { border-left:3px solid var(--primary); }
+    .search-result-text { font-size:13px; color:var(--text); }
+    .search-empty { text-align:center; padding:60px 20px; color:var(--text3); font-size:14px; }
+
+    /* ─── Edit modal ─── */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:500;
+      display:flex; align-items:center; justify-content:center;
+      backdrop-filter:blur(2px); animation:fadeIn .15s;
+    }
+    .modal-overlay.hidden { display:none; }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes slideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .modal-box {
+      background:var(--surface); border-radius:14px; padding:22px 24px;
+      width:340px; box-shadow:var(--shadow-md); animation:slideUp .18s;
+      border:1px solid var(--border);
+    }
+    .modal-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:14px; }
+    .modal-input {
+      width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 12px;
+      font-size:14px; font-family:inherit; outline:none; background:var(--surface);
+      color:var(--text); margin-bottom:12px; transition:border-color .15s, box-shadow .15s;
+    }
+    .modal-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-l); }
+    .modal-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .modal-label { font-size:12px; color:var(--text2); font-weight:600; min-width:36px; }
+    .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+    .btn-primary { background:var(--primary); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .btn-primary:hover { background:var(--primary-h); }
+    .btn-secondary { background:var(--surface2); color:var(--text2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
+    .btn-secondary:hover { background:var(--border); }
+
+    /* ─── Shortcuts hint ─── */
+    .shortcuts-hint { position:fixed; bottom:16px; right:16px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:11px; color:var(--text3); box-shadow:var(--shadow-md); line-height:1.8; z-index:100; opacity:.7; transition:opacity .15s; }
+    .shortcuts-hint:hover { opacity:1; }
+    .shortcut-key { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-family:monospace; font-size:10px; color:var(--text2); }
   </style>
 </head>
 <body>
 
 <header class="header">
-  <div class="header-title">📅 캘린더 태스크</div>
-  <div class="week-nav">
-    <button class="nav-btn" id="prevBtn">◀ 이전</button>
+  <span class="header-title">📅 태스크</span>
+  <div class="view-toggle">
+    <button class="view-btn active" id="btnWeek">주간</button>
+    <button class="view-btn" id="btnMonth">월간</button>
+  </div>
+  <div class="nav-group">
+    <button class="nav-btn" id="prevBtn">‹</button>
     <span class="week-label" id="weekLabel"></span>
-    <button class="nav-btn" id="nextBtn">다음 ▶</button>
+    <button class="nav-btn" id="nextBtn">›</button>
     <button class="nav-btn today-btn" id="todayBtn">오늘</button>
   </div>
-  <div class="header-right">
-    <button class="location-btn" id="locationBtn">📍 내 위치로 날씨</button>
-    <div class="progress-info" id="progressInfo"></div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-input" id="searchInput" placeholder="태스크 검색... (/)">
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
+    <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
+    <div class="progress-pill" id="progressInfo"></div>
   </div>
 </header>
 
-<div class="calendar-wrap">
-  <div class="calendar-grid" id="calendarGrid"></div>
+<div id="mainView"></div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay hidden" id="editModal">
+  <div class="modal-box">
+    <div class="modal-title">태스크 수정</div>
+    <input class="modal-input" id="editInput" type="text" placeholder="할 일 내용">
+    <div class="modal-row">
+      <span class="modal-label">색상</span>
+      <div class="color-picker" id="editColors"></div>
+    </div>
+    <div class="modal-row">
+      <span class="modal-label">중요</span>
+      <button class="star-toggle" id="editStarBtn" type="button">★</button>
+    </div>
+    <div class="modal-row">
+      <span class="modal-label">반복</span>
+      <div class="repeat-selector" id="editRepeatSel" style="flex:1">
+        <button class="repeat-opt" data-val="none">없음</button>
+        <button class="repeat-opt" data-val="weekly">매주</button>
+        <button class="repeat-opt" data-val="monthly">매월</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="editCancelBtn">취소</button>
+      <button class="btn-primary" id="editSaveBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="shortcuts-hint">
+  <span class="shortcut-key">←</span><span class="shortcut-key">→</span> 주 이동 &nbsp;
+  <span class="shortcut-key">T</span> 오늘 &nbsp;
+  <span class="shortcut-key">/</span> 검색 &nbsp;
+  <span class="shortcut-key">D</span> 다크모드
 </div>
 
 <script>
 // ── Constants ──
-const DAY_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
+const DAY_NAMES = ['월','화','수','목','금','토','일'];
 const COLORS = [
-  { hex: '#1a73e8', name: '파랑' },
-  { hex: '#e53935', name: '빨강' },
-  { hex: '#f9a825', name: '노랑' },
-  { hex: '#43a047', name: '초록' },
-  { hex: '#8e24aa', name: '보라' },
-  { hex: '#fb8c00', name: '주황' },
-  { hex: '#607d8b', name: '회색' },
+  {hex:'#1a73e8',name:'파랑'},{hex:'#e53935',name:'빨강'},{hex:'#f9a825',name:'노랑'},
+  {hex:'#43a047',name:'초록'},{hex:'#8e24aa',name:'보라'},{hex:'#fb8c00',name:'주황'},
+  {hex:'#607d8b',name:'회색'},
 ];
-const WMO = {
-  0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
-  45:'🌫️',48:'🌫️',
-  51:'🌦️',53:'🌦️',55:'🌦️',
-  61:'🌧️',63:'🌧️',65:'🌧️',
-  71:'❄️',73:'❄️',75:'❄️',77:'🌨️',
-  80:'🌦️',81:'🌦️',82:'🌦️',
-  85:'❄️',86:'❄️',
-  95:'⛈️',96:'⛈️',99:'⛈️',
-};
-const WMO_DESC = {
-  0:'맑음',1:'구름조금',2:'구름많음',3:'흐림',
-  45:'안개',48:'안개',
-  51:'이슬비',53:'이슬비',55:'이슬비',
-  61:'비',63:'비',65:'강한비',
-  71:'눈',73:'눈',75:'강한눈',77:'싸락눈',
-  80:'소나기',81:'소나기',82:'강한소나기',
-  85:'눈소나기',86:'눈소나기',
-  95:'뇌우',96:'뇌우(우박)',99:'뇌우(우박)',
-};
+const WMO = {0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌦️',61:'🌧️',63:'🌧️',65:'🌧️',71:'❄️',73:'❄️',75:'❄️',77:'🌨️',80:'🌦️',81:'🌦️',82:'🌦️',85:'❄️',86:'❄️',95:'⛈️',96:'⛈️',99:'⛈️'};
+const WMO_D = {0:'맑음',1:'구름조금',2:'구름많음',3:'흐림',45:'안개',48:'안개',51:'이슬비',53:'이슬비',55:'이슬비',61:'비',63:'비',65:'강한비',71:'눈',73:'눈',75:'강한눈',77:'싸락눈',80:'소나기',81:'소나기',82:'강한소나기',85:'눈소나기',86:'눈소나기',95:'뇌우',96:'뇌우',99:'뇌우'};
 
 // ── Seed data ──
 const SEED_TASKS = {
-  '2026-03-30': [
-    { id:'s001', text:'오전) 개인화 검수', starred:true,  checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s001a', text:'재방_7시반 이자벨마랑&뻐두', checked:false, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-03-31': [
-    { id:'s002', text:'첫구매런 > 앱푸쉬',      starred:true,  checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s003', text:'최종 기획전 검토',         starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s004', text:'전관행사 쿠폰 및 연결',    starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s005', text:'퇴근 전 결재',             starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-01': [
-    { id:'s006', text:'첫구매런 > 앱푸쉬',           starred:true,  checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s007', text:'웰컴 4월 문서변경',             starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s008', text:'전관행사 쿠폰 생성 및 연결',   starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s009', text:'기획전 검토',                   starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-02': [
-    { id:'s010', text:'오전) 개인화 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s010a', text:'오픈예정3건', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s011', text:'출석체크 푸쉬 취합', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-03': [
-    { id:'s012', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s013', text:'전관행사 쿠폰 및 세팅', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s013a', text:'앨페스타', checked:true, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-06': [
-    { id:'s014', text:'7시반_재방_헤지스/닥스골프', starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s014a', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s015', text:'5월 웰컴 쿠폰 생성>미승인', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s016', text:'웰컴>유의사항&카운트 수정', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s017', text:'앨페스타 문구 수정',         starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-07': [
-    { id:'s018', text:'오전) 개인화 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s018a', text:'7시반 본방',    checked:false, starred:false, color:null, subs:[] },
-      { id:'s018b', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-08': [
-    { id:'s019', text:'첫구매런 > 앱푸쉬', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s019a', text:'7시반 본방', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s020', text:'레스타 알림 문자 발송 → 12시 발송', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s020a', text:'11시 결재', checked:true, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s021', text:'웰컴 디자인 요청',                   starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s022', text:'첫구매런 할인 취합 요청 > (목)까지', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s023', text:'메일 세팅(자주 필요일까지)',          starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s024', text:'마일리지지급_4/9일세팅',              starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s025', text:'거래선코드',                          starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-09': [
-    { id:'s026', text:'오전) 개인화 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s026a', text:'오픈예정3건', checked:false, starred:false, color:null, subs:[] },
-      { id:'s026b', text:'7시반_재방',  checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s027', text:'10시 웰컴 페이지 확인',      starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s028', text:'첫구매런 앱푸쉬 취합',        starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s029', text:'111214 >> LMS 지원요청',      starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s030', text:'기획전 오픈X',                starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s031', text:'AP-260402579 > 마일리지지급', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-10': [
-    { id:'s032', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s032a', text:'11시 재방_(빈스/바쉬/뻐두)', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s033', text:'출석체크 참여자 추출',                     starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s034', text:'출석체크 쿠폰 생성',                       starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s035', text:'오후) CR 쿠폰 생성',                       starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s036', text:'오후) 첫구매_장바구니보유_SMS', starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s036a', text:'모수 26,000명으로 추후 발송', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s037', text:'오후) 출석체크 쿠폰 발급요청 > LMS 발송', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s038', text:'5월출석체크/친구초대 원스피어 세팅 완료',  starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-13': [
-    { id:'s039', text:'7시반_재방', starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s039a', text:'퇴근 후 결재', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s040', text:'CR개선 1차_최용남팀장님', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s040a', text:'소문내기 참여자 추출',     checked:true, starred:false, color:null, subs:[] },
-      { id:'s040b', text:'장성우 > 파일 전달·받기', checked:true, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-14': [
-    { id:'s041', text:'오전) 개인화 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s041a', text:'7시반_본방',    checked:false, starred:false, color:null, subs:[] },
-      { id:'s041b', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-15': [
-    { id:'s042', text:'첫구매런 > 앱푸쉬', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s042a', text:'7시반 본방',    checked:false, starred:false, color:null, subs:[] },
-      { id:'s042b', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s043', text:'소문내기 마일리지 지급', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s043a', text:'그름발송 추가 후 결재(2시)', checked:true, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s044', text:'메일 세팅(자주 필요일까지)', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s045', text:'5월 기획전 배너 세팅',        starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s046', text:'전관행사 쿠폰 생성 및 세팅',  starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-16': [
-    { id:'s047', text:'오전) 개인화 검수 > 오픈예정3건', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s047a', text:'7시반_재방',    checked:false, starred:false, color:null, subs:[] },
-      { id:'s047b', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s048', text:'익일 11시 재방 세팅 해야함', starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s049', text:'전관행사 확인 후 상품세팅',   starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s050', text:'소문내기/친구초대 상품 변경', starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s051', text:'첫구매_장바구니보유_SMS', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s051a', text:'1시쯤 결재', checked:true, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-17': [
-    { id:'s052', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s052a', text:'11시_재방', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s053', text:'전시휴무', starred:false, checked:false, color:'#e53935', repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-20': [
-    { id:'s054', text:'연차', starred:false, checked:false, color:'#fb8c00', repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-21': [
-    { id:'s055', text:'오전) 개인화 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s055a', text:'7시반본방', checked:false, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-22': [
-    { id:'s056', text:'첫구매런 > 앱푸쉬', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s056a', text:'7시반본방', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s057', text:'소문내기/친구초대 지라요청',  starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s058', text:'캠페인 (첫구매/친구매런)',     starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s059', text:'웰컴 5월 공동 코드 등록요청', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s059a', text:'지라요청', checked:true, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-23': [
-    { id:'s060', text:'오전) 개인화 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s060a', text:'오픈예정3건',   checked:false, starred:false, color:null, subs:[] },
-      { id:'s060b', text:'7시반본방',     checked:false, starred:false, color:null, subs:[] },
-      { id:'s060c', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s061', text:'개인화 오픈일정 안내', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-24': [
-    { id:'s062', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s063', text:'비용품의 작성(출석체크/친구초대/상품공구)', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s064', text:'CR 쿠폰생성(승인완료)',                      starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s065', text:'첫구매 리텐션 (인수인계)', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s065a', text:'주문쿠폰 이달 리텐션',      checked:true, starred:false, color:null, subs:[] },
-      { id:'s065b', text:'할인쿠폰 생성 후 LMS 발송', checked:true, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s066', text:'16시 > 아울렛', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s066a', text:'15시 결재', checked:true, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-27': [
-    { id:'s067', text:'7시반본방 > 닥스', starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s068', text:'CR개선 2차 > 9시에 새로고침',      starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s069', text:'10시 웰컴 기획전 확인',             starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s070', text:'전관행사 쿠폰 세팅',                starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s071', text:'메시지_전표',                       starred:false, checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s072', text:'비용품의 작성(웰컴/CR/정기리텐션)', starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s073', text:'시크릿혜택 기획전 세팅', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s073a', text:'쿠폰/마일리지/e마일리지', checked:true, starred:false, color:null, subs:[] }
-    ]}
-  ],
-  '2026-04-28': [
-    { id:'s074', text:'오전) 개인화 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s074a', text:'7시반본방 → 바버', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s075', text:'메일 세팅(자주 필요일까지)',     starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s076', text:'14시 아울렛 문자 결재 완료',     starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s077', text:'16시 이후 바버 고객군 중복검사', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-29': [
-    { id:'s078', text:'첫구매런 > 앱푸쉬',                starred:true,  checked:false, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s079', text:'14시 설문조사 문자발송(결재완료)', starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s080', text:'메시지 전표',                       starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s081', text:'비용품의 올리기',                   starred:false, checked:true,  color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-04-30': [
-    { id:'s082', text:'오전) 개인화 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[
-      { id:'s082a', text:'7시반 재방송',  checked:false, starred:false, color:null, subs:[] },
-      { id:'s082b', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
-    ]},
-    { id:'s083', text:'기획전 검토',        starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s084', text:'전관행사 10시 세팅', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] },
-    { id:'s085', text:'첫구매 기획전 확인', starred:false, checked:true, color:null, repeat:'none', completions:{}, subs:[] }
-  ],
-  '2026-05-01': [
-    { id:'s086', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, repeat:'none', completions:{}, subs:[] }
-  ]
+  '2026-03-30':[{id:'s001',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s001a',text:'재방_7시반 이자벨마랑&뻐두',checked:false,starred:false,color:null,subs:[]}]}],
+  '2026-03-31':[{id:'s002',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s003',text:'최종 기획전 검토',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s004',text:'전관행사 쿠폰 및 연결',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s005',text:'퇴근 전 결재',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-01':[{id:'s006',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s007',text:'웰컴 4월 문서변경',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s008',text:'전관행사 쿠폰 생성 및 연결',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s009',text:'기획전 검토',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-02':[{id:'s010',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s010a',text:'오픈예정3건',checked:false,starred:false,color:null,subs:[]}]},{id:'s011',text:'출석체크 푸쉬 취합',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-03':[{id:'s012',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s013',text:'전관행사 쿠폰 및 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s013a',text:'앨페스타',checked:true,starred:false,color:null,subs:[]}]}],
+  '2026-04-06':[{id:'s014',text:'7시반_재방_헤지스/닥스골프',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s014a',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s015',text:'5월 웰컴 쿠폰 생성>미승인',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s016',text:'웰컴>유의사항&카운트 수정',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s017',text:'앨페스타 문구 수정',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-07':[{id:'s018',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s018a',text:'7시반 본방',checked:false,starred:false,color:null,subs:[]},{id:'s018b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]}],
+  '2026-04-08':[{id:'s019',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s019a',text:'7시반 본방',checked:false,starred:false,color:null,subs:[]}]},{id:'s020',text:'레스타 알림 문자 발송 → 12시 발송',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s020a',text:'11시 결재',checked:true,starred:false,color:null,subs:[]}]},{id:'s021',text:'웰컴 디자인 요청',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s022',text:'첫구매런 할인 취합 요청 > (목)까지',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s023',text:'메일 세팅(자주 필요일까지)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s024',text:'마일리지지급_4/9일세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s025',text:'거래선코드',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-09':[{id:'s026',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s026a',text:'오픈예정3건',checked:false,starred:false,color:null,subs:[]},{id:'s026b',text:'7시반_재방',checked:false,starred:false,color:null,subs:[]}]},{id:'s027',text:'10시 웰컴 페이지 확인',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s028',text:'첫구매런 앱푸쉬 취합',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s029',text:'111214 >> LMS 지원요청',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s030',text:'기획전 오픈X',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s031',text:'AP-260402579 > 마일리지지급',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-10':[{id:'s032',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s032a',text:'11시 재방_(빈스/바쉬/뻐두)',checked:false,starred:false,color:null,subs:[]}]},{id:'s033',text:'출석체크 참여자 추출',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s034',text:'출석체크 쿠폰 생성',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s035',text:'오후) CR 쿠폰 생성',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s036',text:'오후) 첫구매_장바구니보유_SMS',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s036a',text:'모수 26,000명으로 추후 발송',checked:false,starred:false,color:null,subs:[]}]},{id:'s037',text:'오후) 출석체크 쿠폰 발급요청 > LMS 발송',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s038',text:'5월출석체크/친구초대 원스피어 세팅 완료',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-13':[{id:'s039',text:'7시반_재방',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s039a',text:'퇴근 후 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s040',text:'CR개선 1차_최용남팀장님',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s040a',text:'소문내기 참여자 추출',checked:true,starred:false,color:null,subs:[]},{id:'s040b',text:'장성우 > 파일 전달·받기',checked:true,starred:false,color:null,subs:[]}]}],
+  '2026-04-14':[{id:'s041',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s041a',text:'7시반_본방',checked:false,starred:false,color:null,subs:[]},{id:'s041b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]}],
+  '2026-04-15':[{id:'s042',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s042a',text:'7시반 본방',checked:false,starred:false,color:null,subs:[]},{id:'s042b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s043',text:'소문내기 마일리지 지급',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s043a',text:'그름발송 추가 후 결재(2시)',checked:true,starred:false,color:null,subs:[]}]},{id:'s044',text:'메일 세팅(자주 필요일까지)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s045',text:'5월 기획전 배너 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s046',text:'전관행사 쿠폰 생성 및 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-16':[{id:'s047',text:'오전) 개인화 검수 > 오픈예정3건',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s047a',text:'7시반_재방',checked:false,starred:false,color:null,subs:[]},{id:'s047b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s048',text:'익일 11시 재방 세팅 해야함',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s049',text:'전관행사 확인 후 상품세팅',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s050',text:'소문내기/친구초대 상품 변경',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s051',text:'첫구매_장바구니보유_SMS',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s051a',text:'1시쯤 결재',checked:true,starred:false,color:null,subs:[]}]}],
+  '2026-04-17':[{id:'s052',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s052a',text:'11시_재방',checked:false,starred:false,color:null,subs:[]}]},{id:'s053',text:'전시휴무',starred:false,checked:false,color:'#e53935',repeat:'none',completions:{},subs:[]}],
+  '2026-04-20':[{id:'s054',text:'연차',starred:false,checked:false,color:'#fb8c00',repeat:'none',completions:{},subs:[]}],
+  '2026-04-21':[{id:'s055',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s055a',text:'7시반본방',checked:false,starred:false,color:null,subs:[]}]}],
+  '2026-04-22':[{id:'s056',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s056a',text:'7시반본방',checked:false,starred:false,color:null,subs:[]}]},{id:'s057',text:'소문내기/친구초대 지라요청',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s058',text:'캠페인 (첫구매/친구매런)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s059',text:'웰컴 5월 공동 코드 등록요청',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s059a',text:'지라요청',checked:true,starred:false,color:null,subs:[]}]}],
+  '2026-04-23':[{id:'s060',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s060a',text:'오픈예정3건',checked:false,starred:false,color:null,subs:[]},{id:'s060b',text:'7시반본방',checked:false,starred:false,color:null,subs:[]},{id:'s060c',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s061',text:'개인화 오픈일정 안내',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-24':[{id:'s062',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s063',text:'비용품의 작성(출석체크/친구초대/상품공구)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s064',text:'CR 쿠폰생성(승인완료)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s065',text:'첫구매 리텐션 (인수인계)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s065a',text:'주문쿠폰 이달 리텐션',checked:true,starred:false,color:null,subs:[]},{id:'s065b',text:'할인쿠폰 생성 후 LMS 발송',checked:true,starred:false,color:null,subs:[]}]},{id:'s066',text:'16시 > 아울렛',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s066a',text:'15시 결재',checked:true,starred:false,color:null,subs:[]}]}],
+  '2026-04-27':[{id:'s067',text:'7시반본방 > 닥스',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s068',text:'CR개선 2차 > 9시에 새로고침',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s069',text:'10시 웰컴 기획전 확인',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s070',text:'전관행사 쿠폰 세팅',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s071',text:'메시지_전표',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s072',text:'비용품의 작성(웰컴/CR/정기리텐션)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s073',text:'시크릿혜택 기획전 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s073a',text:'쿠폰/마일리지/e마일리지',checked:true,starred:false,color:null,subs:[]}]}],
+  '2026-04-28':[{id:'s074',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s074a',text:'7시반본방 → 바버',checked:false,starred:false,color:null,subs:[]}]},{id:'s075',text:'메일 세팅(자주 필요일까지)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s076',text:'14시 아울렛 문자 결재 완료',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s077',text:'16시 이후 바버 고객군 중복검사',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-29':[{id:'s078',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s079',text:'14시 설문조사 문자발송(결재완료)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s080',text:'메시지 전표',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s081',text:'비용품의 올리기',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-04-30':[{id:'s082',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s082a',text:'7시반 재방송',checked:false,starred:false,color:null,subs:[]},{id:'s082b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s083',text:'기획전 검토',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s084',text:'전관행사 10시 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s085',text:'첫구매 기획전 확인',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
+  '2026-05-01':[{id:'s086',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]}]
 };
 
 // ── State ──
+let currentView = 'week';
 let weekStart = getMonday(new Date('2026-03-30'));
+let monthDate = new Date('2026-03-01');
 let tasks = loadTasks();
 let activeInput = null;
-let weatherByDate = {};   // { 'YYYY-MM-DD': { emoji, max, min, desc } }
-let weatherLocation = { lat: 37.5665, lon: 126.9780, name: '서울' };
+let weatherByDate = {};
+let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
+let searchQuery = '';
+let editCtx = null; // {dk, taskId}
+let _editColor = null, _editStarred = false, _editRepeat = 'none';
 
 // ── Persistence ──
 function loadTasks() {
   try {
-    const stored = JSON.parse(localStorage.getItem('calTasks') || '{}');
+    const stored = JSON.parse(localStorage.getItem('calTasks')||'{}');
     const merged = JSON.parse(JSON.stringify(SEED_TASKS));
     Object.keys(stored).forEach(dk => { merged[dk] = stored[dk]; });
     return merged;
@@ -491,374 +414,484 @@ function saveTasks() { localStorage.setItem('calTasks', JSON.stringify(tasks)); 
 function getMonday(d) {
   const date = new Date(d);
   const day = date.getDay();
-  date.setDate(date.getDate() - (day === 0 ? 6 : day - 1));
-  date.setHours(0, 0, 0, 0);
-  return date;
+  date.setDate(date.getDate()-(day===0?6:day-1));
+  date.setHours(0,0,0,0); return date;
 }
-function dateKey(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function today() { const d=new Date(); d.setHours(0,0,0,0); return d; }
+function dateToDayIdx(d) { const day=new Date(d).getDay(); return day===0?6:day-1; }
 
 // ── Repeat helpers ──
-// dayIdx: 0=Mon … 6=Sun (same as our column index)
-function dateToDayIdx(d) {
-  const day = new Date(d).getDay(); // 0=Sun
-  return day === 0 ? 6 : day - 1;
-}
 function getRepeatTasksForDate(date, dayIdx) {
   const dk = dateKey(date);
-  const results = [];
-  Object.entries(tasks).forEach(([originDk, list]) => {
-    if (originDk === dk) return; // shown as normal task
-    list.forEach(task => {
-      if (!task.repeat || task.repeat === 'none') return;
-      if (task.repeat === 'weekly') {
-        if (dateToDayIdx(originDk) === dayIdx) results.push({ task, originDk, instanceDk: dk });
-      } else if (task.repeat === 'monthly') {
-        const originDay = new Date(originDk).getDate();
-        if (originDay === date.getDate()) results.push({ task, originDk, instanceDk: dk });
-      }
+  const out = [];
+  Object.entries(tasks).forEach(([oDk, list]) => {
+    if (oDk===dk) return;
+    list.forEach(t => {
+      if (!t.repeat||t.repeat==='none') return;
+      if (t.repeat==='weekly' && dateToDayIdx(oDk)===dayIdx) out.push({task:t,originDk:oDk,instanceDk:dk});
+      if (t.repeat==='monthly' && new Date(oDk).getDate()===date.getDate()) out.push({task:t,originDk:oDk,instanceDk:dk});
     });
   });
-  return results;
+  return out;
 }
 function isRepeatChecked(task, instanceDk) {
   if (!task.completions) return task.checked;
   return instanceDk in task.completions ? task.completions[instanceDk] : false;
 }
-function toggleRepeatInstance(originDk, taskId, instanceDk) {
-  const task = (tasks[originDk] || []).find(t => t.id === taskId);
-  if (!task) return;
-  if (!task.completions) task.completions = {};
-  task.completions[instanceDk] = !isRepeatChecked(task, instanceDk);
+function toggleRepeatInst(originDk, taskId, instanceDk) {
+  const t=(tasks[originDk]||[]).find(x=>x.id===taskId); if(!t)return;
+  if(!t.completions) t.completions={};
+  t.completions[instanceDk]=!isRepeatChecked(t,instanceDk);
   saveTasks(); render();
 }
 
 // ── Task mutations ──
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
-function addTask(dk, text, color, starred, repeat, parentId) {
-  if (!tasks[dk]) tasks[dk] = [];
-  const t = { id: uid(), text, checked: false, starred: !!starred, color: color||null, repeat: repeat||'none', completions:{}, subs:[] };
-  if (parentId) {
-    const p = tasks[dk].find(x => x.id === parentId);
-    if (p) p.subs.push(t);
-  } else {
-    tasks[dk].push(t);
-  }
-  saveTasks(); activeInput = null; render();
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function addTask(dk,text,color,starred,repeat,parentId) {
+  if(!tasks[dk]) tasks[dk]=[];
+  const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',completions:{},subs:[]};
+  if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p)p.subs.push(t);}
+  else tasks[dk].push(t);
+  saveTasks(); activeInput=null; render();
 }
-function toggleTask(dk, id, subId) {
-  const list = tasks[dk] || [];
-  if (subId) {
-    const p = list.find(x => x.id === id);
-    if (p) { const s = p.subs.find(x => x.id === subId); if (s) s.checked = !s.checked; }
-  } else {
-    const t = list.find(x => x.id === id);
-    if (t) t.checked = !t.checked;
-  }
+function toggleTask(dk,id,subId) {
+  const list=tasks[dk]||[];
+  if(subId){const p=list.find(x=>x.id===id);if(p){const s=p.subs.find(x=>x.id===subId);if(s)s.checked=!s.checked;}}
+  else{const t=list.find(x=>x.id===id);if(t)t.checked=!t.checked;}
   saveTasks(); render();
 }
-function toggleStar(dk, id) {
-  const t = (tasks[dk]||[]).find(x => x.id === id);
-  if (t) { t.starred = !t.starred; saveTasks(); render(); }
-}
-function deleteTask(dk, id, subId) {
-  if (!tasks[dk]) return;
-  if (subId) {
-    const p = tasks[dk].find(x => x.id === id);
-    if (p) p.subs = p.subs.filter(x => x.id !== subId);
-  } else {
-    tasks[dk] = tasks[dk].filter(x => x.id !== id);
-  }
-  saveTasks(); render();
-}
-function deleteRepeatTask(originDk, taskId) {
-  if (!tasks[originDk]) return;
-  tasks[originDk] = tasks[originDk].filter(x => x.id !== taskId);
+function toggleStar(dk,id){const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks();render();}}
+function deleteTask(dk,id,subId) {
+  if(!tasks[dk])return;
+  if(subId){const p=tasks[dk].find(x=>x.id===id);if(p)p.subs=p.subs.filter(x=>x.id!==subId);}
+  else tasks[dk]=tasks[dk].filter(x=>x.id!==id);
   saveTasks(); render();
 }
 
-// ── Weather ──
-async function fetchWeather(lat, lon) {
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      `&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max` +
-      `&timezone=auto&forecast_days=16`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const out = {};
-    (data.daily.time || []).forEach((dt, i) => {
-      const code = data.daily.weathercode[i] ?? 0;
-      out[dt] = {
-        emoji: WMO[code] || '🌡️',
-        desc:  WMO_DESC[code] || '',
-        max:   Math.round(data.daily.temperature_2m_max[i]),
-        min:   Math.round(data.daily.temperature_2m_min[i]),
-        rain:  data.daily.precipitation_probability_max[i] ?? 0,
-      };
-    });
-    weatherByDate = out;
-    render();
-  } catch(e) { console.warn('날씨 로드 실패', e); }
-}
-function requestLocation() {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(pos => {
-    weatherLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude, name: '내 위치' };
-    document.getElementById('locationBtn').textContent = '📍 내 위치';
-    fetchWeather(weatherLocation.lat, weatherLocation.lon);
-  }, () => {
-    fetchWeather(weatherLocation.lat, weatherLocation.lon);
+// ── Edit modal ──
+function buildEditColors() {
+  const cp = document.getElementById('editColors'); cp.innerHTML='';
+  const none=el('div','cp-dot selected');
+  none.style.background='#e8eaed'; none.title='없음'; none.dataset.color='';
+  none.onclick=()=>{_editColor=null;cp.querySelectorAll('.cp-dot').forEach(d=>d.classList.remove('selected'));none.classList.add('selected');};
+  cp.appendChild(none);
+  COLORS.forEach(c=>{
+    const dot=el('div','cp-dot'); dot.style.background=c.hex; dot.title=c.name; dot.dataset.color=c.hex;
+    dot.onclick=()=>{_editColor=c.hex;cp.querySelectorAll('.cp-dot').forEach(d=>d.classList.remove('selected'));dot.classList.add('selected');};
+    cp.appendChild(dot);
   });
 }
-
-// ── DOM helpers ──
-function el(tag, cls, attrs) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (attrs) Object.assign(e, attrs);
-  return e;
+function openEdit(dk,task,isRepeatInst,originDk) {
+  const targetDk=isRepeatInst?originDk:dk;
+  const targetTask=isRepeatInst?(tasks[originDk]||[]).find(t=>t.id===task.id):task;
+  if(!targetTask)return;
+  editCtx={dk:targetDk,taskId:targetTask.id};
+  _editColor=targetTask.color; _editStarred=targetTask.starred; _editRepeat=targetTask.repeat||'none';
+  buildEditColors();
+  // Set star
+  const starBtn=document.getElementById('editStarBtn');
+  starBtn.classList.toggle('on',_editStarred);
+  // Highlight current color
+  const cp=document.getElementById('editColors');
+  cp.querySelectorAll('.cp-dot').forEach(d=>{
+    d.classList.toggle('selected',(d.dataset.color||'')===(targetTask.color||''));
+  });
+  // Repeat
+  document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
+    b.classList.toggle('active',b.dataset.val===_editRepeat);
+  });
+  document.getElementById('editInput').value=targetTask.text;
+  document.getElementById('editModal').classList.remove('hidden');
+  setTimeout(()=>{const inp=document.getElementById('editInput');inp.focus();inp.select();},50);
 }
+function closeEdit() { document.getElementById('editModal').classList.add('hidden'); editCtx=null; }
+document.getElementById('editStarBtn').onclick=function(){
+  _editStarred=!_editStarred; this.classList.toggle('on',_editStarred);
+};
+document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
+  b.onclick=()=>{
+    _editRepeat=b.dataset.val;
+    document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+  };
+});
+document.getElementById('editSaveBtn').onclick=()=>{
+  if(!editCtx)return;
+  const text=document.getElementById('editInput').value.trim();
+  if(!text)return;
+  const t=(tasks[editCtx.dk]||[]).find(x=>x.id===editCtx.taskId);
+  if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;if(!t.completions)t.completions={};}
+  saveTasks(); closeEdit(); render();
+};
+document.getElementById('editCancelBtn').onclick=closeEdit;
+document.getElementById('editModal').onclick=e=>{if(e.target===document.getElementById('editModal'))closeEdit();};
 
-// ── Build task item ──
-function buildTaskItem(dk, task, isSub, parentId, isRepeatInst, originDk, instanceDk) {
-  const item = el('div', `task-item${isSub ? ' sub' : ''}`);
-  const checked = isRepeatInst ? isRepeatChecked(task, instanceDk) : task.checked;
+// ── Weather ──
+async function fetchWeather(lat,lon) {
+  try {
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto&forecast_days=16`);
+    const d=await r.json();
+    (d.daily.time||[]).forEach((dt,i)=>{
+      const code=d.daily.weathercode[i]??0;
+      weatherByDate[dt]={emoji:WMO[code]||'🌡️',desc:WMO_D[code]||'',max:Math.round(d.daily.temperature_2m_max[i]),min:Math.round(d.daily.temperature_2m_min[i]),rain:d.daily.precipitation_probability_max[i]??0};
+    });
+    render();
+  } catch(e){console.warn('날씨 로드 실패',e);}
+}
+document.getElementById('locationBtn').onclick=()=>{
+  if(!navigator.geolocation)return;
+  navigator.geolocation.getCurrentPosition(p=>{
+    weatherLoc={lat:p.coords.latitude,lon:p.coords.longitude,name:'내 위치'};
+    document.getElementById('locationBtn').textContent='📍';
+    fetchWeather(weatherLoc.lat,weatherLoc.lon);
+  },()=>fetchWeather(weatherLoc.lat,weatherLoc.lon));
+};
 
-  if (!isSub) {
-    const star = el('span', `task-star${task.starred ? ' on' : ''}`, { textContent:'★', title:'중요 표시' });
-    star.onclick = e => { e.stopPropagation(); toggleStar(isRepeatInst ? originDk : dk, task.id); };
+// ── DOM helper ──
+function el(tag,cls,attrs){const e=document.createElement(tag);if(cls)e.className=cls;if(attrs)Object.assign(e,attrs);return e;}
+
+// ── Task item builder ──
+function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk) {
+  const item=el('div',`task-item${isSub?' sub':''}`);
+  const checked=isRepeatInst?isRepeatChecked(task,instanceDk):task.checked;
+  if(!isSub){
+    const star=el('span',`task-star${task.starred?' on':''}`,{textContent:'★',title:'중요 표시'});
+    star.onclick=e=>{e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
     item.appendChild(star);
   }
-  if (task.color) {
-    const dot = el('div', 'color-dot'); dot.style.background = task.color; item.appendChild(dot);
-  }
-
-  const cb = el('div', `task-cb${checked ? ' checked' : ''}`);
-  cb.onclick = e => {
-    e.stopPropagation();
-    if (isRepeatInst) {
-      toggleRepeatInstance(originDk, task.id, instanceDk);
-    } else {
-      toggleTask(dk, parentId||task.id, parentId ? task.id : null);
-    }
-  };
+  if(task.color){const dot=el('div','color-dot');dot.style.background=task.color;item.appendChild(dot);}
+  const cb=el('div',`task-cb${checked?' checked':''}`);
+  cb.onclick=e=>{e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
   item.appendChild(cb);
-
-  const body = el('div', 'task-body');
-  const txt = el('div', `task-text${checked ? ' done' : ''}`, { textContent: task.text });
-  body.appendChild(txt);
-
-  // Repeat badge
-  if (!isSub && task.repeat && task.repeat !== 'none') {
-    const badge = el('div', 'repeat-badge');
-    badge.textContent = task.repeat === 'weekly' ? '🔄 매주' : '🔄 매월';
-    body.appendChild(badge);
+  const body=el('div','task-body');
+  body.appendChild(el('div',`task-text${checked?' done':''}`,{textContent:task.text}));
+  if(!isSub&&task.repeat&&task.repeat!=='none'){
+    body.appendChild(el('div','repeat-badge',{textContent:task.repeat==='weekly'?'🔄 매주':'🔄 매월'}));
   }
-
-  if (!isSub && task.subs && task.subs.length) {
-    const subList = el('div', 'subtask-list');
-    task.subs.forEach(s => subList.appendChild(buildTaskItem(dk, s, true, task.id, false, null, null)));
-    body.appendChild(subList);
+  if(!isSub&&task.subs&&task.subs.length){
+    const sl=el('div','subtask-list');
+    task.subs.forEach(s=>sl.appendChild(buildTaskItem(dk,s,true,task.id,false,null,null)));
+    body.appendChild(sl);
   }
-  if (!isSub && !isRepeatInst) {
-    const addSub = el('button', 'add-sub-btn', { textContent:'+ 하위 항목' });
-    addSub.onclick = e => { e.stopPropagation(); activeInput = { dateKey: dk, parentId: task.id }; render(); };
+  if(!isSub&&!isRepeatInst){
+    const addSub=el('button','add-sub-btn',{textContent:'+ 하위 항목'});
+    addSub.onclick=e=>{e.stopPropagation();activeInput={dateKey:dk,parentId:task.id};render();};
     body.appendChild(addSub);
   }
   item.appendChild(body);
-
-  const del = el('span', 'task-del', { textContent:'✕', title:'삭제' });
-  del.onclick = e => {
+  const actions=el('div','task-actions');
+  if(!isSub){
+    const editBtn=el('button','task-act-btn',{textContent:'✏️',title:'수정'});
+    editBtn.onclick=e=>{e.stopPropagation();openEdit(dk,task,isRepeatInst,originDk);};
+    actions.appendChild(editBtn);
+  }
+  const delBtn=el('button','task-act-btn del',{textContent:'✕',title:'삭제'});
+  delBtn.onclick=e=>{
     e.stopPropagation();
-    if (isRepeatInst) {
-      if (confirm('반복 태스크 전체를 삭제할까요?')) deleteRepeatTask(originDk, task.id);
-    } else {
-      const msg = task.repeat && task.repeat !== 'none'
-        ? '반복 태스크 전체를 삭제할까요?' : '삭제하시겠습니까?';
-      if (confirm(msg)) deleteTask(dk, parentId||task.id, parentId ? task.id : null);
+    const msg=(isRepeatInst||(task.repeat&&task.repeat!=='none'))?'반복 태스크를 전체 삭제할까요?':'삭제할까요?';
+    if(confirm(msg)) {
+      const tDk=isRepeatInst?originDk:dk;
+      deleteTask(tDk,task.id,null);
     }
   };
-  item.appendChild(del);
+  actions.appendChild(delBtn);
+  item.appendChild(actions);
   return item;
 }
 
-// ── Build input form ──
-function buildInputForm(dk, parentId) {
-  let selColor = null, starred = false, selRepeat = 'none';
-  const form = el('div', 'input-form');
-
-  const row = el('div', 'input-row');
-  const inp = el('input', 'task-input');
-  inp.type = 'text'; inp.placeholder = '할 일 입력...';
-  inp.id = `inp-${dk}-${parentId||'main'}`;
+// ── Input form builder ──
+function buildInputForm(dk,parentId){
+  let selColor=null,starred=false,selRepeat='none';
+  const form=el('div','input-form');
+  const row=el('div','input-row');
+  const inp=el('input','task-input');
+  inp.type='text';inp.placeholder='할 일 입력...';inp.id=`inp-${dk}-${parentId||'main'}`;
   row.appendChild(inp);
-  if (!parentId) {
-    const starBtn = el('button', 'star-toggle', { type:'button', textContent:'★', title:'중요' });
-    starBtn.onclick = () => { starred = !starred; starBtn.classList.toggle('on', starred); };
-    row.appendChild(starBtn);
+  if(!parentId){
+    const sb=el('button','star-toggle',{type:'button',textContent:'★'});
+    sb.onclick=()=>{starred=!starred;sb.classList.toggle('on',starred);};
+    row.appendChild(sb);
   }
   form.appendChild(row);
-
-  if (!parentId) {
-    const cp = el('div', 'color-picker');
-    const none = el('div', 'cp-dot selected');
-    none.style.background = '#e8eaed'; none.title = '색 없음';
-    none.onclick = () => { selColor = null; cp.querySelectorAll('.cp-dot').forEach(d => d.classList.remove('selected')); none.classList.add('selected'); };
+  if(!parentId){
+    const cp=el('div','color-picker');
+    const none=el('div','cp-dot selected');none.style.background='#e8eaed';none.title='없음';
+    none.onclick=()=>{selColor=null;cp.querySelectorAll('.cp-dot').forEach(d=>d.classList.remove('selected'));none.classList.add('selected');};
     cp.appendChild(none);
-    COLORS.forEach(c => {
-      const dot = el('div', 'cp-dot'); dot.style.background = c.hex; dot.title = c.name;
-      dot.onclick = () => { selColor = c.hex; cp.querySelectorAll('.cp-dot').forEach(d => d.classList.remove('selected')); dot.classList.add('selected'); };
+    COLORS.forEach(c=>{
+      const dot=el('div','cp-dot');dot.style.background=c.hex;dot.title=c.name;
+      dot.onclick=()=>{selColor=c.hex;cp.querySelectorAll('.cp-dot').forEach(d=>d.classList.remove('selected'));dot.classList.add('selected');};
       cp.appendChild(dot);
     });
     form.appendChild(cp);
-
-    // Repeat selector
-    const rs = el('div', 'repeat-selector');
-    [['none','없음'],['weekly','매주 반복'],['monthly','매월 반복']].forEach(([val, label]) => {
-      const btn = el('button', `repeat-opt${val === 'none' ? ' active' : ''}`, { type:'button', textContent: label });
-      btn.onclick = () => {
-        selRepeat = val;
-        rs.querySelectorAll('.repeat-opt').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      };
+    const rs=el('div','repeat-selector');
+    [['none','없음'],['weekly','매주'],['monthly','매월']].forEach(([val,label])=>{
+      const btn=el('button',`repeat-opt${val==='none'?' active':''}`,{type:'button',textContent:label});
+      btn.onclick=()=>{selRepeat=val;rs.querySelectorAll('.repeat-opt').forEach(b=>b.classList.remove('active'));btn.classList.add('active');};
       rs.appendChild(btn);
     });
     form.appendChild(rs);
   }
-
-  const actions = el('div', 'form-actions');
-  const addBtn = el('button', 'btn-add', { type:'button', textContent:'추가' });
-  const cancelBtn = el('button', 'btn-cancel', { type:'button', textContent:'취소' });
-  addBtn.onclick = () => { const v = inp.value.trim(); if (v) addTask(dk, v, selColor, starred, selRepeat, parentId); else { activeInput = null; render(); } };
-  cancelBtn.onclick = () => { activeInput = null; render(); };
-  inp.addEventListener('keydown', e => { if (e.key === 'Enter') addBtn.click(); if (e.key === 'Escape') cancelBtn.click(); });
-  actions.appendChild(addBtn); actions.appendChild(cancelBtn);
-  form.appendChild(actions);
+  const acts=el('div','form-actions');
+  const addBtn=el('button','btn-add',{type:'button',textContent:'추가'});
+  const cancelBtn=el('button','btn-cancel',{type:'button',textContent:'취소'});
+  addBtn.onclick=()=>{const v=inp.value.trim();if(v)addTask(dk,v,selColor,starred,selRepeat,parentId);else{activeInput=null;render();}};
+  cancelBtn.onclick=()=>{activeInput=null;render();};
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')addBtn.click();if(e.key==='Escape')cancelBtn.click();});
+  acts.appendChild(addBtn);acts.appendChild(cancelBtn);form.appendChild(acts);
   return form;
 }
 
-// ── Build weather bar ──
-function buildWeatherBar(dk) {
-  const bar = el('div', 'weather-bar');
-  const w = weatherByDate[dk];
-  if (!w) {
-    bar.appendChild(el('span', 'weather-loading', { textContent: '날씨 로드 중...' }));
-  } else {
-    const emojiEl = el('span', 'weather-emoji', { textContent: w.emoji });
-    const info = el('div', 'weather-info');
-    const temp = el('div', 'weather-temp');
-    temp.innerHTML = `<span class="temp-max">${w.max}°</span> / <span class="temp-min">${w.min}°</span>`;
-    const desc = el('div', 'weather-desc', { textContent: w.desc });
-    info.appendChild(temp); info.appendChild(desc);
-    if (w.rain > 0) {
-      info.appendChild(el('div', 'weather-rain', { textContent: `💧 ${w.rain}%` }));
-    }
-    bar.appendChild(emojiEl); bar.appendChild(info);
+// ── Weather bar ──
+function buildWeatherBar(dk){
+  const bar=el('div','weather-bar');
+  const w=weatherByDate[dk];
+  if(!w)bar.appendChild(el('span','weather-skeleton',{textContent:'날씨 로드 중...'}));
+  else{
+    bar.appendChild(el('span','weather-emoji',{textContent:w.emoji}));
+    const info=el('div','weather-info');
+    const temp=el('div','weather-temp');
+    temp.innerHTML=`<span class="hi">${w.max}°</span> / <span class="lo">${w.min}°</span>`;
+    info.appendChild(temp);
+    info.appendChild(el('div','weather-desc',{textContent:w.desc}));
+    if(w.rain>0)info.appendChild(el('div','weather-rain',{textContent:`💧 ${w.rain}%`}));
+    bar.appendChild(info);
   }
   return bar;
 }
 
-// ── Build day column ──
-function buildDayCol(date, dayIdx) {
-  const dk = dateKey(date);
-  const isToday = date.getTime() === today().getTime();
-  const isWeekend = dayIdx >= 5;
-  const col = el('div', `day-col${isToday?' is-today':''}${isWeekend?' is-weekend':''}`);
-
-  // Header
-  const hdr = el('div', 'day-header');
-  hdr.appendChild(el('div', 'day-name', { textContent: DAY_NAMES[dayIdx]+'요일' }));
-  const numWrap = el('div', 'day-num-wrap');
-  numWrap.appendChild(el('div', 'day-num', { textContent: date.getDate() }));
-  hdr.appendChild(numWrap);
-  hdr.appendChild(el('div', 'day-month', { textContent: `${date.getMonth()+1}월` }));
-  col.appendChild(hdr);
-
-  // Tasks
-  const list = el('div', 'tasks-list');
-  const dayTasks = (tasks[dk]||[]).slice().sort((a,b) => (b.starred?1:0)-(a.starred?1:0));
-  dayTasks.forEach(t => list.appendChild(buildTaskItem(dk, t, false, null, false, null, null)));
-
-  // Repeat instances
-  getRepeatTasksForDate(date, dayIdx).forEach(({ task, originDk, instanceDk }) => {
-    list.appendChild(buildTaskItem(dk, task, false, null, true, originDk, instanceDk));
-  });
-
-  // Sub-task input (inside a task)
-  const ai = activeInput;
-  if (ai && ai.dateKey === dk && ai.parentId) {
-    list.appendChild(buildInputForm(dk, ai.parentId));
+// ── Day column ──
+function buildDayCol(date,dayIdx){
+  const dk=dateKey(date);
+  const isToday=date.getTime()===today().getTime();
+  const isWeekend=dayIdx>=5;
+  const col=el('div',`day-col${isToday?' is-today':''}${isWeekend?' is-weekend':''}`);
+  // header
+  const hdr=el('div','day-header');
+  hdr.appendChild(el('div','day-name',{textContent:DAY_NAMES[dayIdx]+'요일'}));
+  const nw=el('div','day-num-wrap');
+  nw.appendChild(el('div','day-num',{textContent:date.getDate()}));
+  hdr.appendChild(nw);
+  hdr.appendChild(el('div','day-month',{textContent:`${date.getMonth()+1}월`}));
+  // task count + mini progress
+  const dayTasks=tasks[dk]||[];
+  const allTasks=[...dayTasks];
+  getRepeatTasksForDate(date,dayIdx).forEach(r=>allTasks.push(r.task));
+  const total=allTasks.length;
+  const done=allTasks.filter(t=>t.checked).length;
+  if(total>0){
+    const meta=el('div','day-meta');
+    meta.appendChild(el('span','task-count-badge',{textContent:`${total}개`}));
+    const bar=el('div','day-progress');
+    const fill=el('div','day-progress-fill');
+    fill.style.width=`${Math.round(done/total*100)}%`;
+    bar.appendChild(fill); meta.appendChild(bar);
+    hdr.appendChild(meta);
   }
+  col.appendChild(hdr);
+  // tasks
+  const list=el('div','tasks-list');
+  const sorted=[...dayTasks].sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
+  sorted.forEach(t=>list.appendChild(buildTaskItem(dk,t,false,null,false,null,null)));
+  getRepeatTasksForDate(date,dayIdx).forEach(({task,originDk,instanceDk})=>{
+    list.appendChild(buildTaskItem(dk,task,false,null,true,originDk,instanceDk));
+  });
+  if(total===0){
+    const empty=el('div','day-empty');
+    empty.appendChild(el('div','day-empty-icon',{textContent:'○'}));
+    empty.appendChild(el('div','day-empty-text',{textContent:'할 일 없음'}));
+    list.appendChild(empty);
+  }
+  const ai=activeInput;
+  if(ai&&ai.dateKey===dk&&ai.parentId) list.appendChild(buildInputForm(dk,ai.parentId));
   col.appendChild(list);
-
-  // Add task / input form
-  if (ai && ai.dateKey === dk && !ai.parentId) {
-    col.appendChild(buildInputForm(dk, null));
-  } else {
-    const addBtn = el('button', 'add-task-btn', { innerHTML:'+ 할 일 추가' });
-    addBtn.onclick = () => { activeInput = { dateKey: dk, parentId: null }; render(); };
+  if(ai&&ai.dateKey===dk&&!ai.parentId) col.appendChild(buildInputForm(dk,null));
+  else{
+    const addBtn=el('button','add-task-btn',{innerHTML:'+ 할 일 추가'});
+    addBtn.onclick=()=>{activeInput={dateKey:dk,parentId:null};render();};
     col.appendChild(addBtn);
   }
-
-  // Weather bar
   col.appendChild(buildWeatherBar(dk));
   return col;
 }
 
-// ── Progress ──
-function calcProgress() {
-  let total = 0, done = 0;
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(weekStart); d.setDate(d.getDate() + i);
-    const dk = dateKey(d);
-    (tasks[dk]||[]).forEach(t => {
-      total++; if (t.checked) done++;
-      (t.subs||[]).forEach(s => { total++; if (s.checked) done++; });
-    });
+// ── Month view ──
+function buildMonthView(){
+  const wrap=el('div','month-wrap');
+  const year=monthDate.getFullYear(), month=monthDate.getMonth();
+  const firstDay=new Date(year,month,1);
+  const lastDay=new Date(year,month+1,0);
+  const start=getMonday(firstDay);
+  const hdrs=el('div','month-day-headers');
+  DAY_NAMES.forEach(n=>hdrs.appendChild(el('div','month-day-header',{textContent:n})));
+  wrap.appendChild(hdrs);
+  const grid=el('div','month-grid');
+  let cur=new Date(start);
+  while(true){
+    const week=el('div','month-week');
+    for(let i=0;i<7;i++){
+      week.appendChild(buildMonthCell(new Date(cur),month));
+      cur.setDate(cur.getDate()+1);
+    }
+    grid.appendChild(week);
+    if(cur>lastDay&&cur.getDay()===1) break;
   }
-  return { total, done };
+  wrap.appendChild(grid);
+  return wrap;
+}
+function buildMonthCell(date,curMonth){
+  const dk=dateKey(date);
+  const isToday=date.getTime()===today().getTime();
+  const isOther=date.getMonth()!==curMonth;
+  const isWeekend=date.getDay()===0||date.getDay()===6;
+  const cell=el('div',`month-cell${isToday?' is-today':''}${isOther?' other-month':''}${isWeekend?' is-weekend':''}`);
+  if(isToday){const c=el('div','month-today-circle',{textContent:date.getDate()});cell.appendChild(c);}
+  else cell.appendChild(el('div','month-date-num',{textContent:date.getDate()}));
+  const list=tasks[dk]||[];
+  list.slice(0,3).forEach(t=>{
+    const pill=el('div',`month-pill${t.checked?' done':''}${t.color?' colored':''}`);
+    if(t.color){pill.style.background=t.color;pill.style.opacity=t.checked?'.5':'1';}
+    pill.textContent=(t.starred?'★ ':'')+t.text;
+    cell.appendChild(pill);
+  });
+  if(list.length>3) cell.appendChild(el('div','month-more',{textContent:`+${list.length-3}개 더`}));
+  cell.onclick=()=>{currentView='week';weekStart=getMonday(date);document.getElementById('btnWeek').classList.add('active');document.getElementById('btnMonth').classList.remove('active');render();};
+  return cell;
+}
+
+// ── Search ──
+function buildSearchView(query){
+  const wrap=el('div','search-results-wrap');
+  if(!query.trim()){wrap.appendChild(el('div','search-empty',{textContent:'검색어를 입력하세요'}));return wrap;}
+  const q=query.toLowerCase();
+  const results=[];
+  Object.entries(tasks).forEach(([dk,list])=>{
+    list.forEach(t=>{
+      if(t.text.toLowerCase().includes(q)||t.subs.some(s=>s.text.toLowerCase().includes(q)))
+        results.push({dk,task:t});
+    });
+  });
+  results.sort((a,b)=>b.dk.localeCompare(a.dk));
+  if(!results.length){wrap.appendChild(el('div','search-empty',{textContent:`"${query}" 검색 결과 없음`}));return wrap;}
+  const groups={};
+  results.forEach(({dk,task})=>{if(!groups[dk])groups[dk]=[];groups[dk].push(task);});
+  Object.entries(groups).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([dk,list])=>{
+    const grp=el('div','search-result-group');
+    const d=new Date(dk);
+    grp.appendChild(el('div','search-result-date',{textContent:`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${DAY_NAMES[dateToDayIdx(d)]})`}));
+    list.forEach(t=>{
+      const item=el('div','search-result-item');
+      if(t.color){const dot=el('div','color-dot');dot.style.background=t.color;dot.style.flexShrink='0';item.appendChild(dot);}
+      const cb=el('div',`task-cb${t.checked?' checked':''}`);
+      cb.onclick=e=>{e.stopPropagation();toggleTask(dk,t.id,null);};
+      item.appendChild(cb);
+      item.appendChild(el('span','search-result-text',{textContent:(t.starred?'★ ':'')+t.text}));
+      item.onclick=()=>{currentView='week';weekStart=getMonday(new Date(dk));searchQuery='';document.getElementById('searchInput').value='';document.getElementById('btnWeek').classList.add('active');document.getElementById('btnMonth').classList.remove('active');render();};
+      grp.appendChild(item);
+    });
+    wrap.appendChild(grp);
+  });
+  return wrap;
+}
+
+// ── Progress (week) ──
+function calcProgress(){
+  let total=0,done=0;
+  for(let i=0;i<7;i++){
+    const d=new Date(weekStart);d.setDate(d.getDate()+i);
+    const dk=dateKey(d);
+    (tasks[dk]||[]).forEach(t=>{total++;if(t.checked)done++;(t.subs||[]).forEach(s=>{total++;if(s.checked)done++;});});
+  }
+  return {total,done};
 }
 
 // ── Render ──
-function render() {
-  const grid = document.getElementById('calendarGrid');
-  grid.innerHTML = '';
-  const end = new Date(weekStart); end.setDate(end.getDate() + 6);
-  document.getElementById('weekLabel').textContent =
-    `${weekStart.getFullYear()}년 ${weekStart.getMonth()+1}월 ${weekStart.getDate()}일 ~ ${end.getMonth()+1}월 ${end.getDate()}일`;
-
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(weekStart); d.setDate(d.getDate() + i);
-    grid.appendChild(buildDayCol(d, i));
+function render(){
+  const view=document.getElementById('mainView');
+  view.innerHTML='';
+  // week label
+  if(currentView==='week'){
+    const end=new Date(weekStart);end.setDate(end.getDate()+6);
+    document.getElementById('weekLabel').textContent=`${weekStart.getFullYear()}년 ${weekStart.getMonth()+1}월 ${weekStart.getDate()}일 ~ ${end.getMonth()+1}월 ${end.getDate()}일`;
+  } else if(currentView==='month'){
+    document.getElementById('weekLabel').textContent=`${monthDate.getFullYear()}년 ${monthDate.getMonth()+1}월`;
+  } else {
+    document.getElementById('weekLabel').textContent='검색 결과';
   }
-
-  const { total, done } = calcProgress();
-  const pct = total ? Math.round(done/total*100) : 0;
-  const pi = document.getElementById('progressInfo');
-  pi.innerHTML = total > 0
-    ? `완료 ${done}/${total} <span class="progress-bar-wrap"><span class="progress-bar-fill" style="width:${pct}%"></span></span>`
-    : '';
-
-  if (activeInput) {
-    setTimeout(() => {
-      const inp = document.getElementById(`inp-${activeInput.dateKey}-${activeInput.parentId||'main'}`);
-      if (inp) inp.focus();
-    }, 30);
+  // main content
+  if(searchQuery){
+    view.appendChild(buildSearchView(searchQuery));
+  } else if(currentView==='week'){
+    const wrap=el('div','calendar-wrap');
+    const grid=el('div','calendar-grid');
+    for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);grid.appendChild(buildDayCol(d,i));}
+    wrap.appendChild(grid); view.appendChild(wrap);
+  } else {
+    view.appendChild(buildMonthView());
+  }
+  // progress
+  const {total,done}=calcProgress();
+  const pct=total?Math.round(done/total*100):0;
+  const pi=document.getElementById('progressInfo');
+  pi.innerHTML=total>0?`${done}/${total} <span class="progress-bar-wrap"><span class="progress-bar-fill" style="width:${pct}%"></span></span>`:'';
+  // focus
+  if(activeInput){
+    setTimeout(()=>{const inp=document.getElementById(`inp-${activeInput.dateKey}-${activeInput.parentId||'main'}`);if(inp)inp.focus();},30);
   }
 }
 
-// ── Navigation ──
-document.getElementById('prevBtn').onclick = () => { weekStart.setDate(weekStart.getDate()-7); render(); };
-document.getElementById('nextBtn').onclick = () => { weekStart.setDate(weekStart.getDate()+7); render(); };
-document.getElementById('todayBtn').onclick = () => { weekStart = getMonday(new Date()); render(); };
-document.getElementById('locationBtn').onclick = requestLocation;
+// ── Nav ──
+document.getElementById('prevBtn').onclick=()=>{
+  if(currentView==='week')weekStart.setDate(weekStart.getDate()-7);
+  else if(currentView==='month')monthDate.setMonth(monthDate.getMonth()-1);
+  render();
+};
+document.getElementById('nextBtn').onclick=()=>{
+  if(currentView==='week')weekStart.setDate(weekStart.getDate()+7);
+  else if(currentView==='month')monthDate.setMonth(monthDate.getMonth()+1);
+  render();
+};
+document.getElementById('todayBtn').onclick=()=>{
+  weekStart=getMonday(new Date()); monthDate=new Date(); monthDate.setDate(1); render();
+};
+document.getElementById('btnWeek').onclick=()=>{
+  currentView='week'; document.getElementById('btnWeek').classList.add('active'); document.getElementById('btnMonth').classList.remove('active'); render();
+};
+document.getElementById('btnMonth').onclick=()=>{
+  currentView='month'; document.getElementById('btnMonth').classList.add('active'); document.getElementById('btnWeek').classList.remove('active'); render();
+};
+
+// ── Search ──
+document.getElementById('searchInput').addEventListener('input',e=>{
+  searchQuery=e.target.value;
+  render();
+});
+
+// ── Dark mode ──
+document.getElementById('darkBtn').onclick=()=>{
+  const html=document.documentElement;
+  const isDark=html.dataset.theme==='dark';
+  html.dataset.theme=isDark?'light':'dark';
+  document.getElementById('darkBtn').textContent=isDark?'🌙':'☀️';
+  localStorage.setItem('theme',html.dataset.theme);
+};
+(()=>{const t=localStorage.getItem('theme')||'light';document.documentElement.dataset.theme=t;document.getElementById('darkBtn').textContent=t==='dark'?'☀️':'🌙';})();
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if(e.key==='ArrowLeft'){document.getElementById('prevBtn').click();}
+  if(e.key==='ArrowRight'){document.getElementById('nextBtn').click();}
+  if(e.key==='t'||e.key==='T'){document.getElementById('todayBtn').click();}
+  if(e.key==='/'){e.preventDefault();document.getElementById('searchInput').focus();}
+  if(e.key==='d'||e.key==='D'){document.getElementById('darkBtn').click();}
+  if(e.key==='Escape'){closeEdit();activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
+});
 
 // ── Init ──
 render();
-fetchWeather(weatherLocation.lat, weatherLocation.lon);
+fetchWeather(weatherLoc.lat,weatherLoc.lon);
 </script>
 </body>
 </html>
