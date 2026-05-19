@@ -1696,15 +1696,117 @@ function buildDashCalendar(){
   panel.appendChild(list);
 }
 
+// ── Google Sheet Sync ──
+const SHEET_ID  = '1wqZEZF34-4CzAsIeNxGyIWvPkjgw4zHCcw1K_exfzIk';
+const SHEET_GID = '1376643190';
+const SHEET_SYNC_KEY = 'sheetLastSync';
+const SHEET_COL_START = 40; // AO (0-based)
+const SHEET_COL_END   = 48; // AW (0-based)
+
+function parseCSV(text){
+  const rows=[];
+  for(const line of text.split('\n')){
+    const fields=[]; let f='', q=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){ if(q&&line[i+1]==='"'){f+='"';i++;}else q=!q; }
+      else if(c===','&&!q){ fields.push(f); f=''; }
+      else f+=c;
+    }
+    fields.push(f); rows.push(fields);
+  }
+  return rows;
+}
+
+function parseDateRange(cellText){
+  // e.g. "1/13 1시~1/15 10시"  or  "1/13~1/15"
+  const year=2026;
+  const found=[...cellText.matchAll(/(\d{1,2})\/(\d{1,2})/g)]
+    .map(m=>new Date(year,+m[1]-1,+m[2]));
+  if(!found.length) return [];
+  if(found.length===1) return [found[0]];
+  // build range between first and last date
+  const days=[]; const cur=new Date(found[0]); const end=new Date(found[found.length-1]);
+  while(cur<=end){ days.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
+  return days;
+}
+
+function makeEventText(cellText){
+  return cellText.replace(/\s+/g,' ').trim();
+}
+
+async function syncSheetEvents(manual=false){
+  const syncBtn=document.getElementById('sheetSyncBtn');
+  if(syncBtn){ syncBtn.disabled=true; syncBtn.textContent='동기화 중...'; }
+  const csvUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+  const proxyUrl=`https://api.allorigins.win/get?url=${encodeURIComponent(csvUrl)}`;
+  try{
+    const res=await fetch(proxyUrl,{signal:AbortSignal.timeout(15000)});
+    const data=await res.json();
+    const rows=parseCSV(data.contents||'');
+    let added=0;
+    // Event rows in CSV: index 3, 9, 15, 21, ... (spreadsheet rows 4,10,16,22...)
+    for(let ri=3; ri<rows.length; ri+=6){
+      const row=rows[ri]||[];
+      for(let ci=SHEET_COL_START; ci<=SHEET_COL_END; ci++){
+        const cell=(row[ci]||'').trim();
+        if(!cell.includes('[전관행사]')) continue;
+        const dates=parseDateRange(cell);
+        if(!dates.length) continue;
+        const text=makeEventText(cell);
+        dates.forEach(date=>{
+          const dk=dateKey(date);
+          if(!tasks[dk]) tasks[dk]=[];
+          if(!tasks[dk].some(t=>t.text===text)){
+            tasks[dk].push({id:uid(),text,checked:false,starred:true,color:'#1677ff',repeat:'none',completions:{},subs:[]});
+            added++;
+          }
+        });
+      }
+    }
+    if(added>0){ localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks)); if(fbRef())fbUpload(); render(); }
+    const now=new Date().toISOString().slice(0,10);
+    localStorage.setItem(SHEET_SYNC_KEY,now);
+    if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent=`✅ 동기화됨 (${added}건)`; }
+    buildDashStats();
+    return {success:true,added};
+  }catch(e){
+    if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent='⚠️ 실패 — 재시도'; }
+    console.warn('Sheet sync error:',e);
+    return {success:false};
+  }
+}
+
+function checkMondaySync(){
+  const today=new Date();
+  if(today.getDay()!==1) return; // 월요일만
+  const todayStr=today.toISOString().slice(0,10);
+  if(localStorage.getItem(SHEET_SYNC_KEY)===todayStr) return;
+  syncSheetEvents();
+}
+
 function initDashboard(){
   if(window.innerWidth<=768) return;
   buildDashStats();
   buildDashCalendar();
+  // Sheet sync button in right panel
+  const panel=document.getElementById('dashCalendar');
+  const divider=document.createElement('div'); divider.style.cssText='margin:14px 0 10px;border-top:1px solid var(--border)';
+  panel.appendChild(divider);
+  const syncRow=document.createElement('div'); syncRow.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';
+  const syncLabel=document.createElement('div'); syncLabel.style.cssText='font-size:11px;color:var(--text3)';
+  const last=localStorage.getItem(SHEET_SYNC_KEY);
+  syncLabel.textContent=last?`시트 마지막 동기화: ${last}`:'시트 미동기화';
+  const syncBtn=document.createElement('button'); syncBtn.id='sheetSyncBtn';
+  syncBtn.style.cssText='font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--primary);background:var(--primary-l);color:var(--primary);cursor:pointer;white-space:nowrap';
+  syncBtn.textContent='📥 지금 가져오기';
+  syncBtn.onclick=()=>syncSheetEvents(true);
+  syncRow.appendChild(syncLabel); syncRow.appendChild(syncBtn);
+  panel.appendChild(syncRow);
 }
 
 initDashboard();
-
-initNews();
+checkMondaySync();
 </script>
 </body>
 </html>
