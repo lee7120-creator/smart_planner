@@ -887,8 +887,9 @@ function getRepeatTasksForDate(date, dayIdx) {
   const out = [];
   Object.entries(tasks).forEach(([oDk, list]) => {
     if (oDk===dk) return;
+    if (!Array.isArray(list)) return;
     list.forEach(t => {
-      if (!t.repeat||t.repeat==='none') return;
+      if (!t||!t.repeat||t.repeat==='none') return;
       if (t.repeat==='weekly' && dateToDayIdx(oDk)===dayIdx) {
         out.push({task:t, originDk:oDk, instanceDk:dk});
       }
@@ -1298,8 +1299,9 @@ function buildMonthCell(date,curMonth){
   if(isToday){const c=el('div','month-today-circle',{textContent:date.getDate()});cell.appendChild(c);}
   else cell.appendChild(el('div','month-date-num',{textContent:date.getDate()}));
   if(holiday) cell.appendChild(el('div','month-holiday-label',{textContent:'🎌 '+holiday}));
-  const directList=tasks[dk]||[];
-  const repeatEntries=getRepeatTasksForDate(date,dayIdx);
+  const directList=Array.isArray(tasks[dk])?tasks[dk]:[];
+  let repeatEntries=[];
+  try{repeatEntries=getRepeatTasksForDate(date,dayIdx);}catch(e){}
   const allItems=[
     ...directList.map(t=>({t,checked:t.checked})),
     ...repeatEntries.map(({task,instanceDk})=>({t:task,checked:isRepeatChecked(task,instanceDk)}))
