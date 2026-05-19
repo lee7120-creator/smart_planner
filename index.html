@@ -1551,21 +1551,36 @@ window.addEventListener('offline', ()=>setSyncStatus('offline'));
 
 // ── News feed ──
 const NEWS_SOURCES = [
-  { label:'패션비즈', url:'https://www.fashionbiz.co.kr/rss/rss.xml' },
-  { label:'어패럴뉴스', url:'https://www.apparelnews.co.kr/rss/rss.xml' },
-  { label:'한국섬유신문', url:'http://www.textoday.co.kr/rss/allArticle.xml' },
+  { label:'패션비즈',    url:'https://www.fashionbiz.co.kr/rss/rss.xml' },
+  { label:'어패럴뉴스',  url:'https://www.apparelnews.co.kr/rss/rss.xml' },
+  { label:'한국섬유신문', url:'https://www.textoday.co.kr/rss/allArticle.xml' },
   { label:'패션인사이트', url:'https://www.fi.co.kr/main/rss.xml' },
 ];
 let newsActiveIdx = 0;
 let newsCache = {};
 
 function timeAgo(dateStr){
+  if(!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff/60000);
+  if(m < 1) return '방금 전';
   if(m < 60) return m+'분 전';
   const h = Math.floor(m/60);
   if(h < 24) return h+'시간 전';
   return Math.floor(h/24)+'일 전';
+}
+
+function parseRSS(xmlText){
+  const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
+  return [...xml.querySelectorAll('item')].map(item=>{
+    const get = tag => {
+      const el = item.querySelector(tag);
+      return el ? (el.textContent || el.getAttribute('url') || '') : '';
+    };
+    const linkEl = item.querySelector('link');
+    const link = linkEl ? (linkEl.textContent.trim() || linkEl.nextSibling?.nodeValue?.trim() || '') : '';
+    return { title: get('title').trim(), link: link || get('guid'), pubDate: get('pubDate') };
+  }).filter(i=>i.title);
 }
 
 function renderNewsSkeletons(){
@@ -1589,32 +1604,42 @@ function renderNewsCards(items, sourceLabel){
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     const src = document.createElement('div'); src.className='news-card-source'; src.textContent=sourceLabel;
-    const title = document.createElement('div'); title.className='news-card-title'; title.textContent=item.title||'';
-    const date = document.createElement('div'); date.className='news-card-date'; date.textContent=item.pubDate?timeAgo(item.pubDate):'';
+    const title = document.createElement('div'); title.className='news-card-title'; title.textContent=item.title;
+    const date = document.createElement('div'); date.className='news-card-date'; date.textContent=timeAgo(item.pubDate);
     a.appendChild(src); a.appendChild(title); a.appendChild(date);
     grid.appendChild(a);
   });
 }
 
+async function fetchNewsWithFallback(rssUrl){
+  const proxies = [
+    u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ];
+  for(const makeUrl of proxies){
+    try{
+      const res = await fetch(makeUrl(rssUrl), {signal: AbortSignal.timeout(8000)});
+      if(!res.ok) continue;
+      const data = await res.json().catch(()=>null);
+      const xmlText = data ? (data.contents || data) : await res.text();
+      if(typeof xmlText !== 'string') continue;
+      const items = parseRSS(xmlText);
+      if(items.length) return items;
+    }catch(e){ continue; }
+  }
+  return [];
+}
+
 function loadNews(idx){
   newsActiveIdx = idx;
-  // update tab styles
   document.querySelectorAll('.news-tab').forEach((t,i)=>t.classList.toggle('active', i===idx));
   const src = NEWS_SOURCES[idx];
   if(newsCache[idx]){ renderNewsCards(newsCache[idx], src.label); return; }
   renderNewsSkeletons();
-  const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(src.url)}&count=12`;
-  fetch(apiUrl)
-    .then(r=>r.json())
-    .then(data=>{
-      if(data.status==='ok' && data.items){
-        newsCache[idx] = data.items;
-        renderNewsCards(data.items, src.label);
-      } else {
-        renderNewsCards([], src.label);
-      }
-    })
-    .catch(()=>renderNewsCards([], src.label));
+  fetchNewsWithFallback(src.url).then(items=>{
+    newsCache[idx] = items;
+    renderNewsCards(items, src.label);
+  });
 }
 
 function initNews(){
@@ -1630,7 +1655,6 @@ function initNews(){
     tabs.appendChild(btn);
   });
   loadNews(0);
-  // refresh every 30 minutes
   setInterval(()=>{ newsCache={}; loadNews(newsActiveIdx); }, 30*60*1000);
 }
 
