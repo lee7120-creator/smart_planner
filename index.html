@@ -865,6 +865,12 @@ function initFirebaseSync() {
       tasks = remote;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
       render();
+    } else if (!remote && Object.keys(tasks).length > 0) {
+      // Firebase empty but local data exists → upload local data
+      ref.set(tasks)
+        .then(() => setSyncStatus('synced'))
+        .catch(() => setSyncStatus('offline'));
+      return;
     }
     setSyncStatus('synced');
   }, () => setSyncStatus('offline'));
