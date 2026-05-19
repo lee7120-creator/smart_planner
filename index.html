@@ -438,6 +438,68 @@
       border-radius:8px; width:36px; height:36px; cursor:pointer; font-size:16px;
     }
 
+    /* ─── Memo popup ─── */
+    .memo-overlay { position:fixed; inset:0; z-index:450; }
+    .memo-overlay.hidden { display:none; }
+    .memo-popup {
+      position:fixed; width:300px; max-width:calc(100vw - 32px);
+      background:#fffef5; border:1px solid #e0d888;
+      border-radius:14px; overflow:hidden;
+      box-shadow:0 8px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
+      animation:memoIn .15s ease; z-index:451;
+    }
+    [data-theme="dark"] .memo-popup { background:#252318; border-color:#4a4630; }
+    @keyframes memoIn { from{opacity:0;transform:scale(.94) translateY(6px)} to{opacity:1;transform:scale(1) translateY(0)} }
+    .memo-header {
+      display:flex; align-items:center; gap:8px;
+      padding:11px 14px 10px; border-bottom:1px solid #e8e080;
+      background:#fff8cc;
+    }
+    [data-theme="dark"] .memo-header { background:#2a2810; border-color:#4a4630; }
+    .memo-icon { font-size:15px; flex-shrink:0; }
+    .memo-task-title { flex:1; font-size:12px; font-weight:600; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    [data-theme="dark"] .memo-task-title { color:#aaa; }
+    .memo-close {
+      background:none; border:none; cursor:pointer; font-size:13px; color:#bbb;
+      padding:3px 5px; border-radius:5px; flex-shrink:0; transition:all .12s;
+    }
+    .memo-close:hover { background:rgba(244,67,54,.12); color:#f44336; }
+    .memo-textarea {
+      width:100%; min-height:150px; max-height:320px; resize:vertical;
+      border:none; outline:none; padding:13px 14px; font-size:13px;
+      font-family:inherit; line-height:1.65; background:transparent; color:#333;
+    }
+    [data-theme="dark"] .memo-textarea { color:#ddd; }
+    .memo-textarea::placeholder { color:#bbb; }
+    .memo-footer {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:6px 14px 10px; font-size:11px; color:#bbb;
+      border-top:1px dashed #e0d888;
+    }
+    [data-theme="dark"] .memo-footer { border-color:#4a4630; }
+    .memo-status.ok { color:#43a047; }
+    .memo-status.saving { color:#f9a825; }
+
+    /* memo indicator on task */
+    .memo-dot {
+      display:inline-block; width:6px; height:6px; border-radius:50%;
+      background:#f9a825; margin-left:4px; vertical-align:middle; flex-shrink:0; margin-top:4px;
+    }
+    .task-text-wrap { cursor:pointer; display:flex; align-items:flex-start; gap:4px; flex:1; min-width:0; }
+    .task-text-wrap:hover .task-text { text-decoration:underline; text-decoration-style:dotted; text-decoration-color:var(--primary); }
+
+    @media (max-width:768px) {
+      .memo-popup {
+        position:fixed !important; bottom:0 !important; top:auto !important;
+        left:0 !important; right:0 !important; width:100% !important;
+        border-radius:18px 18px 0 0; transform:none !important;
+        animation:memoUp .2s ease;
+      }
+      @keyframes memoUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+      .memo-textarea { min-height:180px; font-size:15px; }
+      .memo-overlay { background:rgba(0,0,0,.3); }
+    }
+
     /* ─── User chip in header ─── */
     .user-chip {
       display:flex; align-items:center; gap:5px; background:var(--primary-l);
@@ -505,6 +567,22 @@
 </header>
 
 <div id="mainView"></div>
+
+<!-- Memo Popup -->
+<div class="memo-overlay hidden" id="memoOverlay">
+  <div class="memo-popup" id="memoPopup">
+    <div class="memo-header">
+      <span class="memo-icon">📝</span>
+      <span class="memo-task-title" id="memoTitle"></span>
+      <button class="memo-close" id="memoClose">✕</button>
+    </div>
+    <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;(자동으로 저장됩니다)"></textarea>
+    <div class="memo-footer">
+      <span class="memo-status" id="memoStatus">자동 저장됨 ✓</span>
+      <span id="memoCharCount">0자</span>
+    </div>
+  </div>
+</div>
 
 <!-- Edit Modal -->
 <div class="modal-overlay hidden" id="editModal">
@@ -762,6 +840,74 @@ document.getElementById('editSaveBtn').onclick=()=>{
 document.getElementById('editCancelBtn').onclick=closeEdit;
 document.getElementById('editModal').onclick=e=>{if(e.target===document.getElementById('editModal'))closeEdit();};
 
+// ── Memo ──
+let memoCtx = null, memoTimer = null;
+
+function openMemo(dk, taskId, anchorEl) {
+  const task = (tasks[dk]||[]).find(t=>t.id===taskId);
+  if (!task) return;
+  memoCtx = {dk, taskId};
+  document.getElementById('memoTitle').textContent = task.text;
+  const ta = document.getElementById('memoTextarea');
+  ta.value = task.memo || '';
+  updateMemoCount();
+  setMemoStatus('saved');
+  positionMemo(anchorEl);
+  document.getElementById('memoOverlay').classList.remove('hidden');
+  setTimeout(()=>ta.focus(), 60);
+}
+
+function positionMemo(anchor) {
+  const pop = document.getElementById('memoPopup');
+  if (window.innerWidth <= 768) return; // mobile: CSS handles it (bottom sheet)
+  const rect = anchor.getBoundingClientRect();
+  const popW = 300, popH = 260;
+  let left = rect.right + 14;
+  let top  = rect.top + window.scrollY - 8;
+  if (left + popW > window.innerWidth - 12) left = rect.left - popW - 14;
+  if (left < 12) left = 12;
+  if (top + popH > window.scrollY + window.innerHeight - 12) top = window.scrollY + window.innerHeight - popH - 12;
+  if (top < window.scrollY + 8) top = window.scrollY + 8;
+  pop.style.left = left + 'px';
+  pop.style.top  = top + 'px';
+}
+
+function closeMemo() {
+  clearTimeout(memoTimer);
+  if (memoCtx) saveMemoNow();
+  document.getElementById('memoOverlay').classList.add('hidden');
+  memoCtx = null;
+}
+
+function saveMemoNow() {
+  if (!memoCtx) return;
+  const task = (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId);
+  if (task) {
+    task.memo = document.getElementById('memoTextarea').value;
+    saveTasks();
+    render();
+  }
+}
+
+function setMemoStatus(state) {
+  const el = document.getElementById('memoStatus');
+  el.className = 'memo-status ' + (state==='saved'?'ok':'saving');
+  el.textContent = state==='saved' ? '자동 저장됨 ✓' : '저장 중...';
+}
+
+function updateMemoCount() {
+  document.getElementById('memoCharCount').textContent = document.getElementById('memoTextarea').value.length + '자';
+}
+
+document.getElementById('memoTextarea').addEventListener('input', ()=>{
+  updateMemoCount();
+  setMemoStatus('saving');
+  clearTimeout(memoTimer);
+  memoTimer = setTimeout(()=>{ saveMemoNow(); setMemoStatus('saved'); }, 700);
+});
+document.getElementById('memoClose').onclick = closeMemo;
+document.getElementById('memoOverlay').onclick = e=>{ if(e.target===document.getElementById('memoOverlay')) closeMemo(); };
+
 // ── Weather ──
 async function fetchWeather(lat,lon) {
   try {
@@ -800,7 +946,15 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk) 
   cb.onclick=e=>{e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
   item.appendChild(cb);
   const body=el('div','task-body');
-  body.appendChild(el('div',`task-text${checked?' done':''}`,{textContent:task.text}));
+  // text + memo dot (clickable to open memo)
+  const textWrap=el('div','task-text-wrap');
+  const txt=el('div',`task-text${checked?' done':''}`,{textContent:task.text});
+  textWrap.appendChild(txt);
+  if(!isSub&&task.memo){ const dot=el('span','memo-dot',{title:'메모 있음'}); textWrap.appendChild(dot); }
+  if(!isSub){
+    textWrap.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
+  }
+  body.appendChild(textWrap);
   if(!isSub&&task.repeat&&task.repeat!=='none'){
     body.appendChild(el('div','repeat-badge',{textContent:task.repeat==='weekly'?'🔄 매주':'🔄 매월'}));
   }
@@ -1139,7 +1293,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='t'||e.key==='T'){document.getElementById('todayBtn').click();}
   if(e.key==='/'){e.preventDefault();document.getElementById('searchInput').focus();}
   if(e.key==='d'||e.key==='D'){document.getElementById('darkBtn').click();}
-  if(e.key==='Escape'){closeEdit();activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
+  if(e.key==='Escape'){closeMemo();closeEdit();activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
 });
 
 // ── Init ──
