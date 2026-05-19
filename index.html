@@ -391,9 +391,93 @@
       .calendar-grid { grid-template-columns:repeat(4,1fr); min-width:unset; }
       .day-col { min-height:380px; }
     }
+
+    /* ─── Landing page ─── */
+    .landing-overlay {
+      position:fixed; inset:0; background:var(--bg); z-index:1000;
+      display:flex; align-items:center; justify-content:center; padding:20px;
+    }
+    .landing-card {
+      background:var(--surface); border:1px solid var(--border); border-radius:20px;
+      padding:40px 36px; max-width:420px; width:100%; text-align:center;
+      box-shadow:var(--shadow-md);
+    }
+    .landing-icon { font-size:52px; margin-bottom:12px; }
+    .landing-title { font-size:26px; font-weight:800; color:var(--text); margin-bottom:6px; }
+    .landing-sub { font-size:14px; color:var(--text2); margin-bottom:28px; }
+    .landing-input-wrap { display:flex; gap:8px; margin-bottom:10px; }
+    .landing-input {
+      flex:1; border:1.5px solid var(--border); border-radius:10px; padding:11px 14px;
+      font-size:15px; font-family:inherit; outline:none; background:var(--surface);
+      color:var(--text); transition:border-color .15s, box-shadow .15s;
+    }
+    .landing-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-l); }
+    .landing-btn {
+      background:var(--primary); color:#fff; border:none; border-radius:10px;
+      padding:11px 20px; font-size:15px; font-weight:700; cursor:pointer;
+      font-family:inherit; transition:background .15s; white-space:nowrap;
+    }
+    .landing-btn:hover { background:var(--primary-h); }
+    .landing-hint { font-size:12px; color:var(--text3); margin-bottom:24px; }
+    .landing-features {
+      display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+      margin-bottom:24px;
+    }
+    .landing-feat {
+      background:var(--surface2); border:1px solid var(--border); border-radius:20px;
+      padding:5px 12px; font-size:12px; color:var(--text2);
+    }
+    .landing-demo {
+      display:inline-block; font-size:13px; color:var(--primary); text-decoration:none;
+      border:1px solid var(--primary-l); border-radius:8px; padding:6px 16px;
+      transition:background .15s;
+    }
+    .landing-demo:hover { background:var(--primary-l); }
+    .landing-dark-btn {
+      position:absolute; top:16px; right:16px; background:none; border:1px solid var(--border);
+      border-radius:8px; width:36px; height:36px; cursor:pointer; font-size:16px;
+    }
+
+    /* ─── User chip in header ─── */
+    .user-chip {
+      display:flex; align-items:center; gap:5px; background:var(--primary-l);
+      border-radius:20px; padding:4px 10px; font-size:12px; font-weight:600;
+      color:var(--primary); white-space:nowrap;
+    }
+    .copy-url-btn {
+      background:none; border:1px solid var(--border); border-radius:7px;
+      padding:4px 10px; font-size:12px; cursor:pointer; color:var(--text2);
+      font-family:inherit; transition:all .15s; white-space:nowrap;
+    }
+    .copy-url-btn:hover { background:var(--primary-l); color:var(--primary); border-color:var(--primary); }
+    @media (max-width:768px) { .copy-url-btn span { display:none; } }
   </style>
 </head>
 <body>
+
+<!-- Landing page (shown when no ?u= param) -->
+<div class="landing-overlay" id="landingOverlay" style="display:none">
+  <button class="landing-dark-btn" id="landingDarkBtn">🌙</button>
+  <div class="landing-card">
+    <div class="landing-icon">📅</div>
+    <div class="landing-title">캘린더 태스크</div>
+    <div class="landing-sub">이름을 입력하면 나만의 캘린더 URL이 생성됩니다</div>
+    <div class="landing-input-wrap">
+      <input class="landing-input" id="landingInput" type="text" placeholder="이름 입력 (예: 홍길동)" maxlength="30">
+      <button class="landing-btn" id="landingStartBtn">시작 →</button>
+    </div>
+    <div class="landing-hint">📌 URL을 북마크하거나 저장해두면 다음에 바로 접근 가능해요</div>
+    <div class="landing-features">
+      <span class="landing-feat">✅ 체크리스트</span>
+      <span class="landing-feat">🔄 주간·월간 반복</span>
+      <span class="landing-feat">📅 월간 보기</span>
+      <span class="landing-feat">🔍 검색</span>
+      <span class="landing-feat">🌤️ 날씨</span>
+      <span class="landing-feat">🌙 다크모드</span>
+    </div>
+    <a href="?u=demo" class="landing-demo">📋 데모 보기</a>
+  </div>
+</div>
 
 <header class="header">
   <span class="header-title">📅 태스크</span>
@@ -412,6 +496,8 @@
     <input class="search-input" id="searchInput" placeholder="태스크 검색... (/)">
   </div>
   <div class="header-actions">
+    <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
+    <button class="copy-url-btn" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
     <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
     <div class="progress-pill" id="progressInfo"></div>
@@ -495,28 +581,69 @@ const SEED_TASKS = {
   '2026-05-01':[{id:'s086',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]}]
 };
 
+// ── URL User ──
+const URL_PARAMS = new URLSearchParams(window.location.search);
+const USER_ID = URL_PARAMS.get('u') || '';
+const STORAGE_KEY = USER_ID ? `calTasks_${USER_ID}` : 'calTasks';
+
+// ── Landing page ──
+if (!USER_ID) {
+  document.getElementById('landingOverlay').style.display = 'flex';
+  document.getElementById('landingInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('landingStartBtn').click();
+  });
+  document.getElementById('landingStartBtn').onclick = () => {
+    const name = document.getElementById('landingInput').value.trim();
+    if (!name) { document.getElementById('landingInput').focus(); return; }
+    window.location.href = `?u=${encodeURIComponent(name)}`;
+  };
+  document.getElementById('landingDarkBtn').onclick = () => {
+    const html = document.documentElement;
+    const isDark = html.dataset.theme === 'dark';
+    html.dataset.theme = isDark ? 'light' : 'dark';
+    document.getElementById('landingDarkBtn').textContent = isDark ? '🌙' : '☀️';
+    localStorage.setItem('theme', html.dataset.theme);
+  };
+} else {
+  // Show user chip + copy URL button
+  document.getElementById('userChip').style.display = 'flex';
+  document.getElementById('userChipName').textContent = decodeURIComponent(USER_ID);
+  document.getElementById('copyUrlBtn').style.display = 'flex';
+  document.getElementById('copyUrlBtn').onclick = () => {
+    const url = window.location.href.split('?')[0] + `?u=${encodeURIComponent(USER_ID)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = document.getElementById('copyUrlBtn');
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✅ <span>복사됨!</span>';
+      setTimeout(() => { btn.innerHTML = orig; }, 1800);
+    });
+  };
+}
+
 // ── State ──
 let currentView = 'week';
-let weekStart = getMonday(new Date('2026-03-30'));
-let monthDate = new Date('2026-03-01');
+let weekStart = getMonday(new Date());
+let monthDate = new Date(); monthDate.setDate(1);
 let tasks = loadTasks();
 let activeInput = null;
 let weatherByDate = {};
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
 let searchQuery = '';
-let editCtx = null; // {dk, taskId}
+let editCtx = null;
 let _editColor = null, _editStarred = false, _editRepeat = 'none';
 
 // ── Persistence ──
 function loadTasks() {
   try {
-    const stored = JSON.parse(localStorage.getItem('calTasks')||'{}');
-    const merged = JSON.parse(JSON.stringify(SEED_TASKS));
-    Object.keys(stored).forEach(dk => { merged[dk] = stored[dk]; });
-    return merged;
-  } catch { return JSON.parse(JSON.stringify(SEED_TASKS)); }
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    // demo user gets seed data on first visit
+    if (USER_ID === 'demo' && Object.keys(stored).length === 0) {
+      return JSON.parse(JSON.stringify(SEED_TASKS));
+    }
+    return stored;
+  } catch { return {}; }
 }
-function saveTasks() { localStorage.setItem('calTasks', JSON.stringify(tasks)); }
+function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
 
 // ── Date helpers ──
 function getMonday(d) {
