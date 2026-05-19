@@ -1664,35 +1664,84 @@ function buildDashStats(){
   panel.appendChild(tipWrap);
 }
 
+function getSheetEvents(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const seen=new Set();
+  const events=[];
+  Object.entries(tasks).forEach(([dk,list])=>{
+    if(!Array.isArray(list)) return;
+    list.forEach(t=>{
+      if(!t||t.color!=='#1677ff'||!t.text.includes('[전관행사]')) return;
+      const date=new Date(dk); date.setHours(0,0,0,0);
+      const dday=Math.round((date-today)/86400000);
+      if(dday<0) return; // 지난 행사 제외
+      const key=t.text+'|'+dk;
+      if(seen.has(key)) return;
+      seen.add(key);
+      // 날짜 범위 행사는 시작일만 한번 보여주기 위해 텍스트 기준 중복 제거
+      const textSeen=seen.has(t.text);
+      if(!textSeen){ seen.add(t.text); events.push({text:t.text,dk,date,dday}); }
+    });
+  });
+  return events.sort((a,b)=>a.dday-b.dday);
+}
+
 function buildDashCalendar(){
   const panel = document.getElementById('dashCalendar');
   panel.innerHTML = '';
-  const title = document.createElement('div'); title.className='dash-panel-title'; title.textContent='🗓 패션·리테일 마케팅 캘린더';
+  const sheetEvts = getSheetEvents();
+  const hasSheet = sheetEvts.length > 0;
+
+  const title = document.createElement('div'); title.className='dash-panel-title';
+  title.textContent = hasSheet ? '🏬 전관행사 일정' : '🗓 패션·리테일 마케팅 캘린더';
   panel.appendChild(title);
 
-  const upcoming = MARKETING_EVENTS
-    .map(e=>({ ...e, dday: getDday(e.month, e.day) }))
-    .sort((a,b)=>a.dday-b.dday)
-    .slice(0,8);
-
   const list = document.createElement('div'); list.className='upcoming-list';
-  upcoming.forEach(e=>{
-    const item=document.createElement('div'); item.className='upcoming-item';
-    const dd=document.createElement('div');
-    dd.className='upcoming-dday '+(e.dday===0?'today':e.dday<=14?'soon':'far');
-    dd.textContent=e.dday===0?'D-DAY':'D-'+e.dday;
-    const info=document.createElement('div'); info.className='upcoming-info';
-    const name=document.createElement('div'); name.className='upcoming-name'; name.textContent=e.name;
-    const date=document.createElement('div'); date.className='upcoming-date';
-    const yr=new Date().getFullYear(); const target=new Date(yr,e.month-1,e.day);
-    if(getDday(e.month,e.day)!==Math.round((target-new Date().setHours(0,0,0,0))/86400000)) target.setFullYear(yr+1);
-    date.textContent=`${target.getMonth()+1}월 ${target.getDate()}일`;
-    info.appendChild(name); info.appendChild(date);
-    const tag=document.createElement('div'); tag.className='upcoming-tag';
-    tag.textContent=e.dday<=7?'⚡ 임박':e.dday<=30?'📌 준비':'📋 예정';
-    item.appendChild(dd); item.appendChild(info); item.appendChild(tag);
-    list.appendChild(item);
-  });
+
+  if(hasSheet){
+    sheetEvts.slice(0,10).forEach(e=>{
+      const item=document.createElement('div'); item.className='upcoming-item';
+      const dd=document.createElement('div');
+      dd.className='upcoming-dday '+(e.dday===0?'today':e.dday<=7?'soon':'far');
+      dd.textContent=e.dday===0?'D-DAY':'D-'+e.dday;
+      const info=document.createElement('div'); info.className='upcoming-info';
+      // 텍스트에서 [전관행사] 제거 후 표시
+      const cleanName=e.text.replace('[전관행사]','').trim();
+      const name=document.createElement('div'); name.className='upcoming-name'; name.textContent=cleanName||e.text;
+      const dateEl=document.createElement('div'); dateEl.className='upcoming-date';
+      dateEl.textContent=`${e.date.getMonth()+1}월 ${e.date.getDate()}일 (${['일','월','화','수','목','금','토'][e.date.getDay()]})`;
+      info.appendChild(name); info.appendChild(dateEl);
+      const tag=document.createElement('div'); tag.className='upcoming-tag';
+      tag.textContent=e.dday===0?'🔴 오늘':e.dday<=7?'⚡ 임박':e.dday<=30?'📌 준비':'📋 예정';
+      item.appendChild(dd); item.appendChild(info); item.appendChild(tag);
+      list.appendChild(item);
+    });
+  } else {
+    // 시트 동기화 전 — 하드코딩 폴백
+    MARKETING_EVENTS
+      .map(e=>({ ...e, dday: getDday(e.month, e.day) }))
+      .sort((a,b)=>a.dday-b.dday).slice(0,8)
+      .forEach(e=>{
+        const item=document.createElement('div'); item.className='upcoming-item';
+        const dd=document.createElement('div');
+        dd.className='upcoming-dday '+(e.dday===0?'today':e.dday<=14?'soon':'far');
+        dd.textContent=e.dday===0?'D-DAY':'D-'+e.dday;
+        const info=document.createElement('div'); info.className='upcoming-info';
+        const name=document.createElement('div'); name.className='upcoming-name'; name.textContent=e.name;
+        const yr=new Date().getFullYear(); const target=new Date(yr,e.month-1,e.day);
+        const dateEl=document.createElement('div'); dateEl.className='upcoming-date';
+        dateEl.textContent=`${target.getMonth()+1}월 ${target.getDate()}일`;
+        info.appendChild(name); info.appendChild(dateEl);
+        const tag=document.createElement('div'); tag.className='upcoming-tag';
+        tag.textContent=e.dday<=7?'⚡ 임박':e.dday<=30?'📌 준비':'📋 예정';
+        item.appendChild(dd); item.appendChild(info); item.appendChild(tag);
+        list.appendChild(item);
+      });
+    const hint=document.createElement('div');
+    hint.style.cssText='font-size:11px;color:var(--text3);text-align:center;margin-top:10px';
+    hint.textContent='📥 아래 버튼으로 구글 시트 동기화 시 실제 전관행사 일정으로 업데이트됩니다';
+    list.appendChild(hint);
+  }
   panel.appendChild(list);
 }
 
@@ -1769,6 +1818,10 @@ async function syncSheetEvents(manual=false){
     localStorage.setItem(SHEET_SYNC_KEY,now);
     if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent=`✅ 동기화됨 (${added}건)`; }
     buildDashStats();
+    buildDashCalendar();
+    // 동기화 버튼·라벨 재부착
+    const p=document.getElementById('dashCalendar');
+    if(p){ appendSheetSyncRow(p); }
     return {success:true,added};
   }catch(e){
     if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent='⚠️ 실패 — 재시도'; }
@@ -1785,24 +1838,35 @@ function checkMondaySync(){
   syncSheetEvents();
 }
 
-function initDashboard(){
-  if(window.innerWidth<=768) return;
-  buildDashStats();
-  buildDashCalendar();
-  // Sheet sync button in right panel
-  const panel=document.getElementById('dashCalendar');
-  const divider=document.createElement('div'); divider.style.cssText='margin:14px 0 10px;border-top:1px solid var(--border)';
+function appendSheetSyncRow(panel){
+  // remove old sync row if exists
+  const old=panel.querySelector('.sheet-sync-row');
+  if(old) old.remove();
+  const old2=panel.querySelector('.sheet-sync-divider');
+  if(old2) old2.remove();
+  const divider=document.createElement('div');
+  divider.className='sheet-sync-divider';
+  divider.style.cssText='margin:14px 0 10px;border-top:1px solid var(--border)';
   panel.appendChild(divider);
-  const syncRow=document.createElement('div'); syncRow.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';
+  const syncRow=document.createElement('div');
+  syncRow.className='sheet-sync-row';
+  syncRow.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';
   const syncLabel=document.createElement('div'); syncLabel.style.cssText='font-size:11px;color:var(--text3)';
   const last=localStorage.getItem(SHEET_SYNC_KEY);
-  syncLabel.textContent=last?`시트 마지막 동기화: ${last}`:'시트 미동기화';
+  syncLabel.textContent=last?`마지막 동기화: ${last}`:'시트 미동기화';
   const syncBtn=document.createElement('button'); syncBtn.id='sheetSyncBtn';
   syncBtn.style.cssText='font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--primary);background:var(--primary-l);color:var(--primary);cursor:pointer;white-space:nowrap';
   syncBtn.textContent='📥 지금 가져오기';
   syncBtn.onclick=()=>syncSheetEvents(true);
   syncRow.appendChild(syncLabel); syncRow.appendChild(syncBtn);
   panel.appendChild(syncRow);
+}
+
+function initDashboard(){
+  if(window.innerWidth<=768) return;
+  buildDashStats();
+  buildDashCalendar();
+  appendSheetSyncRow(document.getElementById('dashCalendar'));
 }
 
 initDashboard();
