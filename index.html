@@ -1767,66 +1767,119 @@ function parseCSV(text){
   return rows;
 }
 
-function parseDateRange(cellText){
-  // e.g. "1/13 1시~1/15 10시"  or  "1/13~1/15"
-  const year=2026;
-  const found=[...cellText.matchAll(/(\d{1,2})\/(\d{1,2})/g)]
-    .map(m=>new Date(year,+m[1]-1,+m[2]));
-  if(!found.length) return [];
-  if(found.length===1) return [found[0]];
-  // build range between first and last date
-  const days=[]; const cur=new Date(found[0]); const end=new Date(found[found.length-1]);
+function parseDateRange(cellText, contextYear){
+  // e.g. "[전관행사] L+DAY (1/13 10시~1/15 10시) * 1/13 10시~..."
+  // Deduplicate M/D pairs and track year rollover within the range
+  const rawMatches=[...cellText.matchAll(/(\d{1,2})\/(\d{1,2})/g)]
+    .map(m=>({month:+m[1],day:+m[2]}));
+  if(!rawMatches.length) return [];
+  // Deduplicate consecutive identical months/days
+  const unique=[rawMatches[0]];
+  for(let i=1;i<rawMatches.length;i++){
+    const prev=unique[unique.length-1];
+    if(rawMatches[i].month!==prev.month||rawMatches[i].day!==prev.day) unique.push(rawMatches[i]);
+  }
+  // Assign years: if month drops (12→1), increment year
+  let yr=contextYear; let prevM=null;
+  const dated=unique.map(({month,day})=>{
+    if(prevM!==null&&month<prevM&&prevM>=10) yr++;
+    prevM=month;
+    return new Date(yr,month-1,day);
+  });
+  if(dated.length===1) return dated;
+  // Build inclusive date range between first and last
+  const days=[]; const cur=new Date(dated[0]); const end=new Date(dated[dated.length-1]);
   while(cur<=end){ days.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
   return days;
 }
 
 function makeEventText(cellText){
-  return cellText.replace(/\s+/g,' ').trim();
+  // Strip annotation after asterisk (e.g. "* 1/13 10시~... 우선 랜딩")
+  return cellText.replace(/\*[^[]*$/,'').replace(/\s+/g,' ').trim();
+}
+
+async function fetchSheetCSV(){
+  const exportUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+  const pubUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/pub?gid=${SHEET_GID}&single=true&output=csv`;
+  const proxies=[
+    u=>`https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+    u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ];
+  for(const makeProxy of proxies){
+    for(const srcUrl of [exportUrl, pubUrl]){
+      try{
+        const res=await fetch(makeProxy(srcUrl),{signal:AbortSignal.timeout(15000)});
+        if(!res.ok) continue;
+        const text=await res.text();
+        let csv=text;
+        try{ const j=JSON.parse(text); if(j.contents) csv=j.contents; }catch(e){}
+        // Validate: real CSV has commas and newlines
+        if(csv&&csv.includes(',')&&csv.includes('\n')) return csv;
+      }catch(e){ continue; }
+    }
+  }
+  return null;
 }
 
 async function syncSheetEvents(manual=false){
   const syncBtn=document.getElementById('sheetSyncBtn');
   if(syncBtn){ syncBtn.disabled=true; syncBtn.textContent='동기화 중...'; }
-  const csvUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
-  const proxyUrl=`https://api.allorigins.win/get?url=${encodeURIComponent(csvUrl)}`;
   try{
-    const res=await fetch(proxyUrl,{signal:AbortSignal.timeout(15000)});
-    const data=await res.json();
-    const rows=parseCSV(data.contents||'');
+    const csv=await fetchSheetCSV();
+    if(!csv) throw new Error('CSV 로드 실패');
+    const rows=parseCSV(csv);
+
+    // Determine starting year from first date row (CSV index 2 = spreadsheet row 3)
+    let contextYear=2026, prevWeekMonth=null;
+    const firstDateRow=rows[2]||[];
+    for(let ci=41;ci<=47;ci++){
+      const m=(firstDateRow[ci]||'').match(/(\d{1,2})[월\/\s]\s*\d/);
+      if(m){ prevWeekMonth=+m[1]; contextYear=prevWeekMonth>=10?2025:2026; break; }
+    }
+
     let added=0;
-    // Event rows in CSV: index 3, 9, 15, 21, ... (spreadsheet rows 4,10,16,22...)
-    for(let ri=3; ri<rows.length; ri+=6){
-      const row=rows[ri]||[];
-      for(let ci=SHEET_COL_START; ci<=SHEET_COL_END; ci++){
-        const cell=(row[ci]||'').trim();
-        if(!cell.includes('[전관행사]')) continue;
-        const dates=parseDateRange(cell);
-        if(!dates.length) continue;
-        const text=makeEventText(cell);
-        dates.forEach(date=>{
-          const dk=dateKey(date);
-          if(!tasks[dk]) tasks[dk]=[];
-          if(!tasks[dk].some(t=>t.text===text)){
-            tasks[dk].push({id:uid(),text,checked:false,starred:true,color:'#1677ff',repeat:'none',completions:{},subs:[]});
-            added++;
-          }
-        });
+    // Date rows at CSV indices 2,8,14,20,...  Event rows: dateIdx+1 (가변탭1), dateIdx+2 (가변탭2)
+    for(let dateIdx=2; dateIdx<rows.length; dateIdx+=6){
+      // Update context year by reading this week's Monday date
+      const dateRow=rows[dateIdx]||[];
+      for(let ci=41;ci<=47;ci++){
+        const m=(dateRow[ci]||'').match(/(\d{1,2})[월\/\s]\s*\d/);
+        if(m){
+          const mo=+m[1];
+          if(prevWeekMonth!==null&&mo<prevWeekMonth&&prevWeekMonth>=10) contextYear++;
+          prevWeekMonth=mo; break;
+        }
+      }
+      // Scan event rows: +1 (가변탭1) and +2 (가변탭2)
+      for(const offset of [1,2]){
+        const evRow=rows[dateIdx+offset]||[];
+        for(let ci=SHEET_COL_START;ci<=SHEET_COL_END;ci++){
+          const cell=(evRow[ci]||'').trim();
+          if(!cell.includes('[전관행사]')) continue;
+          const dates=parseDateRange(cell, contextYear);
+          if(!dates.length) continue;
+          const text=makeEventText(cell);
+          dates.forEach(date=>{
+            const dk=dateKey(date);
+            if(!tasks[dk]) tasks[dk]=[];
+            if(!tasks[dk].some(t=>t.text===text)){
+              tasks[dk].push({id:uid(),text,checked:false,starred:true,color:'#1677ff',repeat:'none',completions:{},subs:[]});
+              added++;
+            }
+          });
+        }
       }
     }
     if(added>0){ localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks)); if(fbRef())fbUpload(); render(); }
-    const now=new Date().toISOString().slice(0,10);
-    localStorage.setItem(SHEET_SYNC_KEY,now);
+    localStorage.setItem(SHEET_SYNC_KEY,new Date().toISOString().slice(0,10));
     if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent=`✅ 동기화됨 (${added}건)`; }
-    buildDashStats();
-    buildDashCalendar();
-    // 동기화 버튼·라벨 재부착
-    const p=document.getElementById('dashCalendar');
-    if(p){ appendSheetSyncRow(p); }
+    buildDashStats(); buildDashCalendar();
+    const p=document.getElementById('dashCalendar'); if(p) appendSheetSyncRow(p);
     return {success:true,added};
   }catch(e){
-    if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent='⚠️ 실패 — 재시도'; }
+    if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent=`⚠️ 실패: ${e.message}`; }
     console.warn('Sheet sync error:',e);
-    return {success:false};
+    return {success:false,error:e.message};
   }
 }
 
