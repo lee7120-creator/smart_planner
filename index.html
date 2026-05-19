@@ -397,15 +397,224 @@ const COLORS = [
   { hex: '#607d8b', name: '회색' },
 ];
 
+// ── Seed data (from uploaded schedule image) ──
+const SEED_TASKS = {
+  '2026-03-30': [
+    { id:'s001', text:'오전) 개인화 검수', starred:true,  checked:false, color:null, subs:[
+      { id:'s001a', text:'재방_7시반 이자벨마랑&뻐두', checked:false, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-03-31': [
+    { id:'s002', text:'첫구매런 > 앱푸쉬',      starred:true,  checked:false, color:null, subs:[] },
+    { id:'s003', text:'최종 기획전 검토',         starred:false, checked:false, color:null, subs:[] },
+    { id:'s004', text:'전관행사 쿠폰 및 연결',    starred:false, checked:false, color:null, subs:[] },
+    { id:'s005', text:'퇴근 전 결재',             starred:false, checked:false, color:null, subs:[] }
+  ],
+  '2026-04-01': [
+    { id:'s006', text:'첫구매런 > 앱푸쉬',           starred:true,  checked:false, color:null, subs:[] },
+    { id:'s007', text:'웰컴 4월 문서변경',             starred:false, checked:true,  color:null, subs:[] },
+    { id:'s008', text:'전관행사 쿠폰 생성 및 연결',   starred:false, checked:true,  color:null, subs:[] },
+    { id:'s009', text:'기획전 검토',                   starred:false, checked:true,  color:null, subs:[] }
+  ],
+  '2026-04-02': [
+    { id:'s010', text:'오전) 개인화 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s010a', text:'오픈예정3건', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s011', text:'출석체크 푸쉬 취합', starred:false, checked:true, color:null, subs:[] }
+  ],
+  '2026-04-03': [
+    { id:'s012', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, subs:[] },
+    { id:'s013', text:'전관행사 쿠폰 및 세팅', starred:false, checked:true, color:null, subs:[
+      { id:'s013a', text:'앨페스타', checked:true, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-06': [
+    { id:'s014', text:'7시반_재방_헤지스/닥스골프', starred:false, checked:false, color:null, subs:[
+      { id:'s014a', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s015', text:'5월 웰컴 쿠폰 생성>미승인',     starred:false, checked:true, color:null, subs:[] },
+    { id:'s016', text:'웰컴>유의사항&카운트 수정',      starred:false, checked:true, color:null, subs:[] },
+    { id:'s017', text:'앨페스타 문구 수정',              starred:false, checked:true, color:null, subs:[] }
+  ],
+  '2026-04-07': [
+    { id:'s018', text:'오전) 개인화 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s018a', text:'7시반 본방',     checked:false, starred:false, color:null, subs:[] },
+      { id:'s018b', text:'퇴근 전 결재',  checked:false, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-08': [
+    { id:'s019', text:'첫구매런 > 앱푸쉬', starred:true, checked:false, color:null, subs:[
+      { id:'s019a', text:'7시반 본방', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s020', text:'레스타 알림 문자 발송 → 12시 발송', starred:false, checked:true, color:null, subs:[
+      { id:'s020a', text:'11시 결재', checked:true, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s021', text:'웰컴 디자인 요청',                     starred:false, checked:true, color:null, subs:[] },
+    { id:'s022', text:'첫구매런 할인 취합 요청 > (목)까지',   starred:false, checked:true, color:null, subs:[] },
+    { id:'s023', text:'메일 세팅(자주 필요일까지)',            starred:false, checked:true, color:null, subs:[] },
+    { id:'s024', text:'마일리지지급_4/9일세팅',               starred:false, checked:true, color:null, subs:[] },
+    { id:'s025', text:'거래선코드',                            starred:false, checked:true, color:null, subs:[] }
+  ],
+  '2026-04-09': [
+    { id:'s026', text:'오전) 개인화 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s026a', text:'오픈예정3건',  checked:false, starred:false, color:null, subs:[] },
+      { id:'s026b', text:'7시반_재방',   checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s027', text:'10시 웰컴 페이지 확인',          starred:false, checked:true, color:null, subs:[] },
+    { id:'s028', text:'첫구매런 앱푸쉬 취합',            starred:false, checked:true, color:null, subs:[] },
+    { id:'s029', text:'111214 >> LMS 지원요청',          starred:false, checked:true, color:null, subs:[] },
+    { id:'s030', text:'기획전 오픈X',                    starred:false, checked:true, color:null, subs:[] },
+    { id:'s031', text:'AP-260402579 > 마일리지지급',     starred:false, checked:true, color:null, subs:[] }
+  ],
+  '2026-04-10': [
+    { id:'s032', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s032a', text:'11시 재방_(빈스/바쉬/뻐두)', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s033', text:'출석체크 참여자 추출',                          starred:false, checked:true,  color:null, subs:[] },
+    { id:'s034', text:'출석체크 쿠폰 생성',                            starred:false, checked:true,  color:null, subs:[] },
+    { id:'s035', text:'오후) CR 쿠폰 생성',                            starred:false, checked:true,  color:null, subs:[] },
+    { id:'s036', text:'오후) 첫구매_장바구니보유_SMS', starred:false, checked:false, color:null, subs:[
+      { id:'s036a', text:'모수 26,000명으로 추후 발송', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s037', text:'오후) 출석체크 쿠폰 발급요청 > LMS 발송',      starred:false, checked:true,  color:null, subs:[] },
+    { id:'s038', text:'5월출석체크/친구초대 원스피어 세팅 완료',       starred:false, checked:true,  color:null, subs:[] }
+  ],
+  '2026-04-13': [
+    { id:'s039', text:'7시반_재방', starred:false, checked:false, color:null, subs:[
+      { id:'s039a', text:'퇴근 후 결재', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s040', text:'CR개선 1차_최용남팀장님', starred:false, checked:true, color:null, subs:[
+      { id:'s040a', text:'소문내기 참여자 추출',      checked:true, starred:false, color:null, subs:[] },
+      { id:'s040b', text:'장성우 > 파일 전달·받기',  checked:true, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-14': [
+    { id:'s041', text:'오전) 개인화 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s041a', text:'7시반_본방',    checked:false, starred:false, color:null, subs:[] },
+      { id:'s041b', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-15': [
+    { id:'s042', text:'첫구매런 > 앱푸쉬', starred:true, checked:false, color:null, subs:[
+      { id:'s042a', text:'7시반 본방',    checked:false, starred:false, color:null, subs:[] },
+      { id:'s042b', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s043', text:'소문내기 마일리지 지급', starred:false, checked:true, color:null, subs:[
+      { id:'s043a', text:'그름발송 추가 후 결재(2시)', checked:true, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s044', text:'메일 세팅(자주 필요일까지)', starred:false, checked:true, color:null, subs:[] },
+    { id:'s045', text:'5월 기획전 배너 세팅',        starred:false, checked:true, color:null, subs:[] },
+    { id:'s046', text:'전관행사 쿠폰 생성 및 세팅',  starred:false, checked:true, color:null, subs:[] }
+  ],
+  '2026-04-16': [
+    { id:'s047', text:'오전) 개인화 검수 > 오픈예정3건', starred:true, checked:false, color:null, subs:[
+      { id:'s047a', text:'7시반_재방',    checked:false, starred:false, color:null, subs:[] },
+      { id:'s047b', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s048', text:'익일 11시 재방 세팅 해야함',      starred:false, checked:true,  color:null, subs:[] },
+    { id:'s049', text:'전관행사 확인 후 상품세팅',        starred:false, checked:false, color:null, subs:[] },
+    { id:'s050', text:'소문내기/친구초대 상품 변경',      starred:false, checked:true,  color:null, subs:[] },
+    { id:'s051', text:'첫구매_장바구니보유_SMS', starred:false, checked:true, color:null, subs:[
+      { id:'s051a', text:'1시쯤 결재', checked:true, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-17': [
+    { id:'s052', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s052a', text:'11시_재방', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s053', text:'전시휴무', starred:false, checked:false, color:'#e53935', subs:[] }
+  ],
+  '2026-04-20': [
+    { id:'s054', text:'연차', starred:false, checked:false, color:'#fb8c00', subs:[] }
+  ],
+  '2026-04-21': [
+    { id:'s055', text:'오전) 개인화 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s055a', text:'7시반본방', checked:false, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-22': [
+    { id:'s056', text:'첫구매런 > 앱푸쉬', starred:true, checked:false, color:null, subs:[
+      { id:'s056a', text:'7시반본방', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s057', text:'소문내기/친구초대 지라요청',         starred:false, checked:true, color:null, subs:[] },
+    { id:'s058', text:'캠페인 (첫구매/친구매런)',            starred:false, checked:true, color:null, subs:[] },
+    { id:'s059', text:'웰컴 5월 공동 코드 등록요청', starred:false, checked:true, color:null, subs:[
+      { id:'s059a', text:'지라요청', checked:true, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-23': [
+    { id:'s060', text:'오전) 개인화 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s060a', text:'오픈예정3건',  checked:false, starred:false, color:null, subs:[] },
+      { id:'s060b', text:'7시반본방',    checked:false, starred:false, color:null, subs:[] },
+      { id:'s060c', text:'퇴근 전 결재', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s061', text:'개인화 오픈일정 안내', starred:false, checked:true, color:null, subs:[] }
+  ],
+  '2026-04-24': [
+    { id:'s062', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, subs:[] },
+    { id:'s063', text:'비용품의 작성(출석체크/친구초대/상품공구)', starred:false, checked:true, color:null, subs:[] },
+    { id:'s064', text:'CR 쿠폰생성(승인완료)',                      starred:false, checked:true, color:null, subs:[] },
+    { id:'s065', text:'첫구매 리텐션 (인수인계)', starred:false, checked:true, color:null, subs:[
+      { id:'s065a', text:'주문쿠폰 이달 리텐션',       checked:true, starred:false, color:null, subs:[] },
+      { id:'s065b', text:'할인쿠폰 생성 후 LMS 발송',  checked:true, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s066', text:'16시 > 아울렛', starred:false, checked:true, color:null, subs:[
+      { id:'s066a', text:'15시 결재', checked:true, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-27': [
+    { id:'s067', text:'7시반본방 > 닥스', starred:false, checked:false, color:null, subs:[] },
+    { id:'s068', text:'CR개선 2차 > 9시에 새로고침',           starred:false, checked:true,  color:null, subs:[] },
+    { id:'s069', text:'10시 웰컴 기획전 확인',                  starred:false, checked:true,  color:null, subs:[] },
+    { id:'s070', text:'전관행사 쿠폰 세팅',                     starred:false, checked:false, color:null, subs:[] },
+    { id:'s071', text:'메시지_전표',                            starred:false, checked:false, color:null, subs:[] },
+    { id:'s072', text:'비용품의 작성(웰컴/CR/정기리텐션)',      starred:false, checked:true,  color:null, subs:[] },
+    { id:'s073', text:'시크릿혜택 기획전 세팅', starred:false, checked:true, color:null, subs:[
+      { id:'s073a', text:'쿠폰/마일리지/e마일리지', checked:true, starred:false, color:null, subs:[] }
+    ]}
+  ],
+  '2026-04-28': [
+    { id:'s074', text:'오전) 개인화 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s074a', text:'7시반본방 → 바버', checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s075', text:'메일 세팅(자주 필요일까지)',      starred:false, checked:true, color:null, subs:[] },
+    { id:'s076', text:'14시 아울렛 문자 결재 완료',      starred:false, checked:true, color:null, subs:[] },
+    { id:'s077', text:'16시 이후 바버 고객군 중복검사',  starred:false, checked:true, color:null, subs:[] }
+  ],
+  '2026-04-29': [
+    { id:'s078', text:'첫구매런 > 앱푸쉬',                    starred:true,  checked:false, color:null, subs:[] },
+    { id:'s079', text:'14시 설문조사 문자발송(결재완료)',      starred:false, checked:true,  color:null, subs:[] },
+    { id:'s080', text:'메시지 전표',                           starred:false, checked:true,  color:null, subs:[] },
+    { id:'s081', text:'비용품의 올리기',                       starred:false, checked:true,  color:null, subs:[] }
+  ],
+  '2026-04-30': [
+    { id:'s082', text:'오전) 개인화 검수', starred:true, checked:false, color:null, subs:[
+      { id:'s082a', text:'7시반 재방송',   checked:false, starred:false, color:null, subs:[] },
+      { id:'s082b', text:'퇴근 전 결재',   checked:false, starred:false, color:null, subs:[] }
+    ]},
+    { id:'s083', text:'기획전 검토',           starred:false, checked:true, color:null, subs:[] },
+    { id:'s084', text:'전관행사 10시 세팅',    starred:false, checked:true, color:null, subs:[] },
+    { id:'s085', text:'첫구매 기획전 확인',    starred:false, checked:true, color:null, subs:[] }
+  ],
+  '2026-05-01': [
+    { id:'s086', text:'첫구매런 페이지 검수', starred:true, checked:false, color:null, subs:[] }
+  ]
+};
+
 // ── State ──
-let weekStart = getMonday(new Date());
+let weekStart = getMonday(new Date('2026-03-30'));
 let tasks = loadTasks();
 let activeInput = null; // { dateKey, parentId|null }
 
 // ── Persistence ──
 function loadTasks() {
-  try { return JSON.parse(localStorage.getItem('calTasks') || '{}'); }
-  catch { return {}; }
+  try {
+    const stored = JSON.parse(localStorage.getItem('calTasks') || '{}');
+    // Merge seed data into stored (seed only fills missing dates)
+    const merged = Object.assign({}, SEED_TASKS);
+    Object.keys(stored).forEach(dk => { merged[dk] = stored[dk]; });
+    return merged;
+  } catch { return Object.assign({}, SEED_TASKS); }
 }
 function saveTasks() {
   localStorage.setItem('calTasks', JSON.stringify(tasks));
