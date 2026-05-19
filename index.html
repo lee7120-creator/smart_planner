@@ -575,6 +575,7 @@
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
     <button class="copy-url-btn" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
+    <button class="copy-url-btn" id="switchUserBtn" style="display:none" title="다른 사용자로 전환">↩ <span>전환</span></button>
     <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
     <div class="progress-pill" id="progressInfo"></div>
@@ -728,23 +729,32 @@ const STORAGE_KEY = USER_ID ? `calTasks_${USER_ID}` : 'calTasks';
 
 // ── Landing page ──
 if (!USER_ID) {
-  document.getElementById('landingOverlay').style.display = 'flex';
-  document.getElementById('landingInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('landingStartBtn').click();
-  });
-  document.getElementById('landingStartBtn').onclick = () => {
-    const name = document.getElementById('landingInput').value.trim();
-    if (!name) { document.getElementById('landingInput').focus(); return; }
-    window.location.href = `?u=${encodeURIComponent(name)}`;
-  };
-  document.getElementById('landingDarkBtn').onclick = () => {
-    const html = document.documentElement;
-    const isDark = html.dataset.theme === 'dark';
-    html.dataset.theme = isDark ? 'light' : 'dark';
-    document.getElementById('landingDarkBtn').textContent = isDark ? '🌙' : '☀️';
-    localStorage.setItem('theme', html.dataset.theme);
-  };
+  // Auto-redirect to last used user if they've been here before
+  const lastUser = localStorage.getItem('lastUser');
+  if (lastUser) {
+    window.location.replace(`?u=${encodeURIComponent(lastUser)}`);
+  } else {
+    document.getElementById('landingOverlay').style.display = 'flex';
+    document.getElementById('landingInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('landingStartBtn').click();
+    });
+    document.getElementById('landingStartBtn').onclick = () => {
+      const name = document.getElementById('landingInput').value.trim();
+      if (!name) { document.getElementById('landingInput').focus(); return; }
+      localStorage.setItem('lastUser', name);
+      window.location.href = `?u=${encodeURIComponent(name)}`;
+    };
+    document.getElementById('landingDarkBtn').onclick = () => {
+      const html = document.documentElement;
+      const isDark = html.dataset.theme === 'dark';
+      html.dataset.theme = isDark ? 'light' : 'dark';
+      document.getElementById('landingDarkBtn').textContent = isDark ? '🌙' : '☀️';
+      localStorage.setItem('theme', html.dataset.theme);
+    };
+  }
 } else {
+  // Remember this user for future visits
+  localStorage.setItem('lastUser', USER_ID);
   // Show user chip + copy URL button
   document.getElementById('userChip').style.display = 'flex';
   document.getElementById('userChipName').textContent = decodeURIComponent(USER_ID);
@@ -757,6 +767,13 @@ if (!USER_ID) {
       btn.innerHTML = '✅ <span>복사됨!</span>';
       setTimeout(() => { btn.innerHTML = orig; }, 1800);
     });
+  };
+  document.getElementById('switchUserBtn').style.display = 'flex';
+  document.getElementById('switchUserBtn').onclick = () => {
+    if (confirm('다른 사용자로 전환할까요? 현재 데이터는 유지됩니다.')) {
+      localStorage.removeItem('lastUser');
+      window.location.href = window.location.href.split('?')[0];
+    }
   };
 }
 
