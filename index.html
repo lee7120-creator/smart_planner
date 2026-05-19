@@ -1550,11 +1550,12 @@ window.addEventListener('online', ()=>{ if(pendingUpload && fbRef()){ pendingUpl
 window.addEventListener('offline', ()=>setSyncStatus('offline'));
 
 // ── News feed ──
+const GN = (q) => `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=ko&gl=KR&ceid=KR:ko`;
 const NEWS_SOURCES = [
-  { label:'패션비즈',    url:'https://www.fashionbiz.co.kr/rss/rss.xml' },
-  { label:'어패럴뉴스',  url:'https://www.apparelnews.co.kr/rss/rss.xml' },
-  { label:'한국섬유신문', url:'https://www.textoday.co.kr/rss/allArticle.xml' },
-  { label:'패션인사이트', url:'https://www.fi.co.kr/main/rss.xml' },
+  { label:'패션 트렌드',   url: GN('패션 트렌드') },
+  { label:'리테일·커머스', url: GN('리테일 이커머스 쇼핑몰') },
+  { label:'LF·브랜드',    url: GN('LF 패션 브랜드') },
+  { label:'마케팅·광고',   url: GN('패션 마케팅 광고') },
 ];
 let newsActiveIdx = 0;
 let newsCache = {};
@@ -1573,13 +1574,21 @@ function timeAgo(dateStr){
 function parseRSS(xmlText){
   const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
   return [...xml.querySelectorAll('item')].map(item=>{
-    const get = tag => {
-      const el = item.querySelector(tag);
-      return el ? (el.textContent || el.getAttribute('url') || '') : '';
-    };
+    const get = tag => item.querySelector(tag)?.textContent?.trim() || '';
+    // Google News puts URL in <link> as a sibling text node, fallback to guid
+    let link = '';
     const linkEl = item.querySelector('link');
-    const link = linkEl ? (linkEl.textContent.trim() || linkEl.nextSibling?.nodeValue?.trim() || '') : '';
-    return { title: get('title').trim(), link: link || get('guid'), pubDate: get('pubDate') };
+    if(linkEl){
+      link = linkEl.textContent.trim();
+      if(!link) link = linkEl.nextSibling?.nodeValue?.trim() || '';
+    }
+    if(!link) link = get('guid');
+    // Strip Google redirect wrapper if present
+    if(link.includes('news.google.com/rss/articles')){
+      try{ link = new URL(get('guid')).href; }catch(e){}
+    }
+    const source = item.querySelector('source')?.textContent?.trim() || '';
+    return { title: get('title'), link, pubDate: get('pubDate'), source };
   }).filter(i=>i.title);
 }
 
@@ -1603,7 +1612,7 @@ function renderNewsCards(items, sourceLabel){
     a.href = item.link || '#';
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
-    const src = document.createElement('div'); src.className='news-card-source'; src.textContent=sourceLabel;
+    const src = document.createElement('div'); src.className='news-card-source'; src.textContent=item.source||sourceLabel;
     const title = document.createElement('div'); title.className='news-card-title'; title.textContent=item.title;
     const date = document.createElement('div'); date.className='news-card-date'; date.textContent=timeAgo(item.pubDate);
     a.appendChild(src); a.appendChild(title); a.appendChild(date);
