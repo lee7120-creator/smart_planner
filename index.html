@@ -153,8 +153,23 @@
     }
     .task-act-btn:hover { background:var(--border); color:var(--text); }
     .task-act-btn.del:hover { background:var(--red); color:#fff; }
+    .task-act-btn.move:hover { background:var(--primary-l); color:var(--primary); }
 
-    .add-sub-btn {
+    /* ─── Move popup ─── */
+    .move-popup {
+      position:absolute; right:0; top:100%; z-index:400;
+      background:var(--surface); border:1px solid var(--border); border-radius:12px;
+      box-shadow:var(--shadow-lg,0 10px 25px rgba(0,0,0,.15)); padding:6px;
+      display:flex; flex-direction:column; gap:2px; min-width:150px;
+    }
+    .move-opt {
+      display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px;
+      font-size:12px; color:var(--text); cursor:pointer; border:none; background:none;
+      font-family:inherit; text-align:left; transition:background .1s;
+    }
+    .move-opt:hover { background:var(--surface2); }
+    .move-opt .move-opt-date { font-size:10px; color:var(--text3); margin-left:auto; }
+    .move-popup-divider { height:1px; background:var(--border); margin:3px 0; }
       display:none; align-items:center; gap:2px; font-size:10px; color:var(--text3);
       cursor:pointer; margin:2px 0 0 20px; background:none; border:none;
       padding:1px 4px; border-radius:4px; font-family:inherit; transition:color .12s;
@@ -1022,6 +1037,64 @@ function deleteTask(dk,id,subId) {
   saveTasks(dk); render();
 }
 
+function moveTask(fromDk, taskId, toDk){
+  if(!tasks[fromDk]) return;
+  const idx=tasks[fromDk].findIndex(t=>t.id===taskId);
+  if(idx<0) return;
+  const task=tasks[fromDk].splice(idx,1)[0];
+  if(!tasks[toDk]) tasks[toDk]=[];
+  tasks[toDk].push(task);
+  saveTasks(fromDk); saveTasks(toDk); render();
+}
+
+let activeMovePopup=null;
+function closeMovePopup(){ if(activeMovePopup){activeMovePopup.remove();activeMovePopup=null;} }
+
+function openMovePopup(anchor, fromDk, taskId){
+  closeMovePopup();
+  const popup=el('div','move-popup');
+  const base=new Date(fromDk); base.setHours(0,0,0,0);
+  const tod=today();
+
+  const opts=[
+    {label:'내일',       icon:'☀️', date: (()=>{const d=new Date(tod);d.setDate(d.getDate()+1);return d;})()},
+    {label:'모레',       icon:'📅', date: (()=>{const d=new Date(tod);d.setDate(d.getDate()+2);return d;})()},
+    {label:'다음 주 월요일', icon:'📆', date: (()=>{const d=new Date(tod);d.setDate(d.getDate()+(8-d.getDay())%7||7);return d;})()},
+  ];
+
+  opts.forEach(opt=>{
+    const toDk=dateKey(opt.date);
+    if(toDk===fromDk) return;
+    const btn=el('button','move-opt');
+    btn.innerHTML=`<span>${opt.icon}</span><span>${opt.label}</span><span class="move-opt-date">${opt.date.getMonth()+1}/${opt.date.getDate()}</span>`;
+    btn.onclick=e=>{e.stopPropagation();closeMovePopup();moveTask(fromDk,taskId,toDk);};
+    popup.appendChild(btn);
+  });
+
+  // divider + date picker
+  const div=document.createElement('div'); div.className='move-popup-divider'; popup.appendChild(div);
+  const pickBtn=el('button','move-opt');
+  const inp=document.createElement('input');
+  inp.type='date'; inp.style.cssText='border:none;background:none;font-size:12px;color:var(--text);font-family:inherit;cursor:pointer;outline:none;width:100%';
+  inp.min=dateKey(new Date(tod.getTime()+86400000));
+  inp.onchange=e=>{
+    if(!inp.value) return;
+    closeMovePopup();
+    moveTask(fromDk,taskId,inp.value);
+  };
+  pickBtn.appendChild(el('span',null,{textContent:'🗓'}));
+  pickBtn.appendChild(el('span',null,{textContent:'날짜 선택'}));
+  pickBtn.appendChild(inp);
+  pickBtn.onclick=e=>{e.stopPropagation();inp.showPicker&&inp.showPicker();};
+  popup.appendChild(pickBtn);
+
+  // position relative to anchor
+  anchor.style.position='relative';
+  anchor.appendChild(popup);
+  activeMovePopup=popup;
+  setTimeout(()=>document.addEventListener('click',closeMovePopup,{once:true}),0);
+}
+
 // ── Edit modal ──
 function buildEditColors() {
   const cp = document.getElementById('editColors'); cp.innerHTML='';
@@ -1217,6 +1290,11 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     const editBtn=el('button','task-act-btn',{textContent:'✏️',title:'수정'});
     editBtn.onclick=e=>{e.stopPropagation();openEdit(dk,task,isRepeatInst,originDk);};
     actions.appendChild(editBtn);
+    if(!isRepeatInst){
+      const moveBtn=el('button','task-act-btn move',{textContent:'📅',title:'다른 날짜로 이동'});
+      moveBtn.onclick=e=>{e.stopPropagation();openMovePopup(actions,dk,task.id);};
+      actions.appendChild(moveBtn);
+    }
   }
   const delBtn=el('button','task-act-btn del',{textContent:'✕',title:'삭제'});
   delBtn.onclick=e=>{
