@@ -8,41 +8,65 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#6366f1">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     :root {
-      --bg:#f8fafc; --surface:#ffffff; --surface2:#f1f5f9; --surface3:#e2e8f0;
-      --border:#e2e8f0; --border2:#f1f5f9;
-      --text:#0f172a; --text2:#475569; --text3:#94a3b8;
-      --primary:#6366f1; --primary-h:#4f46e5; --primary-l:#eef2ff;
-      --green:#10b981; --red:#ef4444; --orange:#f97316; --yellow:#f59e0b;
-      --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
-      --shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.06);
-      --shadow-lg:0 10px 15px rgba(0,0,0,.1),0 4px 6px rgba(0,0,0,.05);
+      /* 라이트: 살짝 따뜻한 회백 배경 + 진회색 텍스트 (순흑 대비보다 눈이 편함) */
+      --bg:#f3f5f8; --surface:#ffffff; --surface2:#f4f6f9; --surface3:#e8ecf1;
+      --border:#e4e8ee; --border2:#eef1f5;
+      --text:#2a3342; --text2:#5b6678; --text3:#9aa3b2;
+      --primary:#5b6cf0; --primary-h:#4856d8; --primary-l:#eef0fe;
+      --green:#16a37a; --red:#e35454; --orange:#ee8434; --yellow:#e8a521;
+      --shadow:0 1px 3px rgba(35,45,65,.05),0 1px 2px rgba(35,45,65,.04);
+      --shadow-md:0 4px 8px rgba(35,45,65,.07),0 2px 4px rgba(35,45,65,.05);
+      --shadow-lg:0 12px 24px rgba(35,45,65,.1),0 4px 8px rgba(35,45,65,.05);
     }
     [data-theme="dark"] {
-      --bg:#0f172a; --surface:#1e293b; --surface2:#334155; --surface3:#0f172a;
-      --border:#334155; --border2:#1e293b;
-      --text:#f8fafc; --text2:#94a3b8; --text3:#475569;
-      --primary:#818cf8; --primary-h:#6366f1; --primary-l:#1e1b4b;
-      --green:#10b981; --red:#ef4444; --orange:#f97316; --yellow:#f59e0b;
+      /* 다크: 순흑 대신 짙은 청회색 + 순백 대신 밝은 회백 텍스트 (눈부심 감소) */
+      --bg:#14181f; --surface:#1d232c; --surface2:#272f3a; --surface3:#14181f;
+      --border:#333c49; --border2:#232a34;
+      --text:#e6eaf0; --text2:#9aa6b5; --text3:#5d6878;
+      --primary:#8b97f5; --primary-h:#6d7bee; --primary-l:#262b48;
+      --green:#2cb893; --red:#e57373; --orange:#ef9a55; --yellow:#e0b13e;
       --shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2);
-      --shadow-md:0 4px 6px rgba(0,0,0,.4),0 2px 4px rgba(0,0,0,.3);
-      --shadow-lg:0 10px 15px rgba(0,0,0,.5),0 4px 6px rgba(0,0,0,.3);
+      --shadow-md:0 4px 8px rgba(0,0,0,.4),0 2px 4px rgba(0,0,0,.3);
+      --shadow-lg:0 12px 24px rgba(0,0,0,.5),0 4px 8px rgba(0,0,0,.3);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
-    body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Gothic Neo',sans-serif; background:var(--bg); min-height:100vh; color:var(--text); transition:background .2s,color .2s; }
+    body {
+      font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+      background:var(--bg); min-height:100vh; color:var(--text);
+      transition:background .2s,color .2s;
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+      letter-spacing:-0.01em;
+    }
+
+    /* ─── 모던 디테일: 스크롤바 / 포커스 링 / 선택 색 ─── */
+    * { scrollbar-width:thin; scrollbar-color:var(--surface3) transparent; }
+    ::-webkit-scrollbar { width:8px; height:8px; }
+    ::-webkit-scrollbar-thumb { background:var(--surface3); border-radius:4px; }
+    ::-webkit-scrollbar-thumb:hover { background:var(--text3); }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::selection { background:var(--primary-l); color:var(--primary-h); }
+    :focus-visible { outline:2px solid var(--primary); outline-offset:1px; border-radius:4px; }
 
     /* ─── Header ─── */
     .header {
-      background:var(--surface); border-bottom:none;
+      background:color-mix(in srgb, var(--surface) 88%, transparent);
+      backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+      border-bottom:none;
       padding:0 24px; height:60px; display:flex; align-items:center; gap:12px;
       position:sticky; top:0; z-index:300; box-shadow:0 1px 0 var(--border);
+    }
+    /* 중간 폭(태블릿/작은 노트북): 헤더 줄바꿈 허용해 버튼 겹침 방지 */
+    @media (min-width:769px) and (max-width:1280px) {
+      .header { flex-wrap:wrap; height:auto; padding:8px 16px; row-gap:8px; }
+      .week-label { min-width:unset; }
+      .search-wrap { max-width:200px; }
     }
     .header-title { font-size:18px; font-weight:700; letter-spacing:-0.3px; color:var(--primary); white-space:nowrap; margin-right:4px; }
     .view-toggle { display:flex; background:var(--surface2); border-radius:8px; padding:3px; gap:2px; }
@@ -1362,7 +1386,7 @@ function initFirebaseSync() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
       render();
       setSyncStatus('synced');
-    } else if (Object.keys(tasks).length > 0) {
+    } else if (Object.keys(tasks).length > 0 && !READ_ONLY) {
       // Firebase 비어있고 로컬에 데이터 있음 → Firebase로 업로드
       fbUpload();
     } else {
@@ -2819,7 +2843,7 @@ function render(){
   pi.innerHTML=total>0?`${done}/${total} <span class="progress-bar-wrap"><span class="progress-bar-fill" style="width:${pct}%"></span></span>`:'';
   // focus
   if(activeInput){
-    setTimeout(()=>{const inp=document.getElementById(`inp-${activeInput.dateKey}-${activeInput.parentId||'main'}`);if(inp)inp.focus();},30);
+    setTimeout(()=>{const inp=document.getElementById(`inp-${activeInput.dataKey||activeInput.dateKey}-${activeInput.parentId||'main'}`);if(inp)inp.focus();},30);
   }
 }
 
