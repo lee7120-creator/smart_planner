@@ -700,6 +700,35 @@
     .memo-status.ok { color:#43a047; }
     .memo-status.saving { color:#f9a825; }
 
+    /* memo images */
+    .memo-attach {
+      background:none; border:none; cursor:pointer; font-size:13px;
+      padding:2px 4px; border-radius:4px; line-height:1;
+    }
+    .memo-attach:hover { background:rgba(0,0,0,.06); }
+    .memo-images { display:none; flex-wrap:wrap; gap:6px; padding:0 14px 8px; }
+    .memo-img-thumb {
+      position:relative; width:56px; height:56px; border-radius:8px; overflow:hidden;
+      cursor:pointer; border:1px solid #e0d888; background:rgba(255,255,255,.4);
+      display:flex; align-items:center; justify-content:center;
+    }
+    [data-theme="dark"] .memo-img-thumb { border-color:#4a4630; background:rgba(0,0,0,.2); }
+    .memo-img-thumb img { width:100%; height:100%; object-fit:cover; }
+    .memo-img-thumb.missing { font-size:18px; opacity:.5; cursor:default; }
+    .memo-img-del {
+      position:absolute; top:2px; right:2px; width:16px; height:16px;
+      background:rgba(0,0,0,.55); color:#fff; border:none; border-radius:50%;
+      font-size:9px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      padding:0; line-height:1; z-index:2;
+    }
+    .memo-img-del:hover { background:var(--red); }
+    .img-lightbox {
+      position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:2000;
+      display:flex; align-items:center; justify-content:center; cursor:zoom-out; padding:24px;
+    }
+    .img-lightbox.hidden { display:none; }
+    .img-lightbox img { max-width:100%; max-height:100%; border-radius:8px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+
     /* memo links + preview */
     .memo-links { display:flex; flex-wrap:wrap; gap:4px; padding:0 14px 8px; }
     .memo-link-chip {
@@ -850,9 +879,12 @@
     <div class="memo-header">
       <span class="memo-icon">📝</span>
       <span class="memo-task-title" id="memoTitle"></span>
+      <button class="memo-attach" id="memoAttachBtn" title="이미지 첨부 (붙여넣기도 가능)">📷</button>
       <button class="memo-close" id="memoClose">✕</button>
     </div>
+    <input type="file" id="memoFileInput" accept="image/*" multiple style="display:none">
     <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;(자동으로 저장됩니다)"></textarea>
+    <div class="memo-images" id="memoImages"></div>
     <div class="memo-links" id="memoLinks"></div>
     <div class="memo-footer">
       <span class="memo-status" id="memoStatus">자동 저장됨 ✓</span>
@@ -917,6 +949,11 @@
 </div>
 
 <!-- Pomodoro Widget -->
+<!-- Image Lightbox -->
+<div class="img-lightbox hidden" id="imgLightbox">
+  <img id="imgLightboxImg" alt="첨부 이미지">
+</div>
+
 <div class="pomodoro-widget" id="pomodoroWidget" style="position:fixed">
   <button class="pomodoro-close" id="pomodoroCloseBtn">✕</button>
   <div class="pomodoro-task" id="pomodoroTaskLabel">🍅 집중 타이머</div>
@@ -1545,6 +1582,7 @@ function openMemo(dk, taskId, anchorEl) {
   ta.value = task.memo || '';
   updateMemoCount();
   updateMemoLinks();
+  renderMemoImages(task);
   if (task.memoUpdated) {
     const d = new Date(task.memoUpdated);
     const elS = document.getElementById('memoStatus');
@@ -1589,6 +1627,103 @@ function saveMemoNow() {
     render();
   }
 }
+
+// ── 메모 이미지 (IndexedDB 로컬 저장 — 기기 간 동기화되지 않음) ──
+let imgDB=null;
+function openImgDB(){
+  return new Promise((res,rej)=>{
+    if(imgDB)return res(imgDB);
+    const r=indexedDB.open('plannerImages',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('images');
+    r.onsuccess=()=>{imgDB=r.result;res(imgDB);};
+    r.onerror=()=>rej(r.error);
+  });
+}
+function idbPutImage(id,blob){
+  return openImgDB().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction('images','readwrite');
+    tx.objectStore('images').put(blob,id);
+    tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
+  }));
+}
+function idbGetImage(id){
+  return openImgDB().then(db=>new Promise((res,rej)=>{
+    const rq=db.transaction('images','readonly').objectStore('images').get(id);
+    rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>rej(rq.error);
+  }));
+}
+function idbDeleteImage(id){
+  return openImgDB().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction('images','readwrite');
+    tx.objectStore('images').delete(id);
+    tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
+  }));
+}
+function memoTask(){
+  if(!memoCtx)return null;
+  return (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId)||null;
+}
+function attachMemoImage(file){
+  if(!file||!file.type.startsWith('image/'))return;
+  if(file.size>8*1024*1024){alert('이미지가 너무 큽니다 (최대 8MB)');return;}
+  const task=memoTask(); if(!task)return;
+  const id='img_'+uid();
+  idbPutImage(id,file).then(()=>{
+    if(!Array.isArray(task.memoImages))task.memoImages=[];
+    task.memoImages.push(id);
+    saveTasks(memoCtx.dk);
+    renderMemoImages(task);
+    render();
+  }).catch(()=>alert('이미지 저장 실패'));
+}
+function renderMemoImages(task){
+  const wrap=document.getElementById('memoImages');
+  wrap.innerHTML='';
+  const ids=Array.isArray(task&&task.memoImages)?task.memoImages:[];
+  wrap.style.display=ids.length?'flex':'none';
+  ids.forEach(id=>{
+    const thumb=el('div','memo-img-thumb');
+    const delBtn=el('button','memo-img-del',{textContent:'✕',title:'이미지 삭제'});
+    delBtn.onclick=e=>{
+      e.stopPropagation();
+      const t=memoTask(); if(!t)return;
+      t.memoImages=(t.memoImages||[]).filter(x=>x!==id);
+      idbDeleteImage(id);
+      saveTasks(memoCtx.dk);
+      renderMemoImages(t);
+      render();
+    };
+    thumb.appendChild(delBtn);
+    idbGetImage(id).then(blob=>{
+      if(blob){
+        const url=URL.createObjectURL(blob);
+        const img=el('img',null,{src:url});
+        thumb.insertBefore(img,delBtn);
+        thumb.onclick=()=>{
+          document.getElementById('imgLightboxImg').src=url;
+          document.getElementById('imgLightbox').classList.remove('hidden');
+        };
+      } else {
+        thumb.classList.add('missing');
+        thumb.insertBefore(el('span',null,{textContent:'📵',title:'이 기기에 없는 이미지'}),delBtn);
+      }
+    }).catch(()=>{});
+    wrap.appendChild(thumb);
+  });
+}
+document.getElementById('memoAttachBtn').onclick=()=>document.getElementById('memoFileInput').click();
+document.getElementById('memoFileInput').onchange=e=>{
+  [...e.target.files].forEach(attachMemoImage);
+  e.target.value='';
+};
+document.getElementById('memoTextarea').addEventListener('paste',e=>{
+  const files=[...(e.clipboardData&&e.clipboardData.files||[])].filter(f=>f.type.startsWith('image/'));
+  if(files.length){e.preventDefault();files.forEach(attachMemoImage);}
+});
+document.getElementById('imgLightbox').onclick=()=>{
+  document.getElementById('imgLightbox').classList.add('hidden');
+  document.getElementById('imgLightboxImg').src='';
+};
 
 // 메모 속 URL을 클릭 가능한 칩으로 표시
 function updateMemoLinks() {
@@ -1717,9 +1852,10 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       body.appendChild(tagWrap);
     }
   }
-  if(!isSub&&task.memo&&task.memo.trim()){
-    const firstLine=task.memo.trim().split('\n')[0];
-    const prev=el('div','memo-preview',{textContent:'📝 '+firstLine,title:'메모 열기'});
+  if(!isSub&&((task.memo&&task.memo.trim())||(Array.isArray(task.memoImages)&&task.memoImages.length))){
+    const firstLine=(task.memo||'').trim().split('\n')[0];
+    const imgCnt=Array.isArray(task.memoImages)?task.memoImages.length:0;
+    const prev=el('div','memo-preview',{textContent:'📝 '+(imgCnt?`📷${imgCnt} `:'')+firstLine,title:'메모 열기'});
     prev.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,prev);};
     body.appendChild(prev);
   }
