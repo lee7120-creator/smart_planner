@@ -636,13 +636,24 @@
       border-radius:20px; padding:4px 10px; font-size:12px; font-weight:600;
       color:var(--primary); white-space:nowrap;
     }
-    .copy-url-btn {
-      background:none; border:1px solid var(--border); border-radius:7px;
-      padding:4px 10px; font-size:12px; cursor:pointer; color:var(--text2);
-      font-family:inherit; transition:all .15s; white-space:nowrap;
+    .more-menu-wrap { position:relative; }
+    .more-menu {
+      position:absolute; top:calc(100% + 6px); right:0; z-index:60;
+      background:var(--surface); border:1px solid var(--border); border-radius:12px;
+      box-shadow:0 8px 24px rgba(0,0,0,.12); padding:6px; min-width:180px;
+      display:flex; flex-direction:column; gap:1px;
+      animation:menuPop .15s ease;
     }
-    .copy-url-btn:hover { background:var(--primary-l); color:var(--primary); border-color:var(--primary); }
-    @media (max-width:768px) { .copy-url-btn span { display:none; } }
+    @keyframes menuPop { from{opacity:0; transform:translateY(-4px) scale(.98)} to{opacity:1; transform:translateY(0) scale(1)} }
+    .more-menu.hidden { display:none; }
+    .more-menu-item {
+      display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+      background:none; border:none; border-radius:8px; padding:8px 10px;
+      font-size:13px; color:var(--text); cursor:pointer; font-family:inherit;
+      white-space:nowrap; transition:background .15s;
+    }
+    .more-menu-item:hover { background:var(--surface2); }
+    .more-menu-divider { height:1px; background:var(--border); margin:5px 2px; }
     .sync-dot {
       width:8px; height:8px; border-radius:50%; flex-shrink:0;
       transition:background .3s;
@@ -699,15 +710,21 @@
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
     <div class="sync-dot offline" id="syncDot" title="동기화 상태" style="display:none"></div>
-    <button class="copy-url-btn" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
-    <button class="copy-url-btn" id="forceSyncBtn" style="display:none">☁️ <span>저장</span></button>
-    <button class="copy-url-btn" id="switchUserBtn" style="display:none" title="다른 사용자로 전환">↩ <span>전환</span></button>
-    <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
-    <button class="icon-btn" id="notifyBtn" title="마감 임박 태스크 알림">🔕</button>
-    <button class="icon-btn" id="trashBtn" title="휴지통 (30일 보관)">🗑</button>
-    <button class="icon-btn" id="pomodoroBtn" title="포모도로 타이머">🍅</button>
-    <button class="icon-btn" id="icsExportBtn" title="캘린더로 내보내기 (.ics)">📤</button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
+    <div class="more-menu-wrap">
+      <button class="icon-btn" id="moreBtn" title="더보기">⋯</button>
+      <div class="more-menu hidden" id="moreMenu">
+        <button class="more-menu-item" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
+        <button class="more-menu-item" id="forceSyncBtn" style="display:none">☁️ <span>저장</span></button>
+        <button class="more-menu-item" id="switchUserBtn" style="display:none">↩ <span>다른 사용자로 전환</span></button>
+        <div class="more-menu-divider"></div>
+        <button class="more-menu-item" id="locationBtn">📍 <span>내 위치 날씨</span></button>
+        <button class="more-menu-item" id="notifyBtn"><span id="notifyIcon">🔕</span> <span>마감 알림</span></button>
+        <button class="more-menu-item" id="trashBtn">🗑 <span>휴지통</span></button>
+        <button class="more-menu-item" id="pomodoroBtn">🍅 <span>포모도로 타이머</span></button>
+        <button class="more-menu-item" id="icsExportBtn">📤 <span>캘린더 내보내기</span></button>
+      </div>
+    </div>
     <div class="progress-pill" id="progressInfo"></div>
   </div>
 </header>
@@ -1454,7 +1471,6 @@ document.getElementById('locationBtn').onclick=()=>{
   if(!navigator.geolocation)return;
   navigator.geolocation.getCurrentPosition(p=>{
     weatherLoc={lat:p.coords.latitude,lon:p.coords.longitude,name:'내 위치'};
-    document.getElementById('locationBtn').textContent='📍';
     fetchWeather(weatherLoc.lat,weatherLoc.lon);
   },()=>fetchWeather(weatherLoc.lat,weatherLoc.lon));
 };
@@ -1956,6 +1972,21 @@ document.getElementById('darkBtn').onclick=()=>{
 };
 (()=>{const t=localStorage.getItem('theme')||'light';document.documentElement.dataset.theme=t;document.getElementById('darkBtn').textContent=t==='dark'?'☀️':'🌙';})();
 
+// ── More menu dropdown ──
+document.getElementById('moreBtn').onclick=e=>{
+  e.stopPropagation();
+  document.getElementById('moreMenu').classList.toggle('hidden');
+};
+document.getElementById('moreMenu').addEventListener('click',e=>{
+  if(e.target.closest('.more-menu-item')) document.getElementById('moreMenu').classList.add('hidden');
+});
+document.addEventListener('click',e=>{
+  const menu=document.getElementById('moreMenu');
+  if(!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target.id!=='moreBtn'){
+    menu.classList.add('hidden');
+  }
+});
+
 // ── Due-task notifications (매일 오전 9시 요약 알림) ──
 const NOTIFY_HOUR = 9;
 function getAllTasksForDate(date) {
@@ -1993,7 +2024,7 @@ function checkNotificationSchedule() {
 function updateNotifyBtn() {
   const enabled = localStorage.getItem('notifyEnabled')==='true' && 'Notification' in window && Notification.permission==='granted';
   const btn = document.getElementById('notifyBtn');
-  btn.textContent = enabled?'🔔':'🔕';
+  document.getElementById('notifyIcon').textContent = enabled?'🔔':'🔕';
   btn.title = enabled?'마감 알림 켜짐 (매일 오전 9시 요약)':'마감 알림 꺼짐 (클릭하여 켜기)';
 }
 document.getElementById('notifyBtn').onclick=()=>{
