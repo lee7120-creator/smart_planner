@@ -336,6 +336,12 @@
     .gantt-bar:hover { transform:scaleY(1.25); }
     .gantt-bar.done { opacity:.3; }
 
+    /* ─── Read-only mode ─── */
+    .readonly-mode .task-actions, .readonly-mode .add-task-btn, .readonly-mode .add-sub-btn,
+    .readonly-mode .input-form, .readonly-mode .memo-attach, .readonly-mode #trashBtn,
+    .readonly-mode #templateBtn, .readonly-mode #notifyBtn, .readonly-mode #locationBtn { display:none !important; }
+    .readonly-mode .task-cb, .readonly-mode .task-star { cursor:default; }
+
     /* ─── Undo toast ─── */
     .undo-toast {
       position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
@@ -903,6 +909,8 @@
       <button class="icon-btn" id="moreBtn" title="더보기">⋯</button>
       <div class="more-menu hidden" id="moreMenu">
         <button class="more-menu-item" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
+        <button class="more-menu-item" id="shareRoBtn" style="display:none">👁 <span>읽기전용 링크 복사</span></button>
+        <button class="more-menu-item" id="templateBtn">📑 <span>템플릿</span></button>
         <button class="more-menu-item" id="forceSyncBtn" style="display:none">☁️ <span>저장</span></button>
         <button class="more-menu-item" id="switchUserBtn" style="display:none">↩ <span>다른 사용자로 전환</span></button>
         <div class="more-menu-divider"></div>
@@ -989,6 +997,25 @@
     <div class="modal-actions">
       <button class="btn-secondary" id="editCancelBtn">취소</button>
       <button class="btn-primary" id="editSaveBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Template Modal -->
+<div class="modal-overlay hidden" id="templateModal">
+  <div class="modal-box" style="width:400px;max-height:76vh;display:flex;flex-direction:column">
+    <div class="modal-title">📑 템플릿 <span style="font-weight:400;font-size:11px;color:var(--text3)">(자주 쓰는 할일 묶음)</span></div>
+    <div id="templateList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">새 템플릿 만들기 — 특정 날짜의 할 일을 묶어서 저장</div>
+      <div style="display:flex;gap:6px">
+        <input class="task-input" id="tplNameInput" placeholder="템플릿 이름" style="flex:1">
+        <input type="date" class="time-input" id="tplSrcDate">
+        <button class="btn-add" id="tplCreateBtn">저장</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="templateCloseBtn">닫기</button>
     </div>
   </div>
 </div>
@@ -1165,6 +1192,8 @@ const SEED_TASKS = {
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const USER_ID = URL_PARAMS.get('u') || '';
 const STORAGE_KEY = USER_ID ? `calTasks_${USER_ID}` : 'calTasks';
+const READ_ONLY = URL_PARAMS.get('ro') === '1';
+if (READ_ONLY) document.documentElement.classList.add('readonly-mode');
 
 // ── Landing page ──
 if (!USER_ID) {
@@ -1191,12 +1220,26 @@ if (!USER_ID) {
       localStorage.setItem('theme', html.dataset.theme);
     };
   }
+} else if (READ_ONLY) {
+  // 읽기 전용 보기 — 방문자의 lastUser를 덮어쓰지 않음
+  document.getElementById('userChip').style.display = 'flex';
+  document.getElementById('userChipName').textContent = decodeURIComponent(USER_ID) + ' · 👁 읽기 전용';
 } else {
   // Remember this user for future visits
   localStorage.setItem('lastUser', USER_ID);
   // Show user chip + copy URL button
   document.getElementById('userChip').style.display = 'flex';
   document.getElementById('userChipName').textContent = decodeURIComponent(USER_ID);
+  document.getElementById('shareRoBtn').style.display = 'flex';
+  document.getElementById('shareRoBtn').onclick = () => {
+    const url = window.location.href.split('?')[0] + `?u=${encodeURIComponent(USER_ID)}&ro=1`;
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = document.getElementById('shareRoBtn');
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✅ <span>복사됨!</span>';
+      setTimeout(() => { btn.innerHTML = orig; }, 1800);
+    });
+  };
   document.getElementById('copyUrlBtn').style.display = 'flex';
   document.getElementById('copyUrlBtn').onclick = () => {
     const url = window.location.href.split('?')[0] + `?u=${encodeURIComponent(USER_ID)}`;
@@ -1254,6 +1297,7 @@ function loadTasks() {
 let pendingUpload = false;
 
 function saveTasks(dk) {
+  if (READ_ONLY) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   const ref = fbRef();
   if (!ref) return;
@@ -1270,6 +1314,7 @@ function saveTasks(dk) {
 }
 
 function fbUpload() {
+  if (READ_ONLY) return Promise.reject('read-only');
   const ref = fbRef();
   if (!ref) return Promise.reject('no ref');
   setSyncStatus('syncing');
@@ -1362,6 +1407,7 @@ function isRepeatChecked(task, instanceDk) {
   return instanceDk in task.completions ? task.completions[instanceDk] : false;
 }
 function toggleRepeatInst(originDk, taskId, instanceDk) {
+  if(READ_ONLY)return;
   const t=(tasks[originDk]||[]).find(x=>x.id===taskId); if(!t)return;
   if(!t.completions) t.completions={};
   t.completions[instanceDk]=!isRepeatChecked(t,instanceDk);
@@ -1387,6 +1433,7 @@ document.getElementById('undoBtn').onclick=()=>{
 // ── Task mutations ──
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function addTask(dk,text,color,starred,repeat,parentId,priority,time) {
+  if(READ_ONLY)return;
   if(!tasks[dk]) tasks[dk]=[];
   const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',priority:priority||null,time:time||null,completions:{},subs:[]};
   if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p){if(!Array.isArray(p.subs))p.subs=[];p.subs.push(t);}}
@@ -1405,6 +1452,7 @@ function taskSort(a,b){
 
 // ── Reorder within same day (드래그 순서 변경) ──
 function reorderTask(dk,dragId,targetId){
+  if(READ_ONLY)return;
   const list=tasks[dk]; if(!list)return;
   const from=list.findIndex(t=>t.id===dragId);
   if(from<0)return;
@@ -1443,6 +1491,7 @@ function parseQuickDate(text){
   return null;
 }
 function toggleTask(dk,id,subId) {
+  if(READ_ONLY)return;
   const list=tasks[dk]||[];
   if(subId){const p=list.find(x=>x.id===id);if(p){const s=p.subs.find(x=>x.id===subId);if(s)s.checked=!s.checked;}}
   else{
@@ -1451,8 +1500,9 @@ function toggleTask(dk,id,subId) {
   }
   saveTasks(dk); render();
 }
-function toggleStar(dk,id){const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks(dk);render();}}
+function toggleStar(dk,id){if(READ_ONLY)return;const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks(dk);render();}}
 function deleteTask(dk,id,subId) {
+  if(READ_ONLY)return;
   if(!tasks[dk])return;
   let trashId=null, deletedText='';
   if(subId){
@@ -1538,6 +1588,7 @@ document.getElementById('trashCloseBtn').onclick=()=>document.getElementById('tr
 document.getElementById('trashModal').onclick=e=>{if(e.target===document.getElementById('trashModal'))document.getElementById('trashModal').classList.add('hidden');};
 
 function moveTask(fromDk, taskId, toDk, silent){
+  if(READ_ONLY)return;
   if(!tasks[fromDk]) return;
   const idx=tasks[fromDk].findIndex(t=>t.id===taskId);
   if(idx<0) return;
@@ -1691,8 +1742,9 @@ function openMemo(dk, taskId, anchorEl) {
   } else setMemoStatus('saved');
   positionMemo(anchorEl);
   document.getElementById('memoOverlay').classList.remove('hidden');
-  // 메모가 있으면 보기 모드, 없으면 바로 편집 모드로
-  setMemoMode(task.memo&&task.memo.trim()?'view':'edit');
+  ta.readOnly=READ_ONLY;
+  // 메모가 있으면 보기 모드, 없으면 바로 편집 모드로 (읽기 전용이면 항상 보기)
+  setMemoMode(READ_ONLY||(task.memo&&task.memo.trim())?'view':'edit');
 }
 
 function positionMemo(anchor) {
@@ -1718,7 +1770,7 @@ function closeMemo() {
 }
 
 function saveMemoNow() {
-  if (!memoCtx) return;
+  if (!memoCtx || READ_ONLY) return;
   const task = (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId);
   if (task) {
     const v = document.getElementById('memoTextarea').value;
@@ -1806,6 +1858,76 @@ document.getElementById('memoHistBtn').onclick=()=>{
   if(wrap.classList.contains('hidden')){renderMemoHistory();wrap.classList.remove('hidden');}
   else wrap.classList.add('hidden');
 };
+
+// ── 템플릿 (자주 쓰는 할일 묶음) ──
+const TPL_KEY = USER_ID ? `calTemplates_${USER_ID}` : 'calTemplates';
+function loadTpls(){ try{return JSON.parse(localStorage.getItem(TPL_KEY)||'[]');}catch{return [];} }
+function saveTpls(t){ localStorage.setItem(TPL_KEY,JSON.stringify(t)); }
+function applyTemplate(tpl,dk){
+  if(READ_ONLY)return;
+  if(!tasks[dk])tasks[dk]=[];
+  tpl.items.forEach(it=>{
+    tasks[dk].push({
+      id:uid(),text:it.text,checked:false,starred:!!it.starred,color:it.color||null,
+      repeat:'none',priority:it.priority||null,time:it.time||null,completions:{},
+      subs:(it.subs||[]).map(s=>({id:uid(),text:s.text,checked:false,starred:false,color:null,subs:[]}))
+    });
+  });
+  saveTasks(dk);render();
+}
+function renderTemplateModal(){
+  const list=document.getElementById('templateList');
+  list.innerHTML='';
+  const tpls=loadTpls();
+  if(!tpls.length){
+    list.appendChild(el('div','trash-empty',{textContent:'저장된 템플릿이 없습니다.\n아래에서 만들어보세요.'}));
+    return;
+  }
+  tpls.forEach((tpl,i)=>{
+    const row=el('div','trash-item');
+    const info=el('div','trash-info');
+    info.appendChild(el('div','trash-text',{textContent:`📑 ${tpl.name}`}));
+    info.appendChild(el('div','trash-meta',{textContent:tpl.items.map(it=>it.text).slice(0,3).join(', ')+(tpl.items.length>3?` 외 ${tpl.items.length-3}개`:'')+` · 총 ${tpl.items.length}개`}));
+    row.appendChild(info);
+    const actions=el('div','trash-actions');
+    const applyBtn=el('button','trash-act-btn',{textContent:'오늘 적용'});
+    applyBtn.onclick=()=>{applyTemplate(tpl,dateKey(today()));document.getElementById('templateModal').classList.add('hidden');};
+    const applyDateBtn=el('button','trash-act-btn',{textContent:'날짜 선택'});
+    const dateInp=document.createElement('input');
+    dateInp.type='date';dateInp.style.cssText='position:absolute;opacity:0;width:0;height:0';
+    dateInp.onchange=()=>{ if(dateInp.value){applyTemplate(tpl,dateInp.value);document.getElementById('templateModal').classList.add('hidden');} };
+    applyDateBtn.appendChild(dateInp);
+    applyDateBtn.onclick=()=>{dateInp.showPicker&&dateInp.showPicker();};
+    const delBtn=el('button','trash-act-btn del',{textContent:'✕'});
+    delBtn.onclick=()=>{ if(confirm('템플릿을 삭제할까요?')){const t=loadTpls();t.splice(i,1);saveTpls(t);renderTemplateModal();} };
+    actions.appendChild(applyBtn);actions.appendChild(applyDateBtn);actions.appendChild(delBtn);
+    row.appendChild(actions);
+    list.appendChild(row);
+  });
+}
+document.getElementById('templateBtn').onclick=()=>{
+  renderTemplateModal();
+  document.getElementById('tplSrcDate').value=dateKey(today());
+  document.getElementById('templateModal').classList.remove('hidden');
+};
+document.getElementById('tplCreateBtn').onclick=()=>{
+  const name=document.getElementById('tplNameInput').value.trim();
+  const srcDk=document.getElementById('tplSrcDate').value;
+  if(!name){alert('템플릿 이름을 입력하세요');return;}
+  const src=(tasks[srcDk]||[]).filter(t=>t);
+  if(!src.length){alert('해당 날짜에 할 일이 없습니다');return;}
+  const items=src.map(t=>({
+    text:t.text,starred:!!t.starred,color:t.color||null,priority:t.priority||null,time:t.time||null,
+    subs:(t.subs||[]).map(s=>({text:s.text}))
+  }));
+  const tpls=loadTpls();
+  tpls.push({name,items,createdAt:Date.now()});
+  saveTpls(tpls);
+  document.getElementById('tplNameInput').value='';
+  renderTemplateModal();
+};
+document.getElementById('templateCloseBtn').onclick=()=>document.getElementById('templateModal').classList.add('hidden');
+document.getElementById('templateModal').onclick=e=>{if(e.target===document.getElementById('templateModal'))document.getElementById('templateModal').classList.add('hidden');};
 
 // ── 메모 모아보기 ──
 function renderMemoAllModal(){
@@ -2005,7 +2127,7 @@ function el(tag,cls,attrs){const e=document.createElement(tag);if(cls)e.classNam
 function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
   const item=el('div',`task-item${isSub?' sub':''}`);
   const checked=isRepeatInst?isRepeatChecked(task,instanceDk):task.checked;
-  if(!isSub){
+  if(!isSub&&!READ_ONLY){
     item.draggable=true;
     item.ondragstart=e=>{
       e.dataTransfer.setData('application/json',JSON.stringify({dk:isRepeatInst?originDk:dk,id:task.id,isRepeat:!!isRepeatInst}));
