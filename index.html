@@ -232,6 +232,34 @@
       color:var(--text2); background:var(--surface2); border-radius:4px;
       padding:1px 5px; margin-top:2px;
     }
+
+    /* ─── Drag & drop ─── */
+    .task-item[draggable="true"] { cursor:grab; }
+    .task-item.dragging { opacity:.35; }
+    .day-col.drag-over { border-color:var(--primary) !important; box-shadow:0 0 0 3px var(--primary-l) !important; }
+
+    /* ─── Focus view ─── */
+    .focus-wrap { max-width:680px; margin:0 auto; display:flex; flex-direction:column; gap:18px; padding:4px 0; }
+    .focus-section { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:14px 16px; box-shadow:var(--shadow); }
+    .focus-section-title { font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--border2); }
+    .focus-list { padding:0; overflow:visible; }
+    .focus-date-badge { font-size:9px; color:var(--text3); background:var(--surface2); border-radius:4px; padding:1px 5px; margin-top:2px; display:inline-block; }
+    .focus-empty { text-align:center; padding:24px; color:var(--text3); font-size:13px; }
+
+    /* ─── Trash modal ─── */
+    .trash-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; background:var(--surface2); }
+    .trash-info { flex:1; min-width:0; }
+    .trash-text { font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .trash-text.done { text-decoration:line-through; color:var(--text3); }
+    .trash-meta { font-size:10px; color:var(--text3); margin-top:2px; }
+    .trash-actions { display:flex; gap:4px; flex-shrink:0; }
+    .trash-act-btn {
+      border:1px solid var(--border); background:var(--surface); border-radius:6px;
+      padding:4px 8px; font-size:11px; cursor:pointer; color:var(--text2); font-family:inherit; transition:all .12s;
+    }
+    .trash-act-btn:hover { background:var(--primary-l); color:var(--primary); border-color:var(--primary); }
+    .trash-act-btn.del:hover { background:var(--red); color:#fff; border-color:var(--red); }
+    .trash-empty { text-align:center; padding:30px; color:var(--text3); font-size:13px; }
     .form-actions { display:flex; gap:5px; }
     .btn-add { background:var(--primary); color:#fff; border:none; border-radius:7px; padding:5px 14px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:600; }
     .btn-add:hover { background:var(--primary-h); }
@@ -642,6 +670,7 @@
   <div class="view-toggle">
     <button class="view-btn active" id="btnWeek">주간</button>
     <button class="view-btn" id="btnMonth">월간</button>
+    <button class="view-btn" id="btnFocus">포커스</button>
   </div>
   <div class="nav-group">
     <button class="nav-btn" id="prevBtn">‹</button>
@@ -661,6 +690,7 @@
     <button class="copy-url-btn" id="switchUserBtn" style="display:none" title="다른 사용자로 전환">↩ <span>전환</span></button>
     <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
     <button class="icon-btn" id="notifyBtn" title="마감 임박 태스크 알림">🔕</button>
+    <button class="icon-btn" id="trashBtn" title="휴지통 (30일 보관)">🗑</button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
     <div class="progress-pill" id="progressInfo"></div>
   </div>
@@ -727,9 +757,22 @@
   </div>
 </div>
 
+<!-- Trash Modal -->
+<div class="modal-overlay hidden" id="trashModal">
+  <div class="modal-box" style="width:380px;max-height:72vh;display:flex;flex-direction:column">
+    <div class="modal-title">🗑 휴지통 <span style="font-weight:400;font-size:11px;color:var(--text3)">(30일간 보관 후 자동 삭제)</span></div>
+    <div id="trashList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="trashCloseBtn">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="shortcuts-hint">
   <span class="shortcut-key">←</span><span class="shortcut-key">→</span> 주 이동 &nbsp;
   <span class="shortcut-key">T</span> 오늘 &nbsp;
+  <span class="shortcut-key">N</span> 새 할일 &nbsp;
+  <span class="shortcut-key">F</span> 포커스 &nbsp;
   <span class="shortcut-key">/</span> 검색 &nbsp;
   <span class="shortcut-key">D</span> 다크모드
 </div>
@@ -1094,10 +1137,84 @@ function toggleTask(dk,id,subId) {
 function toggleStar(dk,id){const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks(dk);render();}}
 function deleteTask(dk,id,subId) {
   if(!tasks[dk])return;
-  if(subId){const p=tasks[dk].find(x=>x.id===id);if(p&&Array.isArray(p.subs))p.subs=p.subs.filter(x=>x.id!==subId);}
-  else tasks[dk]=tasks[dk].filter(x=>x.id!==id);
+  if(subId){
+    const p=tasks[dk].find(x=>x.id===id);
+    if(p&&Array.isArray(p.subs)){
+      const idx=p.subs.findIndex(x=>x.id===subId);
+      if(idx>=0) addToTrash(dk,p.subs.splice(idx,1)[0],id);
+    }
+  } else {
+    const idx=tasks[dk].findIndex(x=>x.id===id);
+    if(idx>=0) addToTrash(dk,tasks[dk].splice(idx,1)[0],null);
+  }
   saveTasks(dk); render();
 }
+
+// ── Trash (휴지통, 30일 보관) ──
+const TRASH_KEY = USER_ID ? `calTrash_${USER_ID}` : 'calTrash';
+function loadTrash(){ try{ return JSON.parse(localStorage.getItem(TRASH_KEY)||'[]'); }catch{ return []; } }
+function saveTrash(trash){ localStorage.setItem(TRASH_KEY, JSON.stringify(trash)); }
+function purgeOldTrash(){
+  const cutoff=Date.now()-30*86400000;
+  const trash=loadTrash();
+  const kept=trash.filter(x=>x.deletedAt>cutoff);
+  if(kept.length!==trash.length) saveTrash(kept);
+}
+function addToTrash(dk,task,parentId){
+  const trash=loadTrash();
+  trash.unshift({id:uid(),dk,task,parentId,deletedAt:Date.now()});
+  saveTrash(trash);
+}
+function restoreFromTrash(trashId){
+  const trash=loadTrash();
+  const idx=trash.findIndex(x=>x.id===trashId);
+  if(idx<0)return;
+  const item=trash[idx];
+  if(!tasks[item.dk]) tasks[item.dk]=[];
+  if(item.parentId){
+    const p=tasks[item.dk].find(x=>x.id===item.parentId);
+    if(p){ if(!Array.isArray(p.subs))p.subs=[]; p.subs.push(item.task); }
+    else tasks[item.dk].push(item.task);
+  } else {
+    tasks[item.dk].push(item.task);
+  }
+  trash.splice(idx,1); saveTrash(trash);
+  saveTasks(item.dk); render(); renderTrashModal();
+}
+function permanentDeleteTrash(trashId){
+  const trash=loadTrash();
+  saveTrash(trash.filter(x=>x.id!==trashId));
+  renderTrashModal();
+}
+function renderTrashModal(){
+  const list=document.getElementById('trashList');
+  list.innerHTML='';
+  const trash=loadTrash();
+  if(!trash.length){ list.appendChild(el('div','trash-empty',{textContent:'휴지통이 비어있습니다'})); return; }
+  trash.forEach(item=>{
+    const row=el('div','trash-item');
+    const info=el('div','trash-info');
+    info.appendChild(el('div',`trash-text${item.task.checked?' done':''}`,{textContent:(item.task.starred?'★ ':'')+item.task.text}));
+    const d=new Date(item.dk);
+    const daysLeft=30-Math.floor((Date.now()-item.deletedAt)/86400000);
+    info.appendChild(el('div','trash-meta',{textContent:`${d.getMonth()+1}/${d.getDate()} 삭제됨 · ${daysLeft}일 후 영구삭제`}));
+    row.appendChild(info);
+    const actions=el('div','trash-actions');
+    const restoreBtn=el('button','trash-act-btn',{textContent:'↩ 복구'});
+    restoreBtn.onclick=()=>restoreFromTrash(item.id);
+    const delBtn=el('button','trash-act-btn del',{textContent:'✕'});
+    delBtn.onclick=()=>{ if(confirm('영구 삭제할까요?')) permanentDeleteTrash(item.id); };
+    actions.appendChild(restoreBtn); actions.appendChild(delBtn);
+    row.appendChild(actions);
+    list.appendChild(row);
+  });
+}
+document.getElementById('trashBtn').onclick=()=>{
+  renderTrashModal();
+  document.getElementById('trashModal').classList.remove('hidden');
+};
+document.getElementById('trashCloseBtn').onclick=()=>document.getElementById('trashModal').classList.add('hidden');
+document.getElementById('trashModal').onclick=e=>{if(e.target===document.getElementById('trashModal'))document.getElementById('trashModal').classList.add('hidden');};
 
 function moveTask(fromDk, taskId, toDk){
   if(!tasks[fromDk]) return;
@@ -1322,6 +1439,15 @@ function el(tag,cls,attrs){const e=document.createElement(tag);if(cls)e.classNam
 function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
   const item=el('div',`task-item${isSub?' sub':''}`);
   const checked=isRepeatInst?isRepeatChecked(task,instanceDk):task.checked;
+  if(!isSub&&!isRepeatInst){
+    item.draggable=true;
+    item.ondragstart=e=>{
+      e.dataTransfer.setData('application/json',JSON.stringify({dk,id:task.id}));
+      e.dataTransfer.effectAllowed='move';
+      item.classList.add('dragging');
+    };
+    item.ondragend=()=>item.classList.remove('dragging');
+  }
   if(!isSub){
     const star=el('span',`task-star${task.starred?' on':''}`,{textContent:'★',title:'중요 표시'});
     star.onclick=e=>{e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
@@ -1491,6 +1617,16 @@ function buildDayCol(date,dayIdx){
   const isWeekend=dayIdx>=5;
   const holiday=HOLIDAYS[dk];
   const col=el('div',`day-col${isToday?' is-today':''}${isWeekend?' is-weekend':''}${holiday?' is-holiday':''}`);
+  col.ondragover=e=>{e.preventDefault();col.classList.add('drag-over');};
+  col.ondragleave=()=>col.classList.remove('drag-over');
+  col.ondrop=e=>{
+    e.preventDefault();
+    col.classList.remove('drag-over');
+    try{
+      const data=JSON.parse(e.dataTransfer.getData('application/json'));
+      if(data&&data.dk&&data.id&&data.dk!==dk) moveTask(data.dk,data.id,dk);
+    }catch(err){}
+  };
   // header
   const hdr=el('div','day-header');
   hdr.appendChild(el('div','day-name',{textContent:DAY_NAMES[dayIdx]+'요일'}));
@@ -1539,6 +1675,52 @@ function buildDayCol(date,dayIdx){
   }
   col.appendChild(buildWeatherBar(dk));
   return col;
+}
+
+// ── Focus view (오늘 포커스) ──
+function buildFocusView(){
+  const wrap=el('div','calendar-wrap');
+  const container=el('div','focus-wrap');
+  const now=today();
+  const dk=dateKey(now);
+  const dayIdx=dateToDayIdx(now);
+
+  // 오늘
+  const sec1=el('div','focus-section');
+  sec1.appendChild(el('div','focus-section-title',{textContent:`📌 오늘 · ${now.getMonth()+1}월 ${now.getDate()}일 (${DAY_NAMES[dayIdx]})`}));
+  const list1=el('div','tasks-list focus-list');
+  const directToday=(tasks[dk]||[]).filter(matchesQuery);
+  const repeatsToday=getRepeatTasksForDate(now,dayIdx).filter(({task})=>matchesQuery(task));
+  const sortedDirect=[...directToday].sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
+  sortedDirect.forEach(t=>list1.appendChild(buildTaskItem(dk,t,false,null,false,null,null)));
+  repeatsToday.forEach(({task,originDk,instanceDk,adjusted})=>list1.appendChild(buildTaskItem(dk,task,false,null,true,originDk,instanceDk,adjusted)));
+  if(!sortedDirect.length&&!repeatsToday.length) list1.appendChild(el('div','focus-empty',{textContent:'오늘 할 일이 없습니다 🎉'}));
+  sec1.appendChild(list1);
+  container.appendChild(sec1);
+
+  // 지난 미완료
+  const overdue=[];
+  Object.entries(tasks).forEach(([odk,list])=>{
+    if(!Array.isArray(list))return;
+    const d=new Date(odk); d.setHours(0,0,0,0);
+    if(d>=now)return;
+    list.forEach(t=>{ if(t&&!t.checked&&matchesQuery(t)) overdue.push({dk:odk,task:t,date:d}); });
+  });
+  overdue.sort((a,b)=>b.date-a.date);
+  if(overdue.length){
+    const sec2=el('div','focus-section');
+    sec2.appendChild(el('div','focus-section-title',{textContent:`⚠️ 지난 미완료 (${overdue.length})`}));
+    const list2=el('div','tasks-list focus-list');
+    overdue.slice(0,30).forEach(({dk:odk,task})=>{
+      const item=buildTaskItem(odk,task,false,null,false,null,null);
+      item.querySelector('.task-body').appendChild(el('span','focus-date-badge',{textContent:`${new Date(odk).getMonth()+1}/${new Date(odk).getDate()}`}));
+      list2.appendChild(item);
+    });
+    sec2.appendChild(list2);
+    container.appendChild(sec2);
+  }
+  wrap.appendChild(container);
+  return wrap;
 }
 
 // ── Month view ──
@@ -1590,7 +1772,7 @@ function buildMonthCell(date,curMonth){
     cell.appendChild(pill);
   });
   if(allItems.length>3) cell.appendChild(el('div','month-more',{textContent:`+${allItems.length-3}개 더`}));
-  cell.onclick=()=>{currentView='week';weekStart=getMonday(date);document.getElementById('btnWeek').classList.add('active');document.getElementById('btnMonth').classList.remove('active');render();};
+  cell.onclick=()=>{weekStart=getMonday(date);setView('week');};
   return cell;
 }
 
@@ -1630,7 +1812,7 @@ function buildSearchView(query){
       cb.onclick=e=>{e.stopPropagation();toggleTask(dk,t.id,null);};
       item.appendChild(cb);
       item.appendChild(el('span','search-result-text',{textContent:(t.starred?'★ ':'')+t.text}));
-      item.onclick=()=>{currentView='week';weekStart=getMonday(new Date(dk));searchQuery='';document.getElementById('searchInput').value='';document.getElementById('btnWeek').classList.add('active');document.getElementById('btnMonth').classList.remove('active');render();};
+      item.onclick=()=>{weekStart=getMonday(new Date(dk));searchQuery='';document.getElementById('searchInput').value='';setView('week');};
       grp.appendChild(item);
     });
     wrap.appendChild(grp);
@@ -1657,11 +1839,16 @@ function render(){
   if(currentView==='week'){
     const end=new Date(weekStart);end.setDate(end.getDate()+6);
     document.getElementById('weekLabel').textContent=`${weekStart.getFullYear()}년 ${weekStart.getMonth()+1}월 ${weekStart.getDate()}일 ~ ${end.getMonth()+1}월 ${end.getDate()}일`;
-  } else {
+  } else if(currentView==='month') {
     document.getElementById('weekLabel').textContent=`${monthDate.getFullYear()}년 ${monthDate.getMonth()+1}월`;
+  } else {
+    const now=new Date();
+    document.getElementById('weekLabel').textContent=`${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일`;
   }
   // main content
-  if(currentView==='week'){
+  if(currentView==='focus'){
+    view.appendChild(buildFocusView());
+  } else if(currentView==='week'){
     const wrap=el('div','calendar-wrap');
     // scroll hint on mobile
     if(window.innerWidth<=768){
@@ -1712,12 +1899,16 @@ document.getElementById('nextBtn').onclick=()=>{
 document.getElementById('todayBtn').onclick=()=>{
   weekStart=getMonday(new Date()); monthDate=new Date(); monthDate.setDate(1); render();
 };
-document.getElementById('btnWeek').onclick=()=>{
-  currentView='week'; document.getElementById('btnWeek').classList.add('active'); document.getElementById('btnMonth').classList.remove('active'); render();
-};
-document.getElementById('btnMonth').onclick=()=>{
-  currentView='month'; document.getElementById('btnMonth').classList.add('active'); document.getElementById('btnWeek').classList.remove('active'); render();
-};
+function setView(v){
+  currentView=v;
+  document.getElementById('btnWeek').classList.toggle('active',v==='week');
+  document.getElementById('btnMonth').classList.toggle('active',v==='month');
+  document.getElementById('btnFocus').classList.toggle('active',v==='focus');
+  render();
+}
+document.getElementById('btnWeek').onclick=()=>setView('week');
+document.getElementById('btnMonth').onclick=()=>setView('month');
+document.getElementById('btnFocus').onclick=()=>setView('focus');
 
 // ── Search ──
 document.getElementById('searchInput').addEventListener('input',e=>{
@@ -1805,10 +1996,19 @@ document.addEventListener('keydown',e=>{
   if(e.key==='t'||e.key==='T'){document.getElementById('todayBtn').click();}
   if(e.key==='/'){e.preventDefault();document.getElementById('searchInput').focus();}
   if(e.key==='d'||e.key==='D'){document.getElementById('darkBtn').click();}
+  if(e.key==='f'||e.key==='F'){document.getElementById('btnFocus').click();}
+  if(e.key==='n'||e.key==='N'){
+    e.preventDefault();
+    if(currentView!=='week') setView('week');
+    weekStart=getMonday(new Date());
+    activeInput={dateKey:dateKey(new Date()),parentId:null};
+    render();
+  }
   if(e.key==='Escape'){closeMemo();closeEdit();activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
 });
 
 // ── Init ──
+purgeOldTrash();
 render();
 fetchWeather(weatherLoc.lat,weatherLoc.lon);
 initFirebaseSync();
