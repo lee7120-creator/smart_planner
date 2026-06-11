@@ -394,6 +394,22 @@
     .gantt-bar:hover { transform:scaleY(1.25); }
     .gantt-bar.done { opacity:.3; }
 
+    /* ─── 사용 가이드 ─── */
+    .guide-section { margin-bottom:18px; }
+    .guide-section-title {
+      font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px;
+      padding-bottom:6px; border-bottom:1px solid var(--border2);
+    }
+    .guide-item { display:flex; gap:10px; padding:5px 2px; align-items:flex-start; }
+    .guide-icon {
+      width:34px; flex-shrink:0; text-align:center; font-size:14px;
+      background:var(--surface2); border-radius:8px; padding:4px 2px;
+      font-weight:700; color:var(--text2); white-space:nowrap;
+    }
+    .guide-text { font-size:12.5px; line-height:1.6; color:var(--text2); min-width:0; }
+    .guide-name { font-weight:700; color:var(--text); }
+    .guide-desc { color:var(--text2); }
+
     /* ─── Read-only mode ─── */
     .readonly-mode .task-actions, .readonly-mode .add-task-btn, .readonly-mode .add-sub-btn,
     .readonly-mode .input-form, .readonly-mode .memo-attach, .readonly-mode #trashBtn,
@@ -963,6 +979,7 @@
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
     <div class="sync-dot offline" id="syncDot" title="동기화 상태" style="display:none"></div>
+    <button class="icon-btn" id="guideBtn" title="사용 가이드">❓</button>
     <button class="save-btn" id="forceSyncBtn" style="display:none" title="지금 바로 저장">☁️ <span>저장</span></button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
     <div class="more-menu-wrap">
@@ -1056,6 +1073,17 @@
     <div class="modal-actions">
       <button class="btn-secondary" id="editCancelBtn">취소</button>
       <button class="btn-primary" id="editSaveBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Guide Modal -->
+<div class="modal-overlay hidden" id="guideModal">
+  <div class="modal-box" style="width:480px;max-height:84vh;display:flex;flex-direction:column">
+    <div class="modal-title">📖 사용 가이드</div>
+    <div id="guideBody" style="overflow-y:auto;flex:1;margin-bottom:14px"></div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="guideCloseBtn">알겠어요!</button>
     </div>
   </div>
 </div>
@@ -1951,6 +1979,107 @@ document.getElementById('memoHistBtn').onclick=()=>{
   if(wrap.classList.contains('hidden')){renderMemoHistory();wrap.classList.remove('hidden');}
   else wrap.classList.add('hidden');
 };
+
+// ── 사용 가이드 ──
+// ⚠️ 새 기능을 추가하면 반드시 아래 GUIDE_SECTIONS에도 항목을 추가할 것!
+//    (배열에 추가하면 가이드 모달에 자동 반영됩니다)
+const GUIDE_SECTIONS=[
+  { title:'🚀 시작하기', items:[
+    ['👤','나만의 캘린더','이름을 입력하면 나만의 URL이 생겨요. 이 URL을 북마크해두면 어디서든 내 일정에 접근할 수 있어요. PC·휴대폰에서 같은 URL을 열면 자동으로 동기화됩니다.'],
+    ['☁️','저장 버튼','변경사항은 자동 저장되지만, 헤더의 저장 버튼을 누르면 즉시 클라우드에 백업돼요.'],
+    ['📱','앱으로 설치','브라우저 주소창의 "설치" 아이콘(또는 공유→홈 화면에 추가)을 누르면 앱처럼 쓸 수 있고, 오프라인에서도 열려요.'],
+  ]},
+  { title:'🗓 화면 전환 (헤더 왼쪽 버튼)', items:[
+    ['📋','일간','하루에 집중하는 화면. 상단에서 목록 ↔ 타임라인(시간대별 배치)으로 전환할 수 있어요.'],
+    ['📅','주간','기본 화면. 월~일 7개 칸에 할 일을 관리해요.'],
+    ['🗓','월간','한 달 전체를 한눈에. 날짜를 누르면 그 주의 주간 화면으로 이동해요.'],
+    ['📆','연간','12개월 미니 달력. 점이 찍힌 날 = 할 일이 있는 날이에요.'],
+    ['📊','타임라인','한 달의 할 일을 가로 막대(간트차트)로 보여줘요. 반복 일정의 패턴이 한눈에 보여요.'],
+    ['🎯','포커스','오늘 할 일 + 지난 미완료만 모아서 보여주는 집중 모드예요.'],
+  ]},
+  { title:'✏️ 할 일 입력 꿀팁', items:[
+    ['⌨️','빠른 입력','"내일 3시 회의"처럼 입력하면 날짜와 시간을 자동 인식해요. (오늘/내일/모레/다음주 화요일/3월 15일/3/15 등)'],
+    ['🕐','시간 자동 인식','"8시"는 오전 8시, "6시"는 저녁 6시로 알아서 해석해요. (업무시간 8시~19시 기준) "오후 2시반", "14:30"도 OK!'],
+    ['🔴','우선순위','입력란 아래에서 🔴높음 🟡중간 🟢낮음을 선택. 알림 메시지에도 우선순위 높은 일이 먼저 나와요.'],
+    ['🎨','색상','색 점을 눌러 할 일에 색을 입혀요. 월간 화면에서도 색으로 구분돼요.'],
+    ['🔄','반복','매주/격주/매월/매월 N째 요일(예: 둘째 화요일) 반복을 설정할 수 있어요.'],
+    ['#️⃣','태그','할 일에 #태그를 쓰면 칩으로 표시되고, 누르면 같은 태그를 모아 검색해줘요.'],
+  ]},
+  { title:'✅ 할 일 다루기 (마우스를 올리면 아이콘이 나타나요)', items:[
+    ['★','중요 표시','별을 누르면 항상 맨 위로 정렬돼요.'],
+    ['🍅','포모도로','25분 집중 타이머가 시작돼요.'],
+    ['✏️','수정','내용·색상·우선순위·반복·마감시간을 변경해요.'],
+    ['📅','날짜 이동','내일/모레/다음 주 또는 날짜를 직접 골라 옮겨요.'],
+    ['✕','삭제','휴지통으로 이동돼요 (30일간 보관, 복구 가능). 삭제 직후 하단의 "실행 취소"로 즉시 되돌릴 수도 있어요.'],
+    ['🖱','드래그앤드롭','할 일을 끌어서 다른 날짜로 이동하거나, 같은 날 안에서 순서를 바꿀 수 있어요.'],
+    ['＋','하위 항목','할 일에 마우스를 올리면 "+ 하위 항목"이 나타나요. 체크리스트로 진행률(✓ 2/5)이 표시돼요.'],
+  ]},
+  { title:'📝 메모', items:[
+    ['📝','메모 열기','할 일 제목을 클릭하면 노란 메모장이 열려요. 자동 저장됩니다.'],
+    ['👁','보기/편집','메모는 보기 모드로 열려요. **굵게**, - 목록, - [ ] 체크박스, # 제목 같은 마크다운이 예쁘게 표시돼요. ✏️를 누르거나 더블클릭하면 편집!'],
+    ['📷','이미지 첨부','버튼을 누르거나 스크린샷을 붙여넣기(Ctrl+V)하면 첨부돼요. 이미지는 이 기기에만 저장돼요.'],
+    ['🕐','버전 히스토리','이전에 쓴 내용을 최대 5개까지 복원할 수 있어요.'],
+    ['🔗','링크','메모에 URL을 쓰면 하단에 클릭 가능한 링크 칩이 생겨요.'],
+  ]},
+  { title:'🔔 알림 (더보기 → 마감 알림 켜기)', items:[
+    ['🌅','매일 9시','오늘 할 일을 요약해서 알려줘요. "🔴 14:00 보고서 외 4건이 남아있습니다"'],
+    ['⏰','마감 1시간 전','마감시간이 있는 할 일은 1시간 전에 미리 알려줘요.'],
+    ['🌆','매일 17시','아직 체크 안 된 미완료 할 일을 리마인드해줘요.'],
+    ['💡','참고','브라우저 탭이 열려 있어야 알림이 와요. (백그라운드 탭은 OK)'],
+  ]},
+  { title:'⋯ 더보기 메뉴', items:[
+    ['🔗','내 URL 복사','내 캘린더 주소를 복사해요.'],
+    ['👁','읽기전용 링크','보기만 가능한 공유 링크를 만들어요. 받은 사람은 수정할 수 없어요.'],
+    ['📑','템플릿','자주 쓰는 할일 묶음을 저장해두고 원하는 날짜에 한 번에 추가해요.'],
+    ['📝','메모 모아보기','모든 메모를 최신순으로 한눈에 봐요.'],
+    ['🗑','휴지통','삭제한 할 일을 30일 안에 복구할 수 있어요.'],
+    ['📤','캘린더 내보내기','.ics 파일로 구글캘린더/아웃룩에 가져갈 수 있어요.'],
+    ['📍','내 위치 날씨','요일 칸 하단의 날씨를 내 위치 기준으로 바꿔요.'],
+  ]},
+  { title:'⌨️ 단축키', items:[
+    ['←  →','주 이동','이전/다음 주로 이동해요.'],
+    ['T','오늘','오늘이 있는 주로 돌아와요.'],
+    ['N','새 할 일','오늘 칸에 입력란이 바로 열려요.'],
+    ['F','포커스','포커스 모드로 전환해요.'],
+    ['/','검색','검색창에 커서가 가요.'],
+    ['D','다크모드','어두운 테마로 전환해요.'],
+  ]},
+  { title:'📈 하단 대시보드', items:[
+    ['📊','이번 주 현황','완료 수, 전체 달성률, 연속 완료 일수와 요일별 분포를 보여줘요.'],
+    ['⭐','다가오는 중요 일정','별표/높은 우선순위 할 일의 D-day를 보여줘요.'],
+    ['📈','완료 통계','최근 8주 완료율 추이와 최근 완료한 일 목록이에요.'],
+  ]},
+];
+function renderGuide(){
+  const body=document.getElementById('guideBody');
+  body.innerHTML='';
+  GUIDE_SECTIONS.forEach(sec=>{
+    const s=el('div','guide-section');
+    s.appendChild(el('div','guide-section-title',{textContent:sec.title}));
+    sec.items.forEach(([icon,name,desc])=>{
+      const row=el('div','guide-item');
+      row.appendChild(el('div','guide-icon',{textContent:icon}));
+      const txt=el('div','guide-text');
+      txt.appendChild(el('span','guide-name',{textContent:name}));
+      txt.appendChild(el('span','guide-desc',{textContent:' — '+desc}));
+      row.appendChild(txt);
+      s.appendChild(row);
+    });
+    body.appendChild(s);
+  });
+}
+function openGuide(){
+  renderGuide();
+  document.getElementById('guideModal').classList.remove('hidden');
+}
+document.getElementById('guideBtn').onclick=openGuide;
+document.getElementById('guideCloseBtn').onclick=()=>document.getElementById('guideModal').classList.add('hidden');
+document.getElementById('guideModal').onclick=e=>{if(e.target===document.getElementById('guideModal'))document.getElementById('guideModal').classList.add('hidden');};
+// 첫 방문 시 자동으로 가이드 한 번 보여주기
+if(USER_ID&&!READ_ONLY&&!localStorage.getItem('guideSeen')){
+  localStorage.setItem('guideSeen','1');
+  setTimeout(openGuide,600);
+}
 
 // ── 템플릿 (자주 쓰는 할일 묶음) ──
 const TPL_KEY = USER_ID ? `calTemplates_${USER_ID}` : 'calTemplates';
