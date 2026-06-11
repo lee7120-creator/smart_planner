@@ -244,6 +244,25 @@
     .task-item[draggable="true"] { cursor:grab; }
     .task-item.dragging { opacity:.35; }
     .day-col.drag-over { border-color:var(--primary) !important; box-shadow:0 0 0 3px var(--primary-l) !important; }
+    .task-item.drag-target { box-shadow:inset 0 2px 0 var(--primary) !important; }
+
+    /* ─── 마감시간 ─── */
+    .time-badge {
+      display:inline-flex; align-items:center; font-size:9px; font-weight:700;
+      color:var(--primary); background:var(--primary-l); border-radius:4px;
+      padding:1px 5px; margin-right:3px; margin-top:2px; flex-shrink:0;
+      font-variant-numeric:tabular-nums;
+    }
+    .time-badge.overdue { color:#fff; background:var(--red); }
+    .time-row { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+    .time-row-label { font-size:11px; color:var(--text3); }
+    .time-input {
+      border:1px solid var(--border); border-radius:6px; padding:3px 6px;
+      font-size:12px; font-family:inherit; background:var(--surface); color:var(--text); outline:none;
+    }
+    .time-input:focus { border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-l); }
+    .time-clear-btn { background:none; border:none; cursor:pointer; color:var(--text3); font-size:11px; padding:2px 4px; }
+    .time-clear-btn:hover { color:var(--red); }
 
     /* ─── Focus view ─── */
     .focus-wrap { max-width:680px; margin:0 auto; display:flex; flex-direction:column; gap:18px; padding:4px 0; }
@@ -858,6 +877,11 @@
         <button class="repeat-opt" data-val="monthlyNth">N째 요일</button>
       </div>
     </div>
+    <div class="modal-row">
+      <span class="modal-label">마감시간</span>
+      <input type="time" class="time-input" id="editTimeInput">
+      <button type="button" class="time-clear-btn" id="editTimeClear" title="시간 제거">✕</button>
+    </div>
     <div class="modal-actions">
       <button class="btn-secondary" id="editCancelBtn">취소</button>
       <button class="btn-primary" id="editSaveBtn">저장</button>
@@ -1220,12 +1244,33 @@ function toggleRepeatInst(originDk, taskId, instanceDk) {
 
 // ── Task mutations ──
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
-function addTask(dk,text,color,starred,repeat,parentId,priority) {
+function addTask(dk,text,color,starred,repeat,parentId,priority,time) {
   if(!tasks[dk]) tasks[dk]=[];
-  const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',priority:priority||null,completions:{},subs:[]};
+  const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',priority:priority||null,time:time||null,completions:{},subs:[]};
   if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p){if(!Array.isArray(p.subs))p.subs=[];p.subs.push(t);}}
   else tasks[dk].push(t);
   saveTasks(dk); activeInput=null; render();
+}
+
+// ── Task sort: 중요 → 마감시간순 → 시간 없는 항목 ──
+function taskSort(a,b){
+  const s=(b.starred?1:0)-(a.starred?1:0); if(s)return s;
+  if(a.time&&b.time)return a.time<b.time?-1:a.time>b.time?1:0;
+  if(a.time)return -1;
+  if(b.time)return 1;
+  return 0;
+}
+
+// ── Reorder within same day (드래그 순서 변경) ──
+function reorderTask(dk,dragId,targetId){
+  const list=tasks[dk]; if(!list)return;
+  const from=list.findIndex(t=>t.id===dragId);
+  if(from<0)return;
+  const [moved]=list.splice(from,1);
+  const to=list.findIndex(t=>t.id===targetId);
+  if(to<0){list.splice(from,0,moved);return;}
+  list.splice(to,0,moved);
+  saveTasks(dk);render();
 }
 
 // ── Quick input date parsing (e.g. "내일 회의", "다음주 화요일 보고", "3/15 발표") ──
@@ -1437,6 +1482,7 @@ function openEdit(dk,task,isRepeatInst,originDk) {
   document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
     b.classList.toggle('active',b.dataset.val===_editRepeat);
   });
+  document.getElementById('editTimeInput').value=targetTask.time||'';
   document.getElementById('editInput').value=targetTask.text;
   document.getElementById('editModal').classList.remove('hidden');
   setTimeout(()=>{const inp=document.getElementById('editInput');inp.focus();inp.select();},50);
@@ -1464,9 +1510,10 @@ document.getElementById('editSaveBtn').onclick=()=>{
   const text=document.getElementById('editInput').value.trim();
   if(!text)return;
   const t=(tasks[editCtx.dk]||[]).find(x=>x.id===editCtx.taskId);
-  if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;t.priority=_editPriority;if(!t.completions)t.completions={};}
+  if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;t.priority=_editPriority;t.time=document.getElementById('editTimeInput').value||null;if(!t.completions)t.completions={};}
   saveTasks(editCtx.dk); closeEdit(); render();
 };
+document.getElementById('editTimeClear').onclick=()=>{document.getElementById('editTimeInput').value='';};
 document.getElementById('editCancelBtn').onclick=closeEdit;
 document.getElementById('editModal').onclick=e=>{if(e.target===document.getElementById('editModal'))closeEdit();};
 
@@ -1573,6 +1620,23 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       item.classList.add('dragging');
     };
     item.ondragend=()=>item.classList.remove('dragging');
+    if(!isRepeatInst){
+      item.ondragover=e=>{e.preventDefault();e.stopPropagation();item.classList.add('drag-target');};
+      item.ondragleave=()=>item.classList.remove('drag-target');
+      item.ondrop=e=>{
+        e.preventDefault();e.stopPropagation();
+        item.classList.remove('drag-target');
+        try{
+          const data=JSON.parse(e.dataTransfer.getData('application/json'));
+          if(!data||!data.id||data.id===task.id)return;
+          if(data.dk===dk&&!data.isRepeat){reorderTask(dk,data.id,task.id);}
+          else{
+            if(data.isRepeat&&!confirm('반복 일정 전체의 시작일을 변경합니다. 계속할까요?'))return;
+            moveTask(data.dk,data.id,dk);
+          }
+        }catch(err){}
+      };
+    }
   }
   if(!isSub){
     const star=el('span',`task-star${task.starred?' on':''}`,{textContent:'★',title:'중요 표시'});
@@ -1589,6 +1653,13 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   if(!isSub&&task.priority){
     const flagMap={high:'🔴',mid:'🟡',low:'🟢'};
     textWrap.appendChild(el('span','priority-flag',{textContent:flagMap[task.priority]||''}));
+  }
+  if(!isSub&&task.time){
+    const now=new Date();
+    const nowHM=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const todayDk=dateKey(today());
+    const isOverdue=!checked&&(dk<todayDk||(dk===todayDk&&task.time<=nowHM));
+    textWrap.appendChild(el('span',`time-badge${isOverdue?' overdue':''}`,{textContent:'⏰'+task.time}));
   }
   const txt=el('div',`task-text${checked?' done':''}`,{textContent:task.text});
   textWrap.appendChild(txt);
@@ -1668,6 +1739,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
 // ── Input form builder ──
 function buildInputForm(dk,parentId){
   let selColor=null,starred=false,selRepeat='none',selPriority=null;
+  let timeInp=null;
   const form=el('div','input-form');
   const row=el('div','input-row');
   const inp=el('input','task-input');
@@ -1708,6 +1780,11 @@ function buildInputForm(dk,parentId){
       rs.appendChild(btn);
     });
     form.appendChild(rs);
+    const timeRow=el('div','time-row');
+    timeRow.appendChild(el('span','time-row-label',{textContent:'⏰ 마감시간'}));
+    timeInp=el('input','time-input');timeInp.type='time';
+    timeRow.appendChild(timeInp);
+    form.appendChild(timeRow);
   }
   const acts=el('div','form-actions');
   const addBtn=el('button','btn-add',{type:'button',textContent:'추가'});
@@ -1720,7 +1797,7 @@ function buildInputForm(dk,parentId){
       const parsed=parseQuickDate(v);
       if(parsed&&parsed.text){ v=parsed.text; targetDk=dateKey(parsed.date); }
     }
-    addTask(targetDk,v,selColor,starred,selRepeat,parentId,selPriority);
+    addTask(targetDk,v,selColor,starred,selRepeat,parentId,selPriority,timeInp&&timeInp.value?timeInp.value:null);
   };
   cancelBtn.onclick=()=>{activeInput=null;render();};
   inp.addEventListener('keydown',e=>{if(e.key==='Enter')addBtn.click();if(e.key==='Escape')cancelBtn.click();});
@@ -1791,7 +1868,7 @@ function buildDayCol(date,dayIdx){
   col.appendChild(hdr);
   // tasks
   const list=el('div','tasks-list');
-  const sorted=[...dayTasks].sort((a,b)=>(b.starred?1:0)-(a.starred?1:0)).filter(matchesQuery);
+  const sorted=[...dayTasks].sort(taskSort).filter(matchesQuery);
   sorted.forEach(t=>list.appendChild(buildTaskItem(dk,t,false,null,false,null,null)));
   getRepeatTasksForDate(date,dayIdx).filter(({task})=>matchesQuery(task)).forEach(({task,originDk,instanceDk,adjusted})=>{
     list.appendChild(buildTaskItem(dk,task,false,null,true,originDk,instanceDk,adjusted));
@@ -1829,7 +1906,7 @@ function buildFocusView(){
   const list1=el('div','tasks-list focus-list');
   const directToday=(tasks[dk]||[]).filter(matchesQuery);
   const repeatsToday=getRepeatTasksForDate(now,dayIdx).filter(({task})=>matchesQuery(task));
-  const sortedDirect=[...directToday].sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
+  const sortedDirect=[...directToday].sort(taskSort);
   sortedDirect.forEach(t=>list1.appendChild(buildTaskItem(dk,t,false,null,false,null,null)));
   repeatsToday.forEach(({task,originDk,instanceDk,adjusted})=>list1.appendChild(buildTaskItem(dk,task,false,null,true,originDk,instanceDk,adjusted)));
   if(!sortedDirect.length&&!repeatsToday.length) list1.appendChild(el('div','focus-empty',{textContent:'오늘 할 일이 없습니다 🎉'}));
@@ -2226,7 +2303,7 @@ const NOTIFY_HOUR = 9;
 function getAllTasksForDate(date) {
   const dk = dateKey(date);
   const dayIdx = dateToDayIdx(date);
-  const direct = (tasks[dk]||[]).map(t=>({text:t.text, checked:!!t.checked}));
+  const direct = (tasks[dk]||[]).map(t=>({text:(t.time?t.time+' ':'')+t.text, checked:!!t.checked}));
   const repeats = getRepeatTasksForDate(date,dayIdx).map(({task,instanceDk})=>({text:task.text, checked:isRepeatChecked(task,instanceDk)}));
   return [...direct, ...repeats];
 }
