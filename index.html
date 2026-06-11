@@ -253,6 +253,70 @@
     .focus-date-badge { font-size:9px; color:var(--text3); background:var(--surface2); border-radius:4px; padding:1px 5px; margin-top:2px; display:inline-block; }
     .focus-empty { text-align:center; padding:24px; color:var(--text3); font-size:13px; }
 
+    /* ─── Day view ─── */
+    .day-view-wrap { max-width:620px; margin:0 auto; padding:16px; }
+    .day-view-wrap .day-col { min-height:420px; }
+
+    /* ─── Year view ─── */
+    .year-wrap { padding:16px; }
+    .year-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; max-width:1200px; margin:0 auto; }
+    @media (max-width:1059px) { .year-grid { grid-template-columns:repeat(3,1fr); } }
+    @media (max-width:768px) { .year-grid { grid-template-columns:repeat(2,1fr); gap:10px; } }
+    @media (max-width:480px) { .year-grid { grid-template-columns:1fr; } }
+    .year-month {
+      background:var(--surface); border:1px solid var(--border); border-radius:14px;
+      padding:12px; box-shadow:var(--shadow); cursor:pointer; transition:all .15s;
+    }
+    .year-month:hover { border-color:var(--primary); box-shadow:var(--shadow-md),0 0 0 2px var(--primary-l); }
+    .year-month-title { font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; }
+    .year-month-title.cur { color:var(--primary); }
+    .year-mini-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; }
+    .year-dow { font-size:9px; text-align:center; color:var(--text3); padding:1px 0; font-weight:600; }
+    .year-day {
+      font-size:10px; text-align:center; padding:3px 0 5px; border-radius:5px;
+      color:var(--text2); position:relative; cursor:pointer; line-height:1.2;
+    }
+    .year-day:hover { background:var(--primary-l); color:var(--primary); }
+    .year-day.weekend { color:var(--red); opacity:.75; }
+    .year-day.other { visibility:hidden; }
+    .year-day.is-today { background:var(--primary); color:#fff; font-weight:700; opacity:1; }
+    .year-day.has-tasks::after {
+      content:''; position:absolute; bottom:1px; left:50%; transform:translateX(-50%);
+      width:3px; height:3px; border-radius:50%; background:var(--primary);
+    }
+    .year-day.is-today.has-tasks::after { background:#fff; }
+
+    /* ─── Timeline (간트) view ─── */
+    .gantt-wrap { padding:16px; }
+    .gantt-scroller {
+      overflow-x:auto; background:var(--surface); border:1px solid var(--border);
+      border-radius:14px; box-shadow:var(--shadow); padding:6px 0;
+    }
+    .gantt-row { display:grid; align-items:stretch; min-width:760px; }
+    .gantt-row:not(.gantt-header):hover { background:var(--surface2); }
+    .gantt-header { position:sticky; top:0; background:var(--surface); z-index:5; border-bottom:1px solid var(--border); }
+    .gantt-hdr-cell { font-size:10px; font-weight:700; color:var(--text3); text-align:center; padding:6px 0; }
+    .gantt-day-num.weekend { color:var(--red); opacity:.7; }
+    .gantt-day-num.is-today { color:#fff; background:var(--primary); border-radius:6px 6px 0 0; }
+    .gantt-name-cell {
+      display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text);
+      padding:4px 10px; overflow:hidden; cursor:pointer;
+      position:sticky; left:0; background:inherit; z-index:2;
+      background:var(--surface); border-right:1px solid var(--border2);
+    }
+    .gantt-row:not(.gantt-header):hover .gantt-name-cell { background:var(--surface2); }
+    .gantt-name-cell.gantt-hdr-cell { text-align:left; }
+    .gantt-name-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .gantt-cell { border-right:1px solid var(--border2); display:flex; align-items:center; padding:3px 1px; min-height:24px; }
+    .gantt-cell.weekend { background:color-mix(in srgb, var(--surface) 96%, var(--red) 4%); }
+    .gantt-cell.is-today { background:var(--primary-l); }
+    .gantt-bar {
+      width:100%; height:12px; border-radius:6px; background:var(--primary);
+      cursor:pointer; transition:transform .1s, opacity .1s;
+    }
+    .gantt-bar:hover { transform:scaleY(1.25); }
+    .gantt-bar.done { opacity:.3; }
+
     /* ─── Trash modal ─── */
     .trash-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; background:var(--surface2); }
     .trash-info { flex:1; min-width:0; }
@@ -422,7 +486,7 @@
         height:auto; flex-wrap:wrap; padding:8px 12px; gap:6px;
       }
       .header-title { font-size:15px; order:1; }
-      .view-toggle { order:2; }
+      .view-toggle { order:2; flex-wrap:wrap; }
       .nav-group { order:3; flex:1; justify-content:flex-end; gap:4px; }
       .search-wrap { order:5; max-width:100%; flex:1 1 100%; }
       .header-actions { order:4; margin-left:0; gap:6px; }
@@ -700,8 +764,11 @@
 <header class="header">
   <span class="header-title">🗓 마이플래너</span>
   <div class="view-toggle">
+    <button class="view-btn" id="btnDay">일간</button>
     <button class="view-btn active" id="btnWeek">주간</button>
     <button class="view-btn" id="btnMonth">월간</button>
+    <button class="view-btn" id="btnYear">연간</button>
+    <button class="view-btn" id="btnTimeline">타임라인</button>
     <button class="view-btn" id="btnFocus">포커스</button>
   </div>
   <div class="nav-group">
@@ -1013,6 +1080,8 @@ if (!USER_ID) {
 let currentView = 'week';
 let weekStart = getMonday(new Date());
 let monthDate = new Date(); monthDate.setDate(1);
+let dayDate = today();
+let yearNum = new Date().getFullYear();
 let tasks = loadTasks();
 let activeInput = null;
 let weatherByDate = {};
@@ -1841,6 +1910,131 @@ function buildMonthCell(date,curMonth){
   return cell;
 }
 
+// ── Day view (일간) ──
+function buildDayView(){
+  const wrap=el('div','day-view-wrap');
+  wrap.appendChild(buildDayCol(new Date(dayDate),dateToDayIdx(dayDate)));
+  return wrap;
+}
+
+// ── Year view (연간) ──
+function buildYearView(){
+  const wrap=el('div','year-wrap');
+  const grid=el('div','year-grid');
+  for(let m=0;m<12;m++) grid.appendChild(buildYearMonth(yearNum,m));
+  wrap.appendChild(grid);
+  return wrap;
+}
+function buildYearMonth(year,month){
+  const box=el('div','year-month');
+  const isCurMonth=year===new Date().getFullYear()&&month===new Date().getMonth();
+  box.appendChild(el('div',`year-month-title${isCurMonth?' cur':''}`,{textContent:`${month+1}월`}));
+  const dowRow=el('div','year-mini-grid year-dow-row');
+  DAY_NAMES.forEach(n=>dowRow.appendChild(el('div','year-dow',{textContent:n[0]})));
+  box.appendChild(dowRow);
+  const grid=el('div','year-mini-grid');
+  const firstDay=new Date(year,month,1);
+  const lastDay=new Date(year,month+1,0);
+  let cur=getMonday(firstDay);
+  while(cur<=lastDay){
+    for(let i=0;i<7;i++){
+      const d=new Date(cur);
+      if(d.getMonth()!==month){grid.appendChild(el('div','year-day other'));}
+      else{
+        const dk=dateKey(d);
+        const isToday=d.getTime()===today().getTime();
+        const isWeekend=d.getDay()===0||d.getDay()===6;
+        const holiday=HOLIDAYS[dk];
+        let hasTasks=Array.isArray(tasks[dk])&&tasks[dk].length>0;
+        if(!hasTasks){try{hasTasks=getRepeatTasksForDate(d,dateToDayIdx(d)).length>0;}catch(e){}}
+        const cell=el('div',`year-day${isToday?' is-today':''}${isWeekend||holiday?' weekend':''}${hasTasks?' has-tasks':''}`,{textContent:d.getDate()});
+        cell.onclick=e=>{e.stopPropagation();weekStart=getMonday(d);setView('week');};
+        grid.appendChild(cell);
+      }
+      cur.setDate(cur.getDate()+1);
+    }
+  }
+  box.appendChild(grid);
+  box.onclick=()=>{monthDate=new Date(year,month,1);setView('month');};
+  return box;
+}
+
+// ── Timeline (간트) view ──
+function buildTimelineView(){
+  const wrap=el('div','gantt-wrap');
+  const year=monthDate.getFullYear(),month=monthDate.getMonth();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  // 이번 달 모든 할 일 수집 (반복 일정은 한 행으로 합침)
+  const repRows={},rows=[];
+  for(let d=1;d<=daysInMonth;d++){
+    const date=new Date(year,month,d);
+    const dk=dateKey(date);
+    (tasks[dk]||[]).forEach(t=>{
+      if(!t||!matchesQuery(t))return;
+      if(t.repeat&&t.repeat!=='none'){
+        if(!repRows[t.id])repRows[t.id]={task:t,cells:[]};
+        repRows[t.id].cells.push({d,checked:t.checked,date});
+      } else rows.push({task:t,cells:[{d,checked:t.checked,date}]});
+    });
+    try{
+      getRepeatTasksForDate(date,dateToDayIdx(date)).forEach(({task,instanceDk})=>{
+        if(!matchesQuery(task))return;
+        if(!repRows[task.id])repRows[task.id]={task,cells:[]};
+        repRows[task.id].cells.push({d,checked:isRepeatChecked(task,instanceDk),date});
+      });
+    }catch(e){}
+  }
+  const allRows=[...rows,...Object.values(repRows)].sort((a,b)=>a.cells[0].d-b.cells[0].d);
+  if(!allRows.length){
+    wrap.appendChild(el('div','search-empty',{textContent:'이번 달 할 일이 없습니다'}));
+    return wrap;
+  }
+  const scroller=el('div','gantt-scroller');
+  const gridTemplate=`minmax(150px,200px) repeat(${daysInMonth},minmax(22px,1fr))`;
+  const todayDk=dateKey(today());
+  // 헤더 (날짜)
+  const hdr=el('div','gantt-row gantt-header');
+  hdr.style.gridTemplateColumns=gridTemplate;
+  hdr.appendChild(el('div','gantt-name-cell gantt-hdr-cell',{textContent:'할 일'}));
+  for(let d=1;d<=daysInMonth;d++){
+    const date=new Date(year,month,d);
+    const isWeekend=date.getDay()===0||date.getDay()===6;
+    const isToday=dateKey(date)===todayDk;
+    const c=el('div',`gantt-hdr-cell gantt-day-num${isWeekend?' weekend':''}${isToday?' is-today':''}`,{textContent:d});
+    hdr.appendChild(c);
+  }
+  scroller.appendChild(hdr);
+  // 행
+  allRows.forEach(({task,cells})=>{
+    const row=el('div','gantt-row');
+    row.style.gridTemplateColumns=gridTemplate;
+    const name=el('div','gantt-name-cell');
+    if(task.color){const dot=el('span','color-dot');dot.style.background=task.color;dot.style.marginTop='0';name.appendChild(dot);}
+    const isRepeat=task.repeat&&task.repeat!=='none';
+    name.appendChild(el('span','gantt-name-text',{textContent:(task.starred?'★ ':'')+(isRepeat?'🔄 ':'')+task.text}));
+    name.onclick=()=>{weekStart=getMonday(cells[0].date);setView('week');};
+    row.appendChild(name);
+    const cellMap={};cells.forEach(c=>cellMap[c.d]=c);
+    for(let d=1;d<=daysInMonth;d++){
+      const date=new Date(year,month,d);
+      const isWeekend=date.getDay()===0||date.getDay()===6;
+      const isToday=dateKey(date)===todayDk;
+      const cell=el('div',`gantt-cell${isWeekend?' weekend':''}${isToday?' is-today':''}`);
+      if(cellMap[d]){
+        const bar=el('div',`gantt-bar${cellMap[d].checked?' done':''}`);
+        if(task.color)bar.style.background=task.color;
+        bar.title=`${month+1}/${d} · ${task.text}${cellMap[d].checked?' (완료)':''}`;
+        bar.onclick=()=>{weekStart=getMonday(cellMap[d].date);setView('week');};
+        cell.appendChild(bar);
+      }
+      row.appendChild(cell);
+    }
+    scroller.appendChild(row);
+  });
+  wrap.appendChild(scroller);
+  return wrap;
+}
+
 // ── Search ──
 function matchesQuery(t){
   if(!searchQuery) return true;
@@ -1904,8 +2098,12 @@ function render(){
   if(currentView==='week'){
     const end=new Date(weekStart);end.setDate(end.getDate()+6);
     document.getElementById('weekLabel').textContent=`${weekStart.getFullYear()}년 ${weekStart.getMonth()+1}월 ${weekStart.getDate()}일 ~ ${end.getMonth()+1}월 ${end.getDate()}일`;
-  } else if(currentView==='month') {
+  } else if(currentView==='month'||currentView==='timeline') {
     document.getElementById('weekLabel').textContent=`${monthDate.getFullYear()}년 ${monthDate.getMonth()+1}월`;
+  } else if(currentView==='day') {
+    document.getElementById('weekLabel').textContent=`${dayDate.getFullYear()}년 ${dayDate.getMonth()+1}월 ${dayDate.getDate()}일 (${DAY_NAMES[dateToDayIdx(dayDate)]})`;
+  } else if(currentView==='year') {
+    document.getElementById('weekLabel').textContent=`${yearNum}년`;
   } else {
     const now=new Date();
     document.getElementById('weekLabel').textContent=`${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일`;
@@ -1913,6 +2111,12 @@ function render(){
   // main content
   if(currentView==='focus'){
     view.appendChild(buildFocusView());
+  } else if(currentView==='day'){
+    view.appendChild(buildDayView());
+  } else if(currentView==='year'){
+    view.appendChild(buildYearView());
+  } else if(currentView==='timeline'){
+    view.appendChild(buildTimelineView());
   } else if(currentView==='week'){
     const wrap=el('div','calendar-wrap');
     // scroll hint on mobile
@@ -1953,27 +2157,29 @@ function render(){
 // ── Nav ──
 document.getElementById('prevBtn').onclick=()=>{
   if(currentView==='week')weekStart.setDate(weekStart.getDate()-7);
-  else if(currentView==='month')monthDate.setMonth(monthDate.getMonth()-1);
+  else if(currentView==='month'||currentView==='timeline')monthDate.setMonth(monthDate.getMonth()-1);
+  else if(currentView==='day')dayDate.setDate(dayDate.getDate()-1);
+  else if(currentView==='year')yearNum--;
   render();
 };
 document.getElementById('nextBtn').onclick=()=>{
   if(currentView==='week')weekStart.setDate(weekStart.getDate()+7);
-  else if(currentView==='month')monthDate.setMonth(monthDate.getMonth()+1);
+  else if(currentView==='month'||currentView==='timeline')monthDate.setMonth(monthDate.getMonth()+1);
+  else if(currentView==='day')dayDate.setDate(dayDate.getDate()+1);
+  else if(currentView==='year')yearNum++;
   render();
 };
 document.getElementById('todayBtn').onclick=()=>{
-  weekStart=getMonday(new Date()); monthDate=new Date(); monthDate.setDate(1); render();
+  weekStart=getMonday(new Date()); monthDate=new Date(); monthDate.setDate(1);
+  dayDate=today(); yearNum=new Date().getFullYear(); render();
 };
+const VIEW_BTNS={day:'btnDay',week:'btnWeek',month:'btnMonth',year:'btnYear',timeline:'btnTimeline',focus:'btnFocus'};
 function setView(v){
   currentView=v;
-  document.getElementById('btnWeek').classList.toggle('active',v==='week');
-  document.getElementById('btnMonth').classList.toggle('active',v==='month');
-  document.getElementById('btnFocus').classList.toggle('active',v==='focus');
+  Object.entries(VIEW_BTNS).forEach(([view,id])=>document.getElementById(id).classList.toggle('active',v===view));
   render();
 }
-document.getElementById('btnWeek').onclick=()=>setView('week');
-document.getElementById('btnMonth').onclick=()=>setView('month');
-document.getElementById('btnFocus').onclick=()=>setView('focus');
+Object.entries(VIEW_BTNS).forEach(([view,id])=>{document.getElementById(id).onclick=()=>setView(view);});
 
 // ── Search ──
 document.getElementById('searchInput').addEventListener('input',e=>{
