@@ -5,6 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>마이플래너</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#6366f1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -275,6 +278,27 @@
     /* ─── Day view ─── */
     .day-view-wrap { max-width:620px; margin:0 auto; padding:16px; }
     .day-view-wrap .day-col { min-height:420px; }
+
+    /* ─── Day timeline (타임블로킹) ─── */
+    .day-mode-toggle { display:flex; gap:4px; margin-bottom:10px; justify-content:center; }
+    .day-mode-btn {
+      padding:4px 14px; border:1px solid var(--border); border-radius:8px; font-size:12px;
+      cursor:pointer; color:var(--text2); background:var(--surface); font-family:inherit; transition:all .15s;
+    }
+    .day-mode-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .timeblock-box { background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); overflow:hidden; }
+    .timeblock-untimed { padding:10px 12px; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .timeblock-untimed-title { font-size:11px; font-weight:700; color:var(--text3); margin-bottom:4px; }
+    .timeblock-grid { display:flex; flex-direction:column; }
+    .timeblock-row { display:flex; border-bottom:1px solid var(--border2); min-height:34px; }
+    .timeblock-row:last-child { border-bottom:none; }
+    .timeblock-row.now { background:var(--primary-l); }
+    .timeblock-row.now .timeblock-hour { color:var(--primary); font-weight:700; }
+    .timeblock-hour {
+      width:52px; flex-shrink:0; font-size:10px; color:var(--text3); padding:6px 8px;
+      text-align:right; border-right:1px solid var(--border2); font-variant-numeric:tabular-nums;
+    }
+    .timeblock-slot { flex:1; padding:2px 6px; min-width:0; }
 
     /* ─── Year view ─── */
     .year-wrap { padding:16px; }
@@ -2514,10 +2538,51 @@ function buildMonthCell(date,curMonth){
 }
 
 // ── Day view (일간) ──
+let dayViewMode='list';
 function buildDayView(){
   const wrap=el('div','day-view-wrap');
-  wrap.appendChild(buildDayCol(new Date(dayDate),dateToDayIdx(dayDate)));
+  const toggle=el('div','day-mode-toggle');
+  [['list','📋 목록'],['time','🕐 타임라인']].forEach(([v,label])=>{
+    const b=el('button',`day-mode-btn${dayViewMode===v?' active':''}`,{textContent:label});
+    b.onclick=()=>{dayViewMode=v;render();};
+    toggle.appendChild(b);
+  });
+  wrap.appendChild(toggle);
+  if(dayViewMode==='list') wrap.appendChild(buildDayCol(new Date(dayDate),dateToDayIdx(dayDate)));
+  else wrap.appendChild(buildDayTimeline());
   return wrap;
+}
+function buildDayTimeline(){
+  const dk=dateKey(dayDate);
+  const dayIdx=dateToDayIdx(dayDate);
+  const box=el('div','timeblock-box');
+  const items=[];
+  (tasks[dk]||[]).filter(matchesQuery).forEach(t=>items.push({task:t,isRepeat:false,originDk:null,instanceDk:null}));
+  try{
+    getRepeatTasksForDate(dayDate,dayIdx).filter(({task})=>matchesQuery(task)).forEach(({task,originDk,instanceDk})=>
+      items.push({task,isRepeat:true,originDk,instanceDk}));
+  }catch(e){}
+  const untimed=items.filter(x=>!x.task.time);
+  if(untimed.length){
+    const sec=el('div','timeblock-untimed');
+    sec.appendChild(el('div','timeblock-untimed-title',{textContent:'☰ 시간 미지정'}));
+    untimed.forEach(x=>sec.appendChild(buildTaskItem(dk,x.task,false,null,x.isRepeat,x.originDk,x.instanceDk)));
+    box.appendChild(sec);
+  }
+  const grid=el('div','timeblock-grid');
+  const isTodayView=dateKey(today())===dk;
+  for(let h=6;h<=23;h++){
+    const row=el('div','timeblock-row'+(isTodayView&&new Date().getHours()===h?' now':''));
+    row.appendChild(el('div','timeblock-hour',{textContent:`${String(h).padStart(2,'0')}:00`}));
+    const slot=el('div','timeblock-slot');
+    items.filter(x=>x.task.time&&parseInt(x.task.time.split(':')[0],10)===h)
+      .sort((a,b)=>a.task.time<b.task.time?-1:1)
+      .forEach(x=>slot.appendChild(buildTaskItem(dk,x.task,false,null,x.isRepeat,x.originDk,x.instanceDk)));
+    row.appendChild(slot);
+    grid.appendChild(row);
+  }
+  box.appendChild(grid);
+  return box;
 }
 
 // ── Year view (연간) ──
@@ -3017,6 +3082,11 @@ initFirebaseSync();
 setInterval(()=>{ if(fbRef()) fbUpload(); }, 5*60*1000);
 window.addEventListener('online', ()=>{ if(pendingUpload && fbRef()){ pendingUpload=false; fbUpload(); } });
 window.addEventListener('offline', ()=>setSyncStatus('offline'));
+
+// ── PWA 서비스워커 등록 (오프라인 지원 + 홈 화면 설치) ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
 
 // ── Dashboard ──
 function getImportantUpcoming(){
