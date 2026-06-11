@@ -2468,12 +2468,12 @@ function buildDayCol(date,dayIdx){
   hdr.appendChild(nw);
   hdr.appendChild(el('div','day-month',{textContent:`${date.getMonth()+1}월`}));
   if(holiday) hdr.appendChild(el('div','holiday-label',{textContent:'🎌 '+holiday}));
-  // task count + mini progress
+  // task count + mini progress (반복 인스턴스는 해당 날짜의 체크 상태 기준)
   const dayTasks=tasks[dk]||[];
-  const allTasks=[...dayTasks];
-  getRepeatTasksForDate(date,dayIdx).forEach(r=>allTasks.push(r.task));
-  const total=allTasks.length;
-  const done=allTasks.filter(t=>t.checked).length;
+  const repeatEntries=getRepeatTasksForDate(date,dayIdx);
+  const total=dayTasks.length+repeatEntries.length;
+  const done=dayTasks.filter(t=>t&&t.checked).length
+    +repeatEntries.filter(({task,instanceDk})=>isRepeatChecked(task,instanceDk)).length;
   if(total>0){
     const meta=el('div','day-meta');
     meta.appendChild(el('span','task-count-badge',{textContent:`${total}개`}));
@@ -2826,7 +2826,13 @@ function calcProgress(){
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(d.getDate()+i);
     const dk=dateKey(d);
-    (tasks[dk]||[]).forEach(t=>{total++;if(t.checked)done++;(t.subs||[]).forEach(s=>{total++;if(s.checked)done++;});});
+    (tasks[dk]||[]).forEach(t=>{if(!t)return;total++;if(t.checked)done++;(t.subs||[]).forEach(s=>{total++;if(s.checked)done++;});});
+    // 반복 인스턴스 포함 (해당 날짜의 체크 상태 기준)
+    try{
+      getRepeatTasksForDate(d,i).forEach(({task,instanceDk})=>{
+        total++; if(isRepeatChecked(task,instanceDk))done++;
+      });
+    }catch(e){}
   }
   return {total,done};
 }
@@ -3199,6 +3205,15 @@ function buildDashStats(){
       if(diff>=0 && diff<7){ weekTotal++; if(t.checked) weekDone++; dayTotals[diff]+=1; }
     });
   });
+  // 이번 주 반복 인스턴스 포함
+  for(let i=0;i<7;i++){
+    const d=new Date(monday); d.setDate(d.getDate()+i);
+    try{
+      getRepeatTasksForDate(d,i).forEach(({task,instanceDk})=>{
+        weekTotal++; if(isRepeatChecked(task,instanceDk)) weekDone++; dayTotals[i]+=1;
+      });
+    }catch(e){}
+  }
   const streak = (()=>{
     let s=0, d=new Date(now);
     for(let i=0;i<60;i++){
@@ -3303,6 +3318,11 @@ function buildDashCalendar(){
     for(let i=0;i<7;i++){
       const d=new Date(ws); d.setDate(d.getDate()+i);
       (tasks[dateKey(d)]||[]).forEach(t=>{ if(t){total++; if(t.checked)done++;} });
+      try{
+        getRepeatTasksForDate(d,i).forEach(({task,instanceDk})=>{
+          total++; if(isRepeatChecked(task,instanceDk))done++;
+        });
+      }catch(e){}
     }
     weekStats.push({ws,total,done,pct:total?Math.round(done/total*100):0});
   }
