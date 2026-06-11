@@ -594,6 +594,62 @@
       .memo-overlay { background:rgba(0,0,0,.3); }
     }
 
+    /* ─── 스탠드얼론 메모장 (플로팅 노트) ─── */
+    .note-win {
+      position:fixed; min-width:240px; min-height:170px;
+      background:var(--surface); border:1px solid var(--border); border-radius:12px;
+      box-shadow:var(--shadow-md); display:flex; flex-direction:column;
+      resize:both; overflow:hidden;
+    }
+    .note-head {
+      display:flex; align-items:center; gap:6px; padding:8px 10px;
+      border-bottom:1px solid var(--border2); background:var(--surface2);
+      cursor:move; user-select:none; flex-shrink:0;
+    }
+    .note-crumb {
+      font-size:11px; color:var(--text3); cursor:pointer; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; max-width:100px; flex-shrink:0;
+      background:none; border:none; font-family:inherit; padding:1px 3px; border-radius:4px;
+    }
+    .note-crumb:hover { color:var(--primary); background:var(--primary-l); }
+    .note-title-input {
+      flex:1; border:none; outline:none; background:none; font-size:13px; font-weight:700;
+      color:var(--text); font-family:inherit; min-width:0;
+    }
+    .note-title-input::placeholder { color:var(--text3); font-weight:500; }
+    .note-btn {
+      background:none; border:none; cursor:pointer; font-size:12px; color:var(--text3);
+      padding:2px 5px; border-radius:4px; flex-shrink:0; transition:all .12s;
+    }
+    .note-btn:hover { background:var(--border); color:var(--text); }
+    .note-btn.del:hover { background:var(--red); color:#fff; }
+    .note-textarea {
+      flex:1; border:none; outline:none; resize:none; padding:10px 12px; font-size:13px;
+      line-height:1.6; font-family:inherit; background:none; color:var(--text); min-height:50px;
+    }
+    .note-textarea::placeholder { color:var(--text3); }
+    .note-children { border-top:1px dashed var(--border); padding:5px 7px; max-height:42%; overflow-y:auto; flex-shrink:0; }
+    .note-child {
+      display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px;
+      cursor:pointer; font-size:12px; color:var(--text2); transition:background .12s;
+    }
+    .note-child:hover { background:var(--surface2); color:var(--primary); }
+    .note-child-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .note-add-child {
+      display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text3);
+      cursor:pointer; padding:4px 6px; border-radius:6px; background:none; border:none;
+      font-family:inherit; width:100%; transition:all .12s;
+    }
+    .note-add-child:hover { color:var(--primary); background:var(--primary-l); }
+    @media (max-width:768px) {
+      .note-win {
+        left:0 !important; right:0 !important; bottom:0 !important; top:auto !important;
+        width:100% !important; height:58vh !important; resize:none;
+        border-radius:18px 18px 0 0; min-width:unset;
+      }
+      .note-head { cursor:default; }
+    }
+
     /* ─── User chip in header ─── */
     .user-chip {
       display:flex; align-items:center; gap:5px; background:var(--primary-l);
@@ -674,6 +730,10 @@
     <span class="visually-hidden" aria-live="polite" id="syncLive"></span>
     <button class="copy-url-btn" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
     <button class="copy-url-btn" id="switchUserBtn" style="display:none" title="다른 사용자로 전환">↩ <span>전환</span></button>
+    <div class="settings-wrap">
+      <button class="icon-btn" id="notesBtn" title="메모장" aria-label="메모장 메뉴" aria-haspopup="true">📝</button>
+      <div class="settings-menu hidden" id="notesMenu" role="menu"></div>
+    </div>
     <button class="icon-btn" id="locationBtn" title="내 위치 날씨" aria-label="내 위치 날씨">📍</button>
     <button class="icon-btn" id="darkBtn" title="다크 모드" aria-label="다크 모드 전환">🌙</button>
     <div class="settings-wrap">
@@ -781,7 +841,8 @@
   <span class="shortcut-key">T</span> 오늘 &nbsp;
   <span class="shortcut-key">/</span> 검색 &nbsp;
   <span class="shortcut-key">D</span> 다크모드 &nbsp;
-  <span class="shortcut-key">W</span><span class="shortcut-key">M</span><span class="shortcut-key">S</span> 보기 전환
+  <span class="shortcut-key">W</span><span class="shortcut-key">M</span><span class="shortcut-key">S</span> 보기 전환 &nbsp;
+  <span class="shortcut-key">더블클릭</span> 새 메모
 </div>
 
 <script>
@@ -2198,6 +2259,7 @@ document.getElementById('searchInput').addEventListener('input',e=>{
 const settingsMenu=document.getElementById('settingsMenu');
 document.getElementById('settingsBtn').onclick=e=>{
   e.stopPropagation();
+  document.getElementById('notesMenu').classList.add('hidden');
   settingsMenu.classList.toggle('hidden');
 };
 document.addEventListener('click',e=>{
@@ -2207,7 +2269,7 @@ document.addEventListener('click',e=>{
 // JSON 내보내기
 document.getElementById('exportBtn').onclick=()=>{
   settingsMenu.classList.add('hidden');
-  const blob=new Blob([JSON.stringify(tasks,null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({_v:2,tasks,memos},null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`calendar-tasks-${USER_ID||'local'}-${todayKey()}.json`;
@@ -2227,18 +2289,24 @@ document.getElementById('importFile').addEventListener('change',e=>{
   const reader=new FileReader();
   reader.onload=()=>{
     try{
-      const imported=normalizeTasks(JSON.parse(reader.result));
+      const parsed=JSON.parse(reader.result);
+      // v2 백업({tasks,memos}) 또는 구버전(태스크만) 모두 지원
+      const isV2=parsed&&typeof parsed==='object'&&parsed.tasks;
+      const imported=normalizeTasks(isV2?parsed.tasks:parsed);
+      const importedMemos=isV2?normalizeMemos(parsed.memos||{}):null;
       const replace=confirm('확인: 기존 데이터를 백업 파일로 교체합니다.\n취소: 기존 데이터와 병합합니다.');
       if(replace){
         tasks=imported;
+        if(importedMemos)memos=importedMemos;
       } else {
         Object.entries(imported).forEach(([dk,list])=>{
           if(!tasks[dk]){tasks[dk]=list;return;}
           const ids=new Set(tasks[dk].map(t=>t.id));
           list.forEach(t=>{if(!ids.has(t.id))tasks[dk].push(t);});
         });
+        if(importedMemos)Object.entries(importedMemos).forEach(([id,m])=>{if(!memos[id])memos[id]=m;});
       }
-      saveTasks(); render();
+      saveTasks(); if(importedMemos){saveMemos();renderNoteWins();} render();
       showToast(`📥 ${replace?'교체':'병합'} 완료`);
     }catch{
       showToast('⚠️ 올바른 백업 파일이 아니에요');
@@ -2311,8 +2379,312 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     closeMemo();closeEdit();closeRepeatDel();closeDayModal();
     settingsMenu.classList.add('hidden');
+    notesMenu.classList.add('hidden');
     activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();
   }
+});
+
+// ═══════════════════════════════════════
+// 스탠드얼론 메모장 — 빈 영역 더블클릭으로 생성, 노션식 하위 뎁스, 드래그+리사이즈
+// ═══════════════════════════════════════
+const MEMOS_KEY = USER_ID ? `calMemos_${USER_ID}` : 'calMemos';
+let memoSaveTimer2 = null, pendingMemoLocal = false;
+const NOTE_Z_BASE = 410; // 모달(500)·태스크메모(450)보다 아래
+
+function memosFbRef() {
+  return USER_ID && USER_ID !== 'demo' ? fbDb.ref(`users/${USER_ID}/memos`) : null;
+}
+
+function normalizeMemos(raw) {
+  const out = {};
+  Object.values(raw || {}).forEach(m => {
+    if (!m || !m.id) return;
+    out[m.id] = {
+      id: m.id, title: m.title || '', text: m.text || '',
+      parentId: m.parentId || null, open: !!m.open,
+      x: typeof m.x === 'number' ? m.x : 80, y: typeof m.y === 'number' ? m.y : 120,
+      w: typeof m.w === 'number' ? m.w : 300, h: typeof m.h === 'number' ? m.h : 280,
+      z: typeof m.z === 'number' ? m.z : 0, created: m.created || Date.now(),
+    };
+  });
+  // 부모가 삭제된 메모는 루트로 승격
+  Object.values(out).forEach(m => { if (m.parentId && !out[m.parentId]) m.parentId = null; });
+  return out;
+}
+
+let memos = (() => {
+  try { return normalizeMemos(JSON.parse(localStorage.getItem(MEMOS_KEY) || '{}')); }
+  catch { return {}; }
+})();
+
+function saveMemos() {
+  if (READ_ONLY) return;
+  localStorage.setItem(MEMOS_KEY, JSON.stringify(memos));
+  const ref = memosFbRef();
+  if (!ref) return;
+  pendingMemoLocal = true;
+  setSyncStatus('syncing');
+  clearTimeout(memoSaveTimer2);
+  memoSaveTimer2 = setTimeout(() => {
+    memoSaveTimer2 = null;
+    ref.set(memos)
+      .then(() => { pendingMemoLocal = false; setSyncStatus('synced'); })
+      .catch(() => setSyncStatus('offline'));
+  }, 300);
+}
+window.addEventListener('pagehide', () => {
+  if (memoSaveTimer2) {
+    clearTimeout(memoSaveTimer2); memoSaveTimer2 = null;
+    const ref = memosFbRef(); if (ref) ref.set(memos);
+  }
+});
+
+function initMemoSync() {
+  const ref = memosFbRef();
+  if (!ref) return;
+  ref.on('value', snap => {
+    if (pendingMemoLocal) return;
+    const remote = snap.val();
+    if (remote && typeof remote === 'object') {
+      memos = normalizeMemos(remote);
+      localStorage.setItem(MEMOS_KEY, JSON.stringify(memos));
+      renderNoteWins();
+    }
+  }, () => {});
+}
+
+function memoChildren(id) {
+  return Object.values(memos).filter(m => m.parentId === id).sort((a,b) => a.created - b.created);
+}
+function memoRoots() {
+  return Object.values(memos).filter(m => !m.parentId).sort((a,b) => a.created - b.created);
+}
+function memoLabel(m) { return m.title.trim() || (m.text.trim() ? m.text.trim().slice(0,18) : '제목 없음'); }
+
+function createMemo(parentId, x, y) {
+  if (READ_ONLY) return null;
+  const id = uid();
+  const n = Object.keys(memos).length;
+  memos[id] = {
+    id, title: '', text: '', parentId: parentId || null, open: true,
+    x: x != null ? x : 90 + (n * 26) % 220,
+    y: y != null ? y : 130 + (n * 22) % 160,
+    w: 300, h: 280, z: 0, created: Date.now(),
+  };
+  bringNoteToFront(id);
+  saveMemos(); renderNoteWins();
+  const elw = noteWinEls[id];
+  if (elw) setTimeout(() => { const t = elw.querySelector('.note-title-input'); if (t) t.focus(); }, 50);
+  return id;
+}
+
+function deleteMemoTree(id) {
+  if (READ_ONLY) return;
+  const removed = {};
+  (function collect(mid) {
+    if (!memos[mid]) return;
+    removed[mid] = memos[mid];
+    memoChildren(mid).forEach(c => collect(c.id));
+    delete memos[mid];
+  })(id);
+  saveMemos(); renderNoteWins();
+  const cnt = Object.keys(removed).length;
+  showToast(`메모 ${cnt}개 삭제됨`, () => {
+    Object.assign(memos, removed);
+    saveMemos(); renderNoteWins();
+  });
+}
+
+// 같은 창 안에서 하위/상위 메모로 이동 (노션식 탐색) — 창 위치·크기를 물려줌
+function navigateNote(fromId, toId) {
+  const from = memos[fromId], to = memos[toId];
+  if (!from || !to) return;
+  to.x = from.x; to.y = from.y; to.w = from.w; to.h = from.h;
+  from.open = false; to.open = true;
+  bringNoteToFront(toId);
+  saveMemos(); renderNoteWins();
+}
+
+function bringNoteToFront(id) {
+  const open = Object.values(memos).filter(m => m.open && m.id !== id).sort((a,b) => a.z - b.z);
+  open.forEach((m, i) => { m.z = i; });
+  if (memos[id]) memos[id].z = open.length;
+  Object.entries(noteWinEls).forEach(([mid, elw]) => {
+    if (memos[mid]) elw.style.zIndex = NOTE_Z_BASE + memos[mid].z;
+  });
+}
+
+const noteWinEls = {}; // memoId → 창 엘리먼트 (입력 중 포커스 보존을 위해 재사용)
+
+function buildNoteWin(m) {
+  const win = el('div', 'note-win');
+  win.style.left = m.x + 'px'; win.style.top = m.y + 'px';
+  win.style.width = m.w + 'px'; win.style.height = m.h + 'px';
+  win.style.zIndex = NOTE_Z_BASE + m.z;
+  win.addEventListener('mousedown', () => bringNoteToFront(m.id));
+
+  // ── 헤더: 브레드크럼 + 제목 + 버튼 ──
+  const head = el('div', 'note-head');
+  if (m.parentId && memos[m.parentId]) {
+    const crumb = el('button', 'note-crumb', {textContent: '‹ ' + memoLabel(memos[m.parentId]), title: '상위 메모로'});
+    crumb.onclick = e => { e.stopPropagation(); navigateNote(m.id, m.parentId); };
+    head.appendChild(crumb);
+  } else {
+    head.appendChild(el('span', 'memo-icon', {textContent: '📝'}));
+  }
+  const title = el('input', 'note-title-input');
+  title.type = 'text'; title.placeholder = '제목'; title.value = m.title; title.readOnly = READ_ONLY;
+  title.addEventListener('input', () => { m.title = title.value; saveMemos(); });
+  head.appendChild(title);
+  if (!READ_ONLY) {
+    const delBtn = el('button', 'note-btn del', {textContent: '🗑', title: '메모 삭제 (하위 포함)'});
+    delBtn.onclick = e => { e.stopPropagation(); deleteMemoTree(m.id); };
+    head.appendChild(delBtn);
+  }
+  const closeBtn = el('button', 'note-btn', {textContent: '✕', title: '닫기 (보관됨)'});
+  closeBtn.setAttribute('aria-label', '메모 닫기');
+  closeBtn.onclick = e => {
+    e.stopPropagation();
+    m.open = false;
+    if (READ_ONLY) renderNoteWins();
+    else { saveMemos(); renderNoteWins(); }
+  };
+  head.appendChild(closeBtn);
+  win.appendChild(head);
+
+  // 헤더 드래그로 이동 (모바일은 바텀시트라 비활성)
+  head.addEventListener('mousedown', e => {
+    if (window.innerWidth <= 768) return;
+    if (e.target.closest('input,button,textarea')) return;
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, ox = win.offsetLeft, oy = win.offsetTop;
+    const mv = ev => {
+      let nx = ox + ev.clientX - sx, ny = oy + ev.clientY - sy;
+      nx = Math.max(4, Math.min(nx, window.innerWidth - 80));
+      ny = Math.max(4, Math.min(ny, window.innerHeight - 50));
+      win.style.left = nx + 'px'; win.style.top = ny + 'px';
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', mv);
+      document.removeEventListener('mouseup', up);
+      m.x = win.offsetLeft; m.y = win.offsetTop;
+      saveMemos();
+    };
+    document.addEventListener('mousemove', mv);
+    document.addEventListener('mouseup', up);
+  });
+
+  // ── 본문 ──
+  const ta = el('textarea', 'note-textarea');
+  ta.placeholder = '메모를 입력하세요... (자동 저장)';
+  ta.value = m.text; ta.readOnly = READ_ONLY;
+  ta.addEventListener('input', () => { m.text = ta.value; saveMemos(); });
+  win.appendChild(ta);
+
+  // ── 하위 메모 목록 ──
+  const kids = memoChildren(m.id);
+  if (kids.length || !READ_ONLY) {
+    const box = el('div', 'note-children');
+    kids.forEach(c => {
+      const row = el('div', 'note-child');
+      row.appendChild(el('span', '', {textContent: '📄'}));
+      row.appendChild(el('span', 'note-child-title', {textContent: memoLabel(c) + (memoChildren(c.id).length ? ` (${memoChildren(c.id).length})` : '')}));
+      row.onclick = () => navigateNote(m.id, c.id);
+      if (!READ_ONLY) {
+        const d = el('button', 'note-btn del', {textContent: '✕', title: '하위 메모 삭제'});
+        d.onclick = e => { e.stopPropagation(); deleteMemoTree(c.id); };
+        row.appendChild(d);
+      }
+      box.appendChild(row);
+    });
+    if (!READ_ONLY) {
+      const add = el('button', 'note-add-child', {textContent: '+ 하위 메모'});
+      add.onclick = () => {
+        const cid = createMemo(m.id);
+        if (cid) navigateNote(m.id, cid);
+      };
+      box.appendChild(add);
+    }
+    win.appendChild(box);
+  }
+
+  // 리사이즈 추적 (CSS resize 핸들)
+  if ('ResizeObserver' in window) {
+    let roTimer = null;
+    new ResizeObserver(() => {
+      clearTimeout(roTimer);
+      roTimer = setTimeout(() => {
+        if (window.innerWidth <= 768) return;
+        const w = win.offsetWidth, h = win.offsetHeight;
+        if (w && h && (w !== m.w || h !== m.h)) { m.w = w; m.h = h; saveMemos(); }
+      }, 250);
+    }).observe(win);
+  }
+  return win;
+}
+
+function renderNoteWins() {
+  Object.keys(noteWinEls).forEach(id => {
+    noteWinEls[id].remove();
+    delete noteWinEls[id];
+  });
+  Object.values(memos).filter(m => m.open).forEach(m => {
+    const win = buildNoteWin(m);
+    noteWinEls[m.id] = win;
+    document.body.appendChild(win);
+  });
+}
+
+// ── 빈 영역 더블클릭 → 그 자리에 새 메모 ──
+document.addEventListener('dblclick', e => {
+  if (READ_ONLY) return;
+  const t = e.target;
+  const blank = t === document.body || t.id === 'mainView' ||
+    (t.classList && ['calendar-wrap','calendar-grid','month-wrap','month-grid','stats-wrap','search-results-wrap'].some(c => t.classList.contains(c)));
+  if (!blank) return;
+  const x = Math.min(e.clientX - 16, window.innerWidth - 320);
+  const y = Math.min(e.clientY - 12, window.innerHeight - 300);
+  createMemo(null, Math.max(4, x), Math.max(4, y));
+});
+
+// ── 📝 메모 보관함 메뉴 ──
+const notesMenu = document.getElementById('notesMenu');
+function renderNotesMenu() {
+  notesMenu.innerHTML = '';
+  if (!READ_ONLY) {
+    const add = el('button', 'settings-item', {textContent: '➕ 새 메모'});
+    add.setAttribute('role', 'menuitem');
+    add.onclick = () => { notesMenu.classList.add('hidden'); createMemo(null); };
+    notesMenu.appendChild(add);
+  }
+  const roots = memoRoots();
+  if (!roots.length) {
+    notesMenu.appendChild(el('div', 'settings-item', {textContent: '메모 없음 — 빈 곳을 더블클릭해 만들 수 있어요', style: 'cursor:default;color:var(--text3);font-size:11px'}));
+  }
+  roots.forEach(m => {
+    const item = el('button', 'settings-item');
+    item.setAttribute('role', 'menuitem');
+    const kidCnt = memoChildren(m.id).length;
+    item.textContent = `${m.open ? '🟢' : '📄'} ${memoLabel(m)}${kidCnt ? ` (${kidCnt})` : ''}`;
+    item.onclick = () => {
+      notesMenu.classList.add('hidden');
+      m.open = true;
+      bringNoteToFront(m.id);
+      if (!READ_ONLY) saveMemos();
+      renderNoteWins();
+    };
+    notesMenu.appendChild(item);
+  });
+}
+document.getElementById('notesBtn').onclick = e => {
+  e.stopPropagation();
+  settingsMenu.classList.add('hidden');
+  renderNotesMenu();
+  notesMenu.classList.toggle('hidden');
+};
+document.addEventListener('click', e => {
+  if (!notesMenu.classList.contains('hidden') && !e.target.closest('.settings-wrap'))
+    notesMenu.classList.add('hidden');
 });
 
 // ── PWA service worker ──
@@ -2324,8 +2696,10 @@ if('serviceWorker' in navigator && location.protocol.startsWith('http')){
 
 // ── Init ──
 render();
+renderNoteWins();
 fetchWeather(weatherLoc.lat,weatherLoc.lon);
 initFirebaseSync();
+initMemoSync();
 </script>
 </body>
 </html>
