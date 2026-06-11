@@ -213,6 +213,25 @@
       background:var(--surface); transition:all .15s; font-family:inherit; font-weight:500;
     }
     .repeat-opt.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .priority-selector { display:flex; gap:3px; margin-bottom:5px; }
+    .priority-opt {
+      flex:1; padding:4px 0; font-size:14px; border:1px solid var(--border);
+      border-radius:6px; cursor:pointer; text-align:center;
+      background:var(--surface); transition:all .15s; font-family:inherit; line-height:1;
+    }
+    .priority-opt.active { border-color:var(--text); background:var(--surface2); box-shadow:0 0 0 2px var(--surface3) inset; }
+    .priority-flag { font-size:11px; margin-right:3px; flex-shrink:0; }
+    .tag-chips { margin-top:3px; display:flex; flex-wrap:wrap; gap:4px; }
+    .tag-chip {
+      font-size:10px; padding:1px 7px; border-radius:10px; background:var(--primary-l);
+      color:var(--primary); cursor:pointer; font-weight:600; transition:all .12s;
+    }
+    .tag-chip:hover { background:var(--primary); color:#fff; }
+    .checklist-badge {
+      display:inline-flex; align-items:center; gap:2px; font-size:9px; font-weight:700;
+      color:var(--text2); background:var(--surface2); border-radius:4px;
+      padding:1px 5px; margin-top:2px;
+    }
     .form-actions { display:flex; gap:5px; }
     .btn-add { background:var(--primary); color:#fff; border:none; border-radius:7px; padding:5px 14px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:600; }
     .btn-add:hover { background:var(--primary-h); }
@@ -684,10 +703,20 @@
       <button class="star-toggle" id="editStarBtn" type="button">★</button>
     </div>
     <div class="modal-row">
+      <span class="modal-label">우선순위</span>
+      <div class="priority-selector" id="editPrioritySel" style="flex:1">
+        <button class="priority-opt" data-val="">⚪</button>
+        <button class="priority-opt" data-val="high">🔴</button>
+        <button class="priority-opt" data-val="mid">🟡</button>
+        <button class="priority-opt" data-val="low">🟢</button>
+      </div>
+    </div>
+    <div class="modal-row">
       <span class="modal-label">반복</span>
       <div class="repeat-selector" id="editRepeatSel" style="flex:1">
         <button class="repeat-opt" data-val="none">없음</button>
         <button class="repeat-opt" data-val="weekly">매주</button>
+        <button class="repeat-opt" data-val="biweekly">격주</button>
         <button class="repeat-opt" data-val="monthly">매월</button>
       </div>
     </div>
@@ -895,7 +924,7 @@ let weatherByDate = {};
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
 let searchQuery = '';
 let editCtx = null;
-let _editColor = null, _editStarred = false, _editRepeat = 'none';
+let _editColor = null, _editStarred = false, _editRepeat = 'none', _editPriority = null;
 
 // ── Persistence ──
 function loadTasks() {
@@ -995,6 +1024,10 @@ function getRepeatTasksForDate(date, dayIdx) {
       if (t.repeat==='weekly' && dateToDayIdx(oDk)===dayIdx) {
         out.push({task:t, originDk:oDk, instanceDk:dk});
       }
+      if (t.repeat==='biweekly' && dateToDayIdx(oDk)===dayIdx) {
+        const weeksDiff = Math.round((getMonday(date) - getMonday(originDate)) / (7*86400000));
+        if (weeksDiff!==0 && weeksDiff%2===0) out.push({task:t, originDk:oDk, instanceDk:dk});
+      }
       if (t.repeat==='monthly') {
         const originDay = originDate.getDate();
         const adj = adjustedMonthlyDate(date.getFullYear(), date.getMonth(), originDay);
@@ -1017,12 +1050,40 @@ function toggleRepeatInst(originDk, taskId, instanceDk) {
 
 // ── Task mutations ──
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
-function addTask(dk,text,color,starred,repeat,parentId) {
+function addTask(dk,text,color,starred,repeat,parentId,priority) {
   if(!tasks[dk]) tasks[dk]=[];
-  const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',completions:{},subs:[]};
+  const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',priority:priority||null,completions:{},subs:[]};
   if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p){if(!Array.isArray(p.subs))p.subs=[];p.subs.push(t);}}
   else tasks[dk].push(t);
   saveTasks(dk); activeInput=null; render();
+}
+
+// ── Quick input date parsing (e.g. "내일 회의", "다음주 화요일 보고", "3/15 발표") ──
+function parseQuickDate(text){
+  const now=today();
+  const dayMap={'일':0,'월':1,'화':2,'수':3,'목':4,'금':5,'토':6};
+  let m;
+  if((m=text.match(/(오늘|내일|모레|글피)\s*/))){
+    const offsets={'오늘':0,'내일':1,'모레':2,'글피':3};
+    const d=new Date(now); d.setDate(d.getDate()+offsets[m[1]]);
+    return {date:d, text:(text.slice(0,m.index)+text.slice(m.index+m[0].length)).trim()};
+  }
+  if((m=text.match(/(다음\s?주|이번\s?주)\s*([월화수목금토일])요?일?\s*/))){
+    const targetDay=dayMap[m[2]];
+    const base=getMonday(now);
+    const add=m[1].replace(/\s/g,'')==='다음주'?7:0;
+    const d=new Date(base); d.setDate(d.getDate()+add+((targetDay+6)%7));
+    return {date:d, text:(text.slice(0,m.index)+text.slice(m.index+m[0].length)).trim()};
+  }
+  if((m=text.match(/(\d{1,2})[\/월]\s?(\d{1,2})일?\s*/))){
+    const mo=+m[1], da=+m[2];
+    if(mo>=1&&mo<=12&&da>=1&&da<=31){
+      let d=new Date(now.getFullYear(),mo-1,da);
+      if(d<now) d.setFullYear(d.getFullYear()+1);
+      return {date:d, text:(text.slice(0,m.index)+text.slice(m.index+m[0].length)).trim()};
+    }
+  }
+  return null;
 }
 function toggleTask(dk,id,subId) {
   const list=tasks[dk]||[];
@@ -1114,7 +1175,7 @@ function openEdit(dk,task,isRepeatInst,originDk) {
   const targetTask=isRepeatInst?(tasks[originDk]||[]).find(t=>t.id===task.id):task;
   if(!targetTask)return;
   editCtx={dk:targetDk,taskId:targetTask.id};
-  _editColor=targetTask.color; _editStarred=targetTask.starred; _editRepeat=targetTask.repeat||'none';
+  _editColor=targetTask.color; _editStarred=targetTask.starred; _editRepeat=targetTask.repeat||'none'; _editPriority=targetTask.priority||null;
   buildEditColors();
   // Set star
   const starBtn=document.getElementById('editStarBtn');
@@ -1123,6 +1184,10 @@ function openEdit(dk,task,isRepeatInst,originDk) {
   const cp=document.getElementById('editColors');
   cp.querySelectorAll('.cp-dot').forEach(d=>{
     d.classList.toggle('selected',(d.dataset.color||'')===(targetTask.color||''));
+  });
+  // Priority
+  document.querySelectorAll('#editPrioritySel .priority-opt').forEach(b=>{
+    b.classList.toggle('active',b.dataset.val===(_editPriority||''));
   });
   // Repeat
   document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
@@ -1143,12 +1208,19 @@ document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
     b.classList.add('active');
   };
 });
+document.querySelectorAll('#editPrioritySel .priority-opt').forEach(b=>{
+  b.onclick=()=>{
+    _editPriority=b.dataset.val||null;
+    document.querySelectorAll('#editPrioritySel .priority-opt').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+  };
+});
 document.getElementById('editSaveBtn').onclick=()=>{
   if(!editCtx)return;
   const text=document.getElementById('editInput').value.trim();
   if(!text)return;
   const t=(tasks[editCtx.dk]||[]).find(x=>x.id===editCtx.taskId);
-  if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;if(!t.completions)t.completions={};}
+  if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;t.priority=_editPriority;if(!t.completions)t.completions={};}
   saveTasks(editCtx.dk); closeEdit(); render();
 };
 document.getElementById('editCancelBtn').onclick=closeEdit;
@@ -1262,6 +1334,10 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   const body=el('div','task-body');
   // text + memo dot (clickable to open memo)
   const textWrap=el('div','task-text-wrap');
+  if(!isSub&&task.priority){
+    const flagMap={high:'🔴',mid:'🟡',low:'🟢'};
+    textWrap.appendChild(el('span','priority-flag',{textContent:flagMap[task.priority]||''}));
+  }
   const txt=el('div',`task-text${checked?' done':''}`,{textContent:task.text});
   textWrap.appendChild(txt);
   if(!isSub&&task.memo){ const dot=el('span','memo-dot',{title:'메모 있음'}); textWrap.appendChild(dot); }
@@ -1269,13 +1345,28 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     textWrap.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
   }
   body.appendChild(textWrap);
+  if(!isSub){
+    const tags=task.text.match(/#[\w가-힣]+/g);
+    if(tags&&tags.length){
+      const tagWrap=el('div','tag-chips');
+      tags.forEach(tag=>{
+        const chip=el('span','tag-chip',{textContent:tag});
+        chip.onclick=e=>{e.stopPropagation();searchQuery=tag;document.getElementById('searchInput').value=tag;render();};
+        tagWrap.appendChild(chip);
+      });
+      body.appendChild(tagWrap);
+    }
+  }
   if(!isSub&&task.repeat&&task.repeat!=='none'){
-    body.appendChild(el('div','repeat-badge',{textContent:task.repeat==='weekly'?'🔄 매주':'🔄 매월'}));
+    const repeatLabels={weekly:'🔄 매주',biweekly:'🔄 격주',monthly:'🔄 매월'};
+    body.appendChild(el('div','repeat-badge',{textContent:repeatLabels[task.repeat]||'🔄'}));
   }
   if(!isSub&&adjusted){
     body.appendChild(el('div','repeat-adjusted-badge',{textContent:'📅 일정 앞당김'}));
   }
   if(!isSub&&Array.isArray(task.subs)&&task.subs.length){
+    const subDone=task.subs.filter(s=>s&&s.checked).length;
+    body.appendChild(el('div','checklist-badge',{textContent:`✓ ${subDone}/${task.subs.length}`}));
     const sl=el('div','subtask-list');
     task.subs.forEach(s=>sl.appendChild(buildTaskItem(dk,s,true,task.id,false,null,null)));
     body.appendChild(sl);
@@ -1314,11 +1405,11 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
 
 // ── Input form builder ──
 function buildInputForm(dk,parentId){
-  let selColor=null,starred=false,selRepeat='none';
+  let selColor=null,starred=false,selRepeat='none',selPriority=null;
   const form=el('div','input-form');
   const row=el('div','input-row');
   const inp=el('input','task-input');
-  inp.type='text';inp.placeholder='할 일 입력...';inp.id=`inp-${dk}-${parentId||'main'}`;
+  inp.type='text';inp.placeholder=parentId?'할 일 입력...':'할 일 입력... (예: 내일 회의, 3/15 보고)';inp.id=`inp-${dk}-${parentId||'main'}`;
   row.appendChild(inp);
   if(!parentId){
     const sb=el('button','star-toggle',{type:'button',textContent:'★'});
@@ -1337,8 +1428,19 @@ function buildInputForm(dk,parentId){
       cp.appendChild(dot);
     });
     form.appendChild(cp);
+    const ps=el('div','priority-selector');
+    [['high','🔴'],['mid','🟡'],['low','🟢']].forEach(([val,icon])=>{
+      const btn=el('button','priority-opt',{type:'button',textContent:icon,title:val});
+      btn.onclick=()=>{
+        selPriority=selPriority===val?null:val;
+        ps.querySelectorAll('.priority-opt').forEach(b=>b.classList.remove('active'));
+        if(selPriority)btn.classList.add('active');
+      };
+      ps.appendChild(btn);
+    });
+    form.appendChild(ps);
     const rs=el('div','repeat-selector');
-    [['none','없음'],['weekly','매주'],['monthly','매월']].forEach(([val,label])=>{
+    [['none','없음'],['weekly','매주'],['biweekly','격주'],['monthly','매월']].forEach(([val,label])=>{
       const btn=el('button',`repeat-opt${val==='none'?' active':''}`,{type:'button',textContent:label});
       btn.onclick=()=>{selRepeat=val;rs.querySelectorAll('.repeat-opt').forEach(b=>b.classList.remove('active'));btn.classList.add('active');};
       rs.appendChild(btn);
@@ -1348,7 +1450,16 @@ function buildInputForm(dk,parentId){
   const acts=el('div','form-actions');
   const addBtn=el('button','btn-add',{type:'button',textContent:'추가'});
   const cancelBtn=el('button','btn-cancel',{type:'button',textContent:'취소'});
-  addBtn.onclick=()=>{const v=inp.value.trim();if(v)addTask(dk,v,selColor,starred,selRepeat,parentId);else{activeInput=null;render();}};
+  addBtn.onclick=()=>{
+    let v=inp.value.trim();
+    if(!v){activeInput=null;render();return;}
+    let targetDk=dk;
+    if(!parentId){
+      const parsed=parseQuickDate(v);
+      if(parsed&&parsed.text){ v=parsed.text; targetDk=dateKey(parsed.date); }
+    }
+    addTask(targetDk,v,selColor,starred,selRepeat,parentId,selPriority);
+  };
   cancelBtn.onclick=()=>{activeInput=null;render();};
   inp.addEventListener('keydown',e=>{if(e.key==='Enter')addBtn.click();if(e.key==='Escape')cancelBtn.click();});
   acts.appendChild(addBtn);acts.appendChild(cancelBtn);form.appendChild(acts);
@@ -1747,6 +1858,23 @@ function getDday(month, day){
   return Math.round((target - now) / 86400000);
 }
 
+function getImportantUpcoming(){
+  const now = today();
+  const items = [];
+  Object.entries(tasks).forEach(([dk,list])=>{
+    if(!Array.isArray(list)) return;
+    const d = new Date(dk); d.setHours(0,0,0,0);
+    if(d < now) return;
+    list.forEach(t=>{
+      if(!t||t.checked) return;
+      if(t.starred||t.priority==='high'){
+        items.push({text:t.text, dk, dday:Math.round((d-now)/86400000), priority:t.priority, starred:t.starred});
+      }
+    });
+  });
+  return items.sort((a,b)=>a.dday-b.dday).slice(0,5);
+}
+
 function buildDashStats(){
   const panel = document.getElementById('dashStats');
   panel.innerHTML = '';
@@ -1802,6 +1930,32 @@ function buildDashStats(){
     col.appendChild(bar); col.appendChild(lbl); barWrap.appendChild(col);
   });
   panel.appendChild(barWrap);
+
+  // important upcoming (D-day)
+  const important=getImportantUpcoming();
+  if(important.length){
+    const ddTitle=document.createElement('div'); ddTitle.className='dash-panel-title';
+    ddTitle.style.cssText='margin-top:14px;margin-bottom:6px';
+    ddTitle.textContent='⭐ 다가오는 중요 일정';
+    panel.appendChild(ddTitle);
+    const ddList=document.createElement('div'); ddList.className='upcoming-list';
+    important.forEach(it=>{
+      const item=document.createElement('div'); item.className='upcoming-item';
+      const dd=document.createElement('div');
+      dd.className='upcoming-dday '+(it.dday===0?'today':it.dday<=3?'soon':'far');
+      dd.textContent=it.dday===0?'D-DAY':'D-'+it.dday;
+      const info=document.createElement('div'); info.className='upcoming-info';
+      const name=document.createElement('div'); name.className='upcoming-name';
+      name.textContent=(it.priority==='high'?'🔴 ':it.starred?'★ ':'')+it.text;
+      const dateEl=document.createElement('div'); dateEl.className='upcoming-date';
+      const d=new Date(it.dk);
+      dateEl.textContent=`${d.getMonth()+1}월 ${d.getDate()}일 (${DAY_NAMES[dateToDayIdx(d)]})`;
+      info.appendChild(name); info.appendChild(dateEl);
+      item.appendChild(dd); item.appendChild(info);
+      ddList.appendChild(item);
+    });
+    panel.appendChild(ddList);
+  }
 
   // tip
   const tipWrap=document.createElement('div'); tipWrap.className='tip-box'; tipWrap.style.marginTop='14px';
