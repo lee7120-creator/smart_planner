@@ -700,6 +700,40 @@
     .memo-status.ok { color:#43a047; }
     .memo-status.saving { color:#f9a825; }
 
+    /* memo markdown view */
+    .memo-md {
+      min-height:140px; max-height:300px; overflow-y:auto; padding:12px 14px;
+      font-size:13px; line-height:1.65; color:#333; cursor:text;
+    }
+    [data-theme="dark"] .memo-md { color:#ddd; }
+    .memo-md.hidden { display:none; }
+    .memo-md .md-h { font-weight:700; font-size:14px; margin:4px 0 2px; }
+    .memo-md .md-check.done { text-decoration:line-through; opacity:.6; }
+    .memo-md code { background:rgba(0,0,0,.08); border-radius:4px; padding:0 4px; font-size:12px; }
+    [data-theme="dark"] .memo-md code { background:rgba(255,255,255,.12); }
+    .memo-md a { color:var(--primary); word-break:break-all; }
+
+    /* memo history */
+    .memo-history { padding:6px 14px 10px; display:flex; flex-direction:column; gap:5px; border-top:1px dashed #e0d888; }
+    [data-theme="dark"] .memo-history { border-color:#4a4630; }
+    .memo-history.hidden { display:none; }
+    .memo-hist-row { display:flex; align-items:center; gap:8px; font-size:11px; }
+    .memo-hist-meta { color:var(--text3); flex-shrink:0; font-variant-numeric:tabular-nums; }
+    .memo-hist-excerpt { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#555; }
+    [data-theme="dark"] .memo-hist-excerpt { color:#bbb; }
+    .memo-hist-empty { font-size:11px; color:var(--text3); text-align:center; padding:6px; }
+
+    /* memo all modal */
+    .memo-all-item {
+      padding:9px 12px; border-radius:10px; background:var(--surface2); cursor:pointer;
+      transition:background .12s;
+    }
+    .memo-all-item:hover { background:var(--primary-l); }
+    .memo-all-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:3px; }
+    .memo-all-task { font-size:13px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .memo-all-date { font-size:10px; color:var(--text3); flex-shrink:0; }
+    .memo-all-excerpt { font-size:11px; color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
     /* memo images */
     .memo-attach {
       background:none; border:none; cursor:pointer; font-size:13px;
@@ -857,6 +891,7 @@
         <div class="more-menu-divider"></div>
         <button class="more-menu-item" id="locationBtn">📍 <span>내 위치 날씨</span></button>
         <button class="more-menu-item" id="notifyBtn"><span id="notifyIcon">🔕</span> <span>마감 알림</span></button>
+        <button class="more-menu-item" id="memoAllBtn">📝 <span>메모 모아보기</span></button>
         <button class="more-menu-item" id="trashBtn">🗑 <span>휴지통</span></button>
         <button class="more-menu-item" id="pomodoroBtn">🍅 <span>포모도로 타이머</span></button>
         <button class="more-menu-item" id="icsExportBtn">📤 <span>캘린더 내보내기</span></button>
@@ -879,10 +914,14 @@
     <div class="memo-header">
       <span class="memo-icon">📝</span>
       <span class="memo-task-title" id="memoTitle"></span>
+      <button class="memo-attach" id="memoViewBtn" title="보기/편집 전환">👁</button>
+      <button class="memo-attach" id="memoHistBtn" title="버전 히스토리">🕐</button>
       <button class="memo-attach" id="memoAttachBtn" title="이미지 첨부 (붙여넣기도 가능)">📷</button>
       <button class="memo-close" id="memoClose">✕</button>
     </div>
     <input type="file" id="memoFileInput" accept="image/*" multiple style="display:none">
+    <div class="memo-md hidden" id="memoMD"></div>
+    <div class="memo-history hidden" id="memoHistory"></div>
     <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;(자동으로 저장됩니다)"></textarea>
     <div class="memo-images" id="memoImages"></div>
     <div class="memo-links" id="memoLinks"></div>
@@ -933,6 +972,17 @@
     <div class="modal-actions">
       <button class="btn-secondary" id="editCancelBtn">취소</button>
       <button class="btn-primary" id="editSaveBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Memo All Modal -->
+<div class="modal-overlay hidden" id="memoAllModal">
+  <div class="modal-box" style="width:420px;max-height:76vh;display:flex;flex-direction:column">
+    <div class="modal-title">📝 메모 모아보기</div>
+    <div id="memoAllList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="memoAllCloseBtn">닫기</button>
     </div>
   </div>
 </div>
@@ -1594,7 +1644,8 @@ function openMemo(dk, taskId, anchorEl) {
   } else setMemoStatus('saved');
   positionMemo(anchorEl);
   document.getElementById('memoOverlay').classList.remove('hidden');
-  setTimeout(()=>ta.focus(), 60);
+  // 메모가 있으면 보기 모드, 없으면 바로 편집 모드로
+  setMemoMode(task.memo&&task.memo.trim()?'view':'edit');
 }
 
 function positionMemo(anchor) {
@@ -1624,12 +1675,132 @@ function saveMemoNow() {
   const task = (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId);
   if (task) {
     const v = document.getElementById('memoTextarea').value;
-    if (v !== (task.memo||'')) task.memoUpdated = Date.now();
+    if (v !== (task.memo||'')) {
+      // 버전 히스토리: 직전 내용 보관 (5분 간격, 최대 5개)
+      const old = task.memo||'';
+      if (old.trim()) {
+        if (!Array.isArray(task.memoHistory)) task.memoHistory = [];
+        const last = task.memoHistory[task.memoHistory.length-1];
+        if (!last || Date.now()-last.ts > 5*60*1000) {
+          task.memoHistory.push({ts: task.memoUpdated||Date.now(), text: old});
+          if (task.memoHistory.length > 5) task.memoHistory.shift();
+        }
+      }
+      task.memoUpdated = Date.now();
+    }
     task.memo = v;
     saveTasks(memoCtx.dk);
     render();
   }
 }
+
+// ── 메모 마크다운 라이트 보기 ──
+let memoViewMode='edit';
+function renderMemoMD(text){
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc(text)
+    .replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>')
+    .replace(/`([^`\n]+)`/g,'<code>$1</code>')
+    .replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>')
+    .split('\n').map(l=>{
+      if(/^- \[x\] /i.test(l))return '<div class="md-line md-check done">☑ '+l.slice(6)+'</div>';
+      if(/^- \[ \] /.test(l))return '<div class="md-line md-check">☐ '+l.slice(6)+'</div>';
+      if(/^- /.test(l))return '<div class="md-line">• '+l.slice(2)+'</div>';
+      if(/^# /.test(l))return '<div class="md-line md-h">'+l.slice(2)+'</div>';
+      return '<div class="md-line">'+(l||'&nbsp;')+'</div>';
+    }).join('');
+}
+function setMemoMode(mode){
+  memoViewMode=mode;
+  const ta=document.getElementById('memoTextarea'), md=document.getElementById('memoMD');
+  document.getElementById('memoHistory').classList.add('hidden');
+  if(mode==='view'){
+    md.innerHTML=renderMemoMD(ta.value);
+    md.classList.remove('hidden'); ta.style.display='none';
+  } else {
+    md.classList.add('hidden'); ta.style.display='';
+    setTimeout(()=>ta.focus(),30);
+  }
+  document.getElementById('memoViewBtn').textContent=mode==='view'?'✏️':'👁';
+}
+document.getElementById('memoViewBtn').onclick=()=>setMemoMode(memoViewMode==='view'?'edit':'view');
+document.getElementById('memoMD').addEventListener('dblclick',()=>setMemoMode('edit'));
+
+// ── 메모 버전 히스토리 (최근 5개) ──
+function renderMemoHistory(){
+  const wrap=document.getElementById('memoHistory');
+  wrap.innerHTML='';
+  const task=memoTask();
+  const hist=Array.isArray(task&&task.memoHistory)?task.memoHistory:[];
+  if(!hist.length){
+    wrap.appendChild(el('div','memo-hist-empty',{textContent:'이전 버전이 없습니다'}));
+    return;
+  }
+  [...hist].reverse().forEach(h=>{
+    const row=el('div','memo-hist-row');
+    const d=new Date(h.ts);
+    const meta=el('div','memo-hist-meta',{textContent:`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`});
+    const excerpt=el('div','memo-hist-excerpt',{textContent:h.text.split('\n')[0].slice(0,40)||'(빈 메모)'});
+    const restoreBtn=el('button','trash-act-btn',{textContent:'복원'});
+    restoreBtn.onclick=()=>{
+      if(!confirm('이 버전으로 복원할까요? 현재 내용은 히스토리에 저장됩니다.'))return;
+      document.getElementById('memoTextarea').value=h.text;
+      saveMemoNow();
+      updateMemoCount(); updateMemoLinks();
+      document.getElementById('memoHistory').classList.add('hidden');
+      if(memoViewMode==='view')setMemoMode('view');
+    };
+    row.appendChild(meta); row.appendChild(excerpt); row.appendChild(restoreBtn);
+    wrap.appendChild(row);
+  });
+}
+document.getElementById('memoHistBtn').onclick=()=>{
+  const wrap=document.getElementById('memoHistory');
+  if(wrap.classList.contains('hidden')){renderMemoHistory();wrap.classList.remove('hidden');}
+  else wrap.classList.add('hidden');
+};
+
+// ── 메모 모아보기 ──
+function renderMemoAllModal(){
+  const list=document.getElementById('memoAllList');
+  list.innerHTML='';
+  const items=[];
+  Object.entries(tasks).forEach(([dk,tList])=>{
+    if(!Array.isArray(tList))return;
+    tList.forEach(t=>{
+      if(t&&((t.memo&&t.memo.trim())||(Array.isArray(t.memoImages)&&t.memoImages.length)))
+        items.push({dk,task:t,ts:t.memoUpdated||new Date(dk).getTime()});
+    });
+  });
+  items.sort((a,b)=>b.ts-a.ts);
+  if(!items.length){
+    list.appendChild(el('div','trash-empty',{textContent:'작성된 메모가 없습니다'}));
+    return;
+  }
+  items.forEach(({dk,task})=>{
+    const row=el('div','memo-all-item');
+    const d=new Date(dk);
+    const head=el('div','memo-all-head');
+    head.appendChild(el('span','memo-all-task',{textContent:(task.starred?'★ ':'')+task.text}));
+    head.appendChild(el('span','memo-all-date',{textContent:`${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[dateToDayIdx(d)]})`}));
+    row.appendChild(head);
+    const imgCnt=Array.isArray(task.memoImages)?task.memoImages.length:0;
+    const excerpt=(task.memo||'').trim().split('\n').slice(0,2).join(' / ').slice(0,80);
+    row.appendChild(el('div','memo-all-excerpt',{textContent:(imgCnt?`📷${imgCnt} `:'')+excerpt}));
+    row.onclick=()=>{
+      document.getElementById('memoAllModal').classList.add('hidden');
+      weekStart=getMonday(d);setView('week');
+      setTimeout(()=>openMemo(dk,task.id,document.body),100);
+    };
+    list.appendChild(row);
+  });
+}
+document.getElementById('memoAllBtn').onclick=()=>{
+  renderMemoAllModal();
+  document.getElementById('memoAllModal').classList.remove('hidden');
+};
+document.getElementById('memoAllCloseBtn').onclick=()=>document.getElementById('memoAllModal').classList.add('hidden');
+document.getElementById('memoAllModal').onclick=e=>{if(e.target===document.getElementById('memoAllModal'))document.getElementById('memoAllModal').classList.add('hidden');};
 
 // ── 메모 이미지 (IndexedDB 로컬 저장 — 기기 간 동기화되지 않음) ──
 let imgDB=null;
