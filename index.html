@@ -260,6 +260,20 @@
     .trash-act-btn:hover { background:var(--primary-l); color:var(--primary); border-color:var(--primary); }
     .trash-act-btn.del:hover { background:var(--red); color:#fff; border-color:var(--red); }
     .trash-empty { text-align:center; padding:30px; color:var(--text3); font-size:13px; }
+
+    /* ─── Pomodoro widget ─── */
+    .pomodoro-widget {
+      position:fixed; bottom:16px; left:16px; background:var(--surface); border:1px solid var(--border);
+      border-radius:14px; padding:14px 18px; box-shadow:var(--shadow-lg); z-index:200;
+      flex-direction:column; gap:8px; min-width:160px; display:none;
+    }
+    .pomodoro-widget.active { display:flex; }
+    .pomodoro-close { position:absolute; top:6px; right:8px; background:none; border:none; cursor:pointer; color:var(--text3); font-size:11px; padding:2px; }
+    .pomodoro-task { font-size:11px; color:var(--text2); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 14px; }
+    .pomodoro-time { font-size:30px; font-weight:800; text-align:center; font-variant-numeric:tabular-nums; color:var(--primary); letter-spacing:1px; }
+    .pomodoro-controls { display:flex; gap:6px; }
+    .pomodoro-ctrl-btn { flex:1; border:1px solid var(--border); background:var(--surface2); border-radius:8px; padding:5px; font-size:11px; cursor:pointer; color:var(--text2); font-family:inherit; transition:all .12s; }
+    .pomodoro-ctrl-btn:hover { background:var(--primary-l); color:var(--primary); border-color:var(--primary); }
     .form-actions { display:flex; gap:5px; }
     .btn-add { background:var(--primary); color:#fff; border:none; border-radius:7px; padding:5px 14px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:600; }
     .btn-add:hover { background:var(--primary-h); }
@@ -691,6 +705,8 @@
     <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
     <button class="icon-btn" id="notifyBtn" title="마감 임박 태스크 알림">🔕</button>
     <button class="icon-btn" id="trashBtn" title="휴지통 (30일 보관)">🗑</button>
+    <button class="icon-btn" id="pomodoroBtn" title="포모도로 타이머">🍅</button>
+    <button class="icon-btn" id="icsExportBtn" title="캘린더로 내보내기 (.ics)">📤</button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
     <div class="progress-pill" id="progressInfo"></div>
   </div>
@@ -765,6 +781,17 @@
     <div class="modal-actions">
       <button class="btn-secondary" id="trashCloseBtn">닫기</button>
     </div>
+  </div>
+</div>
+
+<!-- Pomodoro Widget -->
+<div class="pomodoro-widget" id="pomodoroWidget" style="position:fixed">
+  <button class="pomodoro-close" id="pomodoroCloseBtn">✕</button>
+  <div class="pomodoro-task" id="pomodoroTaskLabel">🍅 집중 타이머</div>
+  <div class="pomodoro-time" id="pomodoroTime">25:00</div>
+  <div class="pomodoro-controls">
+    <button class="pomodoro-ctrl-btn" id="pomodoroStartBtn">시작</button>
+    <button class="pomodoro-ctrl-btn" id="pomodoroResetBtn">리셋</button>
   </div>
 </div>
 
@@ -1505,6 +1532,9 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   item.appendChild(body);
   const actions=el('div','task-actions');
   if(!isSub){
+    const pomoBtn=el('button','task-act-btn',{textContent:'🍅',title:'25분 포모도로 시작'});
+    pomoBtn.onclick=e=>{e.stopPropagation();startPomodoroForTask(task.text);};
+    actions.appendChild(pomoBtn);
     const editBtn=el('button','task-act-btn',{textContent:'✏️',title:'수정'});
     editBtn.onclick=e=>{e.stopPropagation();openEdit(dk,task,isRepeatInst,originDk);};
     actions.appendChild(editBtn);
@@ -1987,6 +2017,77 @@ document.getElementById('notifyBtn').onclick=()=>{
 updateNotifyBtn();
 setInterval(checkNotificationSchedule, 60*1000);
 checkNotificationSchedule();
+
+// ── Pomodoro timer ──
+let pomodoroInterval=null, pomodoroSeconds=25*60, pomodoroRunning=false;
+function updatePomodoroDisplay(){
+  const m=Math.floor(pomodoroSeconds/60), s=pomodoroSeconds%60;
+  document.getElementById('pomodoroTime').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function pausePomodoro(){
+  clearInterval(pomodoroInterval); pomodoroInterval=null; pomodoroRunning=false;
+  document.getElementById('pomodoroStartBtn').textContent='시작';
+}
+function startPomodoro(){
+  if(pomodoroRunning) return;
+  pomodoroRunning=true;
+  document.getElementById('pomodoroStartBtn').textContent='일시정지';
+  pomodoroInterval=setInterval(()=>{
+    pomodoroSeconds--;
+    updatePomodoroDisplay();
+    if(pomodoroSeconds<=0){
+      pausePomodoro();
+      pomodoroSeconds=25*60; updatePomodoroDisplay();
+      if('Notification' in window && Notification.permission==='granted') new Notification('🍅 포모도로 완료!',{body:'25분 집중을 마쳤습니다. 잠시 휴식하세요!'});
+      else alert('🍅 25분 집중 완료! 잠시 휴식하세요.');
+    }
+  },1000);
+}
+document.getElementById('pomodoroStartBtn').onclick=()=>{ pomodoroRunning?pausePomodoro():startPomodoro(); };
+document.getElementById('pomodoroResetBtn').onclick=()=>{ pausePomodoro(); pomodoroSeconds=25*60; updatePomodoroDisplay(); };
+document.getElementById('pomodoroBtn').onclick=()=>{
+  document.getElementById('pomodoroWidget').classList.toggle('active');
+};
+document.getElementById('pomodoroCloseBtn').onclick=()=>document.getElementById('pomodoroWidget').classList.remove('active');
+function startPomodoroForTask(text){
+  pausePomodoro(); pomodoroSeconds=25*60; updatePomodoroDisplay();
+  document.getElementById('pomodoroTaskLabel').textContent='🍅 '+text;
+  document.getElementById('pomodoroWidget').classList.add('active');
+  startPomodoro();
+}
+
+// ── iCal (.ics) export ──
+function escapeICS(text){ return String(text).replace(/[\\,;]/g,m=>'\\'+m).replace(/\n/g,'\\n'); }
+function buildICS(){
+  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//마이플래너//KO','CALSCALE:GREGORIAN'];
+  Object.entries(tasks).forEach(([dk,list])=>{
+    if(!Array.isArray(list)) return;
+    const dtstart=dk.replace(/-/g,'');
+    list.forEach(t=>{
+      if(!t) return;
+      lines.push('BEGIN:VEVENT');
+      lines.push('UID:'+t.id+'@myplanner');
+      lines.push('DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z');
+      lines.push('DTSTART;VALUE=DATE:'+dtstart);
+      lines.push('SUMMARY:'+escapeICS((t.starred?'★ ':'')+t.text));
+      if(t.memo) lines.push('DESCRIPTION:'+escapeICS(t.memo));
+      if(t.repeat==='weekly') lines.push('RRULE:FREQ=WEEKLY');
+      else if(t.repeat==='biweekly') lines.push('RRULE:FREQ=WEEKLY;INTERVAL=2');
+      else if(t.repeat==='monthly') lines.push('RRULE:FREQ=MONTHLY');
+      lines.push('END:VEVENT');
+    });
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+document.getElementById('icsExportBtn').onclick=()=>{
+  const blob=new Blob([buildICS()],{type:'text/calendar;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='마이플래너.ics';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 // ── Keyboard shortcuts ──
 document.addEventListener('keydown',e=>{
