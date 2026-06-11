@@ -101,6 +101,15 @@
     }
     .icon-btn:hover { background:var(--surface2); }
     .icon-btn.menu-open { background:var(--surface2); color:var(--primary); border-color:var(--primary); transform:rotate(90deg); }
+    .save-btn {
+      display:flex; align-items:center; gap:4px; height:32px; padding:0 12px;
+      background:var(--primary); color:#fff; border:none; border-radius:8px;
+      font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;
+      white-space:nowrap; transition:background .15s; flex-shrink:0;
+    }
+    .save-btn:hover { background:var(--primary-h); }
+    .save-btn:disabled { opacity:.6; cursor:default; }
+    @media (max-width:768px) { .save-btn span { display:none; } .save-btn { padding:0 10px; } }
     .progress-pill {
       font-size:11px; color:var(--text2); white-space:nowrap;
       display:flex; align-items:center; gap:6px;
@@ -242,9 +251,10 @@
     .cp-dot.selected { border-color:var(--text); }
     .repeat-selector { display:flex; gap:3px; margin-bottom:5px; }
     .repeat-opt {
-      flex:1; padding:4px 0; font-size:11px; border:1px solid var(--border);
+      flex:1; padding:4px 1px; font-size:11px; border:1px solid var(--border);
       border-radius:6px; cursor:pointer; text-align:center; color:var(--text2);
       background:var(--surface); transition:all .15s; font-family:inherit; font-weight:500;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
     }
     .repeat-opt.active { background:var(--primary); color:#fff; border-color:var(--primary); }
     .priority-selector { display:flex; gap:3px; margin-bottom:5px; }
@@ -493,7 +503,7 @@
     .search-result-group { margin-bottom:20px; }
     .search-result-date { font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--border2); }
     .search-result-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px; background:var(--surface); margin-bottom:4px; cursor:pointer; box-shadow:var(--shadow); }
-    .search-result-item:hover { border-left:3px solid var(--primary); }
+    .search-result-item:hover { box-shadow:inset 3px 0 0 var(--primary), var(--shadow); }
     .search-result-text { font-size:13px; color:var(--text); }
     .search-empty { text-align:center; padding:60px 20px; color:var(--text3); font-size:14px; }
 
@@ -873,8 +883,9 @@
     .user-chip {
       display:flex; align-items:center; gap:5px; background:var(--primary-l);
       border-radius:20px; padding:4px 10px; font-size:12px; font-weight:600;
-      color:var(--primary); white-space:nowrap;
+      color:var(--primary); white-space:nowrap; max-width:180px; overflow:hidden;
     }
+    .user-chip span { overflow:hidden; text-overflow:ellipsis; }
     .more-menu-wrap { position:relative; }
     .more-menu {
       position:absolute; top:calc(100% + 6px); right:0; z-index:60;
@@ -952,6 +963,7 @@
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
     <div class="sync-dot offline" id="syncDot" title="동기화 상태" style="display:none"></div>
+    <button class="save-btn" id="forceSyncBtn" style="display:none" title="지금 바로 저장">☁️ <span>저장</span></button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
     <div class="more-menu-wrap">
       <button class="icon-btn" id="moreBtn" title="더보기">⋯</button>
@@ -959,7 +971,6 @@
         <button class="more-menu-item" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
         <button class="more-menu-item" id="shareRoBtn" style="display:none">👁 <span>읽기전용 링크 복사</span></button>
         <button class="more-menu-item" id="templateBtn">📑 <span>템플릿</span></button>
-        <button class="more-menu-item" id="forceSyncBtn" style="display:none">☁️ <span>저장</span></button>
         <button class="more-menu-item" id="switchUserBtn" style="display:none">↩ <span>다른 사용자로 전환</span></button>
         <div class="more-menu-divider"></div>
         <button class="more-menu-item" id="locationBtn">📍 <span>내 위치 날씨</span></button>
@@ -1509,6 +1520,40 @@ function reorderTask(dk,dragId,targetId){
   if(to<0){list.splice(from,0,moved);return;}
   list.splice(to,0,moved);
   saveTasks(dk);render();
+}
+
+// ── Quick input time parsing (예: "8시 회의"→08:00, "6시 보고"→18:00, "오후 2시반"→14:30) ──
+// 업무시간(8시~19시) 휴리스틱: 8~12시는 오전, 1~7시는 오후로 해석
+function parseQuickTime(text){
+  let m;
+  // 오전/오후 명시: "오후 2시", "오전 9시 30분", "오후3시반"
+  if((m=text.match(/(오전|오후|저녁|밤|새벽|아침)\s*(\d{1,2})\s*시\s*(반|(\d{1,2})\s*분)?\s*/))){
+    let h=+m[2];
+    const min=m[3]?(m[3]==='반'?30:+m[4]):0;
+    const isPM=(m[1]==='오후'||m[1]==='저녁'||m[1]==='밤');
+    if(isPM&&h<12)h+=12;
+    if((m[1]==='새벽')&&h===12)h=0;
+    if(h>23||min>59)return null;
+    return {time:`${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`,text:(text.slice(0,m.index)+text.slice(m.index+m[0].length)).trim()};
+  }
+  // 24시간 표기: "14시", "14:30", "9:00"
+  if((m=text.match(/(?:^|\s)(\d{1,2}):(\d{2})(?:\s|$)/))){
+    const h=+m[1],min=+m[2];
+    if(h<=23&&min<=59){
+      const hh=(h>=1&&h<=7)?h+12:h; // 업무시간 휴리스틱
+      return {time:`${String(hh).padStart(2,'0')}:${String(min).padStart(2,'0')}`,text:text.replace(m[0],' ').replace(/\s+/g,' ').trim()};
+    }
+  }
+  // "N시", "N시반", "N시 N분"
+  if((m=text.match(/(\d{1,2})\s*시\s*(반|(\d{1,2})\s*분)?\s*/))){
+    let h=+m[1];
+    const min=m[2]?(m[2]==='반'?30:+m[3]):0;
+    if(h>24||min>59)return null;
+    if(h>=1&&h<=7)h+=12;       // 1~7시 → 오후 (13:00~19:00)
+    if(h===24)h=0;
+    return {time:`${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`,text:(text.slice(0,m.index)+text.slice(m.index+m[0].length)).trim()};
+  }
+  return null;
 }
 
 // ── Quick input date parsing (e.g. "내일 회의", "다음주 화요일 보고", "3/15 발표") ──
@@ -2313,7 +2358,7 @@ function buildInputForm(dk,parentId){
   const form=el('div','input-form');
   const row=el('div','input-row');
   const inp=el('input','task-input');
-  inp.type='text';inp.placeholder=parentId?'할 일 입력...':'할 일 입력... (예: 내일 회의, 3/15 보고)';inp.id=`inp-${dk}-${parentId||'main'}`;
+  inp.type='text';inp.placeholder=parentId?'할 일 입력...':'할 일 입력... (예: 내일 3시 회의)';inp.id=`inp-${dk}-${parentId||'main'}`;
   row.appendChild(inp);
   if(!parentId){
     const sb=el('button','star-toggle',{type:'button',textContent:'★'});
@@ -2363,11 +2408,14 @@ function buildInputForm(dk,parentId){
     let v=inp.value.trim();
     if(!v){activeInput=null;render();return;}
     let targetDk=dk;
+    let parsedTime=null;
     if(!parentId){
       const parsed=parseQuickDate(v);
       if(parsed&&parsed.text){ v=parsed.text; targetDk=dateKey(parsed.date); }
+      const pt=parseQuickTime(v);
+      if(pt&&pt.text){ v=pt.text; parsedTime=pt.time; }
     }
-    addTask(targetDk,v,selColor,starred,selRepeat,parentId,selPriority,timeInp&&timeInp.value?timeInp.value:null);
+    addTask(targetDk,v,selColor,starred,selRepeat,parentId,selPriority,(timeInp&&timeInp.value)||parsedTime||null);
   };
   cancelBtn.onclick=()=>{activeInput=null;render();};
   inp.addEventListener('keydown',e=>{if(e.key==='Enter')addBtn.click();if(e.key==='Escape')cancelBtn.click();});
