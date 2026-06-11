@@ -1250,11 +1250,18 @@ window.addEventListener('pagehide', () => {
   }
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && fbSaveTimer) {
+  if (document.visibilityState !== 'hidden') return;
+  if (fbSaveTimer) {
     clearTimeout(fbSaveTimer);
     fbSaveTimer = null;
     const ref = fbRef();
     if (ref) ref.set(tasks).then(() => { pendingLocal = false; setSyncStatus('synced'); });
+  }
+  if (memoSaveTimer2) {
+    clearTimeout(memoSaveTimer2);
+    memoSaveTimer2 = null;
+    const ref2 = memosFbRef();
+    if (ref2) ref2.set(memos).then(() => { pendingMemoLocal = false; });
   }
 });
 
@@ -2551,7 +2558,7 @@ function normalizeMemos(raw) {
       z: typeof m.z === 'number' ? m.z : 0, created: m.created || Date.now(),
       color: m.color || null, pinned: !!m.pinned,
       cx: typeof m.cx === 'number' ? m.cx : null, cy: typeof m.cy === 'number' ? m.cy : null,
-      hist: Array.isArray(m.hist) ? m.hist.filter(h => h && h.t) : [],
+      hist: Array.isArray(m.hist) ? m.hist.filter(h => h && h.t).map(h => ({t: h.t, title: String(h.title||''), text: String(h.text||'')})) : [],
     };
   });
   // 부모가 삭제된 메모는 루트로 승격
@@ -3016,7 +3023,7 @@ function buildNoteWin(m) {
   // ── 본문: 뷰(렌더된 마크다운) ↔ 편집(textarea) ──
   const bodyWrap = el('div', 'note-body-wrap');
   win.appendChild(bodyWrap);
-  renderNoteBody(m, bodyWrap, win);
+  renderNoteBody(m, bodyWrap, win, noteEditState[m.id] === true);
 
   // ── 하위 메모 목록 ──
   const kids = memoChildren(m.id);
@@ -3079,7 +3086,7 @@ function buildNoteWin(m) {
   return win;
 }
 
-function renderNoteBody(m, bodyWrap, win) {
+function renderNoteBody(m, bodyWrap, win, focusEdit) {
   bodyWrap.innerHTML = '';
   const editing = !READ_ONLY && (noteEditState[m.id] || (!m.text.trim() && !memoChildren(m.id).length));
   if (editing) {
@@ -3128,12 +3135,12 @@ function renderNoteBody(m, bodyWrap, win) {
       e.preventDefault();
       (async () => {
         for (const it of items) await insertImageFile(m, ta, it.getAsFile());
-        renderNoteBody(m, bodyWrap, win);
         noteEditState[m.id] = true;
+        renderNoteBody(m, bodyWrap, win, true);
       })();
     });
     bodyWrap.appendChild(ta);
-    setTimeout(() => ta.focus(), 30);
+    if (focusEdit) setTimeout(() => ta.focus(), 30);
   } else {
     const view = el('div', 'note-view');
     view.innerHTML = renderMarkdown(m.text);
@@ -3167,7 +3174,7 @@ function renderNoteBody(m, bodyWrap, win) {
       if (e.target.closest('a,img')) { e.stopPropagation(); return; }
       if (READ_ONLY) return;
       noteEditState[m.id] = true;
-      renderNoteBody(m, bodyWrap, win);
+      renderNoteBody(m, bodyWrap, win, true);
     });
     bodyWrap.appendChild(view);
   }
