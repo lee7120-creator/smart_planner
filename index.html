@@ -700,6 +700,21 @@
     .memo-status.ok { color:#43a047; }
     .memo-status.saving { color:#f9a825; }
 
+    /* memo links + preview */
+    .memo-links { display:flex; flex-wrap:wrap; gap:4px; padding:0 14px 8px; }
+    .memo-link-chip {
+      font-size:10px; color:var(--primary); background:rgba(255,255,255,.55); border-radius:8px;
+      padding:2px 8px; text-decoration:none; max-width:100%; overflow:hidden;
+      text-overflow:ellipsis; white-space:nowrap;
+    }
+    [data-theme="dark"] .memo-link-chip { background:rgba(0,0,0,.25); }
+    .memo-link-chip:hover { text-decoration:underline; }
+    .memo-preview {
+      font-size:10px; color:var(--text3); margin-top:2px; cursor:pointer;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%;
+    }
+    .memo-preview:hover { color:var(--primary); }
+
     /* memo indicator on task */
     .memo-dot {
       display:inline-block; width:6px; height:6px; border-radius:50%;
@@ -838,6 +853,7 @@
       <button class="memo-close" id="memoClose">✕</button>
     </div>
     <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;(자동으로 저장됩니다)"></textarea>
+    <div class="memo-links" id="memoLinks"></div>
     <div class="memo-footer">
       <span class="memo-status" id="memoStatus">자동 저장됨 ✓</span>
       <span id="memoCharCount">0자</span>
@@ -1528,7 +1544,13 @@ function openMemo(dk, taskId, anchorEl) {
   const ta = document.getElementById('memoTextarea');
   ta.value = task.memo || '';
   updateMemoCount();
-  setMemoStatus('saved');
+  updateMemoLinks();
+  if (task.memoUpdated) {
+    const d = new Date(task.memoUpdated);
+    const elS = document.getElementById('memoStatus');
+    elS.className = 'memo-status ok';
+    elS.textContent = `수정 ${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  } else setMemoStatus('saved');
   positionMemo(anchorEl);
   document.getElementById('memoOverlay').classList.remove('hidden');
   setTimeout(()=>ta.focus(), 60);
@@ -1560,10 +1582,24 @@ function saveMemoNow() {
   if (!memoCtx) return;
   const task = (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId);
   if (task) {
-    task.memo = document.getElementById('memoTextarea').value;
+    const v = document.getElementById('memoTextarea').value;
+    if (v !== (task.memo||'')) task.memoUpdated = Date.now();
+    task.memo = v;
     saveTasks(memoCtx.dk);
     render();
   }
+}
+
+// 메모 속 URL을 클릭 가능한 칩으로 표시
+function updateMemoLinks() {
+  const wrap = document.getElementById('memoLinks');
+  wrap.innerHTML = '';
+  const urls = (document.getElementById('memoTextarea').value.match(/https?:\/\/[^\s<>"']+/g)||[]).slice(0,6);
+  urls.forEach(u=>{
+    const a = el('a','memo-link-chip',{href:u,target:'_blank',rel:'noopener',textContent:'🔗 '+u.replace(/^https?:\/\//,'').slice(0,40)});
+    wrap.appendChild(a);
+  });
+  wrap.style.display = urls.length ? 'flex' : 'none';
 }
 
 function setMemoStatus(state) {
@@ -1578,6 +1614,7 @@ function updateMemoCount() {
 
 document.getElementById('memoTextarea').addEventListener('input', ()=>{
   updateMemoCount();
+  updateMemoLinks();
   setMemoStatus('saving');
   clearTimeout(memoTimer);
   memoTimer = setTimeout(()=>{ saveMemoNow(); setMemoStatus('saved'); }, 700);
@@ -1679,6 +1716,12 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       });
       body.appendChild(tagWrap);
     }
+  }
+  if(!isSub&&task.memo&&task.memo.trim()){
+    const firstLine=task.memo.trim().split('\n')[0];
+    const prev=el('div','memo-preview',{textContent:'📝 '+firstLine,title:'메모 열기'});
+    prev.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,prev);};
+    body.appendChild(prev);
   }
   if(!isSub&&task.repeat&&task.repeat!=='none'){
     const repeatLabels={weekly:'🔄 매주',biweekly:'🔄 격주',monthly:'🔄 매월'};
@@ -2120,7 +2163,7 @@ function buildTimelineView(){
 function matchesQuery(t){
   if(!searchQuery) return true;
   const q=searchQuery.toLowerCase();
-  return (t.text&&t.text.toLowerCase().includes(q))||(Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q)));
+  return (t.text&&t.text.toLowerCase().includes(q))||(t.memo&&t.memo.toLowerCase().includes(q))||(Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q)));
 }
 
 function buildSearchView(query){
@@ -2133,7 +2176,8 @@ function buildSearchView(query){
     list.forEach(t=>{
       if(!t) return;
       const subsMatch=Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q));
-      if(t.text&&t.text.toLowerCase().includes(q)||subsMatch)
+      const memoMatch=t.memo&&t.memo.toLowerCase().includes(q);
+      if(t.text&&t.text.toLowerCase().includes(q)||subsMatch||memoMatch)
         results.push({dk,task:t});
     });
   });
