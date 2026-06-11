@@ -641,6 +641,7 @@
     <button class="copy-url-btn" id="forceSyncBtn" style="display:none">☁️ <span>저장</span></button>
     <button class="copy-url-btn" id="switchUserBtn" style="display:none" title="다른 사용자로 전환">↩ <span>전환</span></button>
     <button class="icon-btn" id="locationBtn" title="내 위치 날씨">📍</button>
+    <button class="icon-btn" id="notifyBtn" title="마감 임박 태스크 알림">🔕</button>
     <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
     <div class="progress-pill" id="progressInfo"></div>
   </div>
@@ -1622,6 +1623,68 @@ document.getElementById('darkBtn').onclick=()=>{
   localStorage.setItem('theme',html.dataset.theme);
 };
 (()=>{const t=localStorage.getItem('theme')||'light';document.documentElement.dataset.theme=t;document.getElementById('darkBtn').textContent=t==='dark'?'☀️':'🌙';})();
+
+// ── Due-task notifications (매일 오전 9시 요약 알림) ──
+const NOTIFY_HOUR = 9;
+function getAllTasksForDate(date) {
+  const dk = dateKey(date);
+  const dayIdx = dateToDayIdx(date);
+  const direct = (tasks[dk]||[]).map(t=>({text:t.text, checked:!!t.checked}));
+  const repeats = getRepeatTasksForDate(date,dayIdx).map(({task,instanceDk})=>({text:task.text, checked:isRepeatChecked(task,instanceDk)}));
+  return [...direct, ...repeats];
+}
+function buildDueSummary() {
+  const t = today();
+  const tomorrow = new Date(t); tomorrow.setDate(tomorrow.getDate()+1);
+  const todayTasks = getAllTasksForDate(t).filter(x=>!x.checked);
+  const tomorrowTasks = getAllTasksForDate(tomorrow).filter(x=>!x.checked);
+  return {todayTasks, tomorrowTasks};
+}
+function showDueNotification() {
+  const {todayTasks, tomorrowTasks} = buildDueSummary();
+  if(todayTasks.length===0 && tomorrowTasks.length===0) return;
+  const lines=[];
+  if(todayTasks.length) lines.push(`오늘: ${todayTasks.slice(0,3).map(t=>t.text).join(', ')}${todayTasks.length>3?` 외 ${todayTasks.length-3}개`:''}`);
+  if(tomorrowTasks.length) lines.push(`내일: ${tomorrowTasks.slice(0,3).map(t=>t.text).join(', ')}${tomorrowTasks.length>3?` 외 ${tomorrowTasks.length-3}개`:''}`);
+  new Notification('🗓 오늘의 할 일', {body: lines.join('\n')});
+}
+function checkNotificationSchedule() {
+  if(localStorage.getItem('notifyEnabled')!=='true') return;
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  const now = new Date();
+  if(now.getHours() < NOTIFY_HOUR) return;
+  const todayDk = dateKey(now);
+  if(localStorage.getItem('lastNotifyDate')===todayDk) return;
+  localStorage.setItem('lastNotifyDate', todayDk);
+  showDueNotification();
+}
+function updateNotifyBtn() {
+  const enabled = localStorage.getItem('notifyEnabled')==='true' && 'Notification' in window && Notification.permission==='granted';
+  const btn = document.getElementById('notifyBtn');
+  btn.textContent = enabled?'🔔':'🔕';
+  btn.title = enabled?'마감 알림 켜짐 (매일 오전 9시 요약)':'마감 알림 꺼짐 (클릭하여 켜기)';
+}
+document.getElementById('notifyBtn').onclick=()=>{
+  if(!('Notification' in window)){ alert('이 브라우저는 알림을 지원하지 않습니다.'); return; }
+  const enabled = localStorage.getItem('notifyEnabled')==='true';
+  if(enabled){
+    localStorage.setItem('notifyEnabled','false');
+    updateNotifyBtn();
+    return;
+  }
+  Notification.requestPermission().then(perm=>{
+    if(perm==='granted'){
+      localStorage.setItem('notifyEnabled','true');
+      new Notification('🗓 마이플래너', {body:'매일 오전 9시에 마감 임박 태스크를 알려드릴게요!'});
+    } else {
+      alert('알림 권한이 거부되었습니다. 브라우저 설정에서 알림을 허용해주세요.');
+    }
+    updateNotifyBtn();
+  });
+};
+updateNotifyBtn();
+setInterval(checkNotificationSchedule, 60*1000);
+checkNotificationSchedule();
 
 // ── Keyboard shortcuts ──
 document.addEventListener('keydown',e=>{
