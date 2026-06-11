@@ -1265,13 +1265,21 @@ function moveTask(fromDk, id, toDk, beforeId) {
   saveTasks(); render();
   return true;
 }
+// 다음 날이 주말·공휴일이면 다음 영업일까지 건너뜀
+function nextWorkdayAfter(dk) {
+  const d = parseDk(dk);
+  d.setDate(d.getDate() + 1);
+  let guard = 0;
+  while (isRestDay(d) && guard++ < 14) d.setDate(d.getDate() + 1);
+  return dateKey(d);
+}
 function postponeTask(dk, id) {
-  const d = parseDk(dk); d.setDate(d.getDate()+1);
-  const toDk = dateKey(d);
+  const toDk = nextWorkdayAfter(dk);
   const t=(tasks[dk]||[]).find(x=>x.id===id);
   const name = t ? t.text : '';
   if (moveTask(dk, id, toDk)) {
-    showToast(`"${name}" → 다음 날로 이동`, ()=>{ moveTask(toDk, id, dk); });
+    const d = parseDk(toDk);
+    showToast(`"${name}" → ${d.getMonth()+1}/${d.getDate()}(${DAY_NAMES[dateToDayIdx(d)]})로 이동`, ()=>{ moveTask(toDk, id, dk); });
   }
 }
 // 어제 미완료 항목을 오늘로 이월
@@ -1599,8 +1607,8 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       editBtn.onclick=e=>{e.stopPropagation();openEdit(dk,task,isRepeatInst,originDk);};
       actions.appendChild(editBtn);
       if(!isRepeatInst){
-        const pstBtn=el('button','task-act-btn',{textContent:'⏭',title:'다음 날로 미루기'});
-        pstBtn.setAttribute('aria-label','다음 날로 미루기');
+        const pstBtn=el('button','task-act-btn',{textContent:'⏭',title:'다음 영업일로 미루기'});
+        pstBtn.setAttribute('aria-label','다음 영업일로 미루기');
         pstBtn.onclick=e=>{e.stopPropagation();postponeTask(dk,task.id);};
         actions.appendChild(pstBtn);
       }
