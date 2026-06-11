@@ -336,6 +336,23 @@
     .gantt-bar:hover { transform:scaleY(1.25); }
     .gantt-bar.done { opacity:.3; }
 
+    /* ─── Undo toast ─── */
+    .undo-toast {
+      position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+      background:var(--text); color:var(--bg); border-radius:12px;
+      padding:10px 16px; display:flex; align-items:center; gap:14px;
+      font-size:13px; box-shadow:var(--shadow-lg); z-index:1500;
+      animation:toastUp .25s ease; max-width:calc(100vw - 32px);
+    }
+    @keyframes toastUp { from{opacity:0;transform:translate(-50%,12px)} to{opacity:1;transform:translate(-50%,0)} }
+    .undo-toast.hidden { display:none; }
+    .undo-toast span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .undo-toast button {
+      background:none; border:none; color:var(--yellow); font-weight:700;
+      font-size:13px; cursor:pointer; font-family:inherit; flex-shrink:0; padding:0;
+    }
+    .undo-toast button:hover { text-decoration:underline; }
+
     /* ─── Trash modal ─── */
     .trash-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; background:var(--surface2); }
     .trash-info { flex:1; min-width:0; }
@@ -999,6 +1016,12 @@
 </div>
 
 <!-- Pomodoro Widget -->
+<!-- Undo Toast -->
+<div class="undo-toast hidden" id="undoToast">
+  <span id="undoMsg"></span>
+  <button id="undoBtn">실행 취소</button>
+</div>
+
 <!-- Image Lightbox -->
 <div class="img-lightbox hidden" id="imgLightbox">
   <img id="imgLightboxImg" alt="첨부 이미지">
@@ -1345,6 +1368,22 @@ function toggleRepeatInst(originDk, taskId, instanceDk) {
   saveTasks(originDk); render();
 }
 
+// ── Undo toast ──
+let undoAction=null, undoTimer=null;
+function showUndoToast(msg,fn){
+  undoAction=fn;
+  document.getElementById('undoMsg').textContent=msg;
+  document.getElementById('undoToast').classList.remove('hidden');
+  clearTimeout(undoTimer);
+  undoTimer=setTimeout(()=>{document.getElementById('undoToast').classList.add('hidden');undoAction=null;},6000);
+}
+document.getElementById('undoBtn').onclick=()=>{
+  const fn=undoAction; undoAction=null;
+  clearTimeout(undoTimer);
+  document.getElementById('undoToast').classList.add('hidden');
+  if(fn)fn();
+};
+
 // ── Task mutations ──
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function addTask(dk,text,color,starred,repeat,parentId,priority,time) {
@@ -1415,17 +1454,19 @@ function toggleTask(dk,id,subId) {
 function toggleStar(dk,id){const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks(dk);render();}}
 function deleteTask(dk,id,subId) {
   if(!tasks[dk])return;
+  let trashId=null, deletedText='';
   if(subId){
     const p=tasks[dk].find(x=>x.id===id);
     if(p&&Array.isArray(p.subs)){
       const idx=p.subs.findIndex(x=>x.id===subId);
-      if(idx>=0) addToTrash(dk,p.subs.splice(idx,1)[0],id);
+      if(idx>=0){const removed=p.subs.splice(idx,1)[0];deletedText=removed.text;trashId=addToTrash(dk,removed,id);}
     }
   } else {
     const idx=tasks[dk].findIndex(x=>x.id===id);
-    if(idx>=0) addToTrash(dk,tasks[dk].splice(idx,1)[0],null);
+    if(idx>=0){const removed=tasks[dk].splice(idx,1)[0];deletedText=removed.text;trashId=addToTrash(dk,removed,null);}
   }
   saveTasks(dk); render();
+  if(trashId) showUndoToast(`"${deletedText.slice(0,16)}" 삭제됨`,()=>restoreFromTrash(trashId));
 }
 
 // ── Trash (휴지통, 30일 보관) ──
@@ -1440,8 +1481,10 @@ function purgeOldTrash(){
 }
 function addToTrash(dk,task,parentId){
   const trash=loadTrash();
-  trash.unshift({id:uid(),dk,task,parentId,deletedAt:Date.now()});
+  const trashId=uid();
+  trash.unshift({id:trashId,dk,task,parentId,deletedAt:Date.now()});
   saveTrash(trash);
+  return trashId;
 }
 function restoreFromTrash(trashId){
   const trash=loadTrash();
@@ -1494,7 +1537,7 @@ document.getElementById('trashBtn').onclick=()=>{
 document.getElementById('trashCloseBtn').onclick=()=>document.getElementById('trashModal').classList.add('hidden');
 document.getElementById('trashModal').onclick=e=>{if(e.target===document.getElementById('trashModal'))document.getElementById('trashModal').classList.add('hidden');};
 
-function moveTask(fromDk, taskId, toDk){
+function moveTask(fromDk, taskId, toDk, silent){
   if(!tasks[fromDk]) return;
   const idx=tasks[fromDk].findIndex(t=>t.id===taskId);
   if(idx<0) return;
@@ -1502,6 +1545,10 @@ function moveTask(fromDk, taskId, toDk){
   if(!tasks[toDk]) tasks[toDk]=[];
   tasks[toDk].push(task);
   saveTasks(fromDk); saveTasks(toDk); render();
+  if(!silent){
+    const d=new Date(toDk);
+    showUndoToast(`"${task.text.slice(0,16)}" → ${d.getMonth()+1}/${d.getDate()} 이동됨`,()=>moveTask(toDk,taskId,fromDk,true));
+  }
 }
 
 let activeMovePopup=null;
@@ -2711,8 +2758,40 @@ document.getElementById('notifyBtn').onclick=()=>{
   });
 };
 updateNotifyBtn();
+// ── 마감시간 도달 시 즉시 알림 ──
+function checkTimeNotifications(){
+  if(localStorage.getItem('notifyEnabled')!=='true')return;
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const now=new Date();
+  const dk=dateKey(now);
+  const nowMin=now.getHours()*60+now.getMinutes();
+  let state={};
+  try{state=JSON.parse(localStorage.getItem('timeNotified')||'{}');}catch{}
+  if(state.dk!==dk)state={dk,ids:[]};
+  const candidates=[];
+  (tasks[dk]||[]).forEach(t=>{ if(t&&t.time&&!t.checked)candidates.push({id:t.id,time:t.time,text:t.text}); });
+  try{
+    getRepeatTasksForDate(now,dateToDayIdx(now)).forEach(({task,instanceDk})=>{
+      if(task.time&&!isRepeatChecked(task,instanceDk))candidates.push({id:task.id,time:task.time,text:task.text});
+    });
+  }catch(e){}
+  candidates.forEach(c=>{
+    if(state.ids.includes(c.id))return;
+    const [h,m]=c.time.split(':').map(Number);
+    const diffMin=nowMin-(h*60+m);
+    if(diffMin>=0){
+      // 10분 넘게 지난 항목은 알림 생략 (뒤늦게 페이지 열었을 때 과거 알림 폭주 방지)
+      if(diffMin<=10) new Notification('⏰ '+c.text,{body:`${c.time} 마감 시간입니다`});
+      state.ids.push(c.id);
+    }
+  });
+  localStorage.setItem('timeNotified',JSON.stringify(state));
+}
+
 setInterval(checkNotificationSchedule, 60*1000);
 checkNotificationSchedule();
+setInterval(checkTimeNotifications, 60*1000);
+checkTimeNotifications();
 
 // ── Pomodoro timer ──
 let pomodoroInterval=null, pomodoroSeconds=25*60, pomodoroRunning=false;
