@@ -1356,7 +1356,10 @@ function parseQuickDate(text){
 function toggleTask(dk,id,subId) {
   const list=tasks[dk]||[];
   if(subId){const p=list.find(x=>x.id===id);if(p){const s=p.subs.find(x=>x.id===subId);if(s)s.checked=!s.checked;}}
-  else{const t=list.find(x=>x.id===id);if(t)t.checked=!t.checked;}
+  else{
+    const t=list.find(x=>x.id===id);
+    if(t){t.checked=!t.checked; if(t.checked)t.completedAt=Date.now(); else delete t.completedAt;}
+  }
   saveTasks(dk); render();
 }
 function toggleStar(dk,id){const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks(dk);render();}}
@@ -2644,47 +2647,6 @@ window.addEventListener('online', ()=>{ if(pendingUpload && fbRef()){ pendingUpl
 window.addEventListener('offline', ()=>setSyncStatus('offline'));
 
 // ── Dashboard ──
-const MARKETING_EVENTS = [
-  { name:'설 시즌 캠페인',      month:1,  day:15 },
-  { name:'발렌타인 프로모',      month:2,  day:10 },
-  { name:'봄 신상 론칭',        month:3,  day:1  },
-  { name:'봄 세일 시작',        month:3,  day:15 },
-  { name:'화이트데이 프로모',    month:3,  day:13 },
-  { name:'SS 시즌 피크',        month:4,  day:1  },
-  { name:'어린이날 프로모',      month:5,  day:2  },
-  { name:'가정의달 기획전',      month:5,  day:8  },
-  { name:'여름 시즌 준비',       month:6,  day:1  },
-  { name:'여름 세일 / 창고대방출',month:7,  day:1  },
-  { name:'블프 기획 시작 (내부)',  month:9,  day:15 },
-  { name:'FW 신상 론칭',        month:9,  day:1  },
-  { name:'추석 시즌 캠페인',     month:9,  day:20 },
-  { name:'FW 세일 피크',        month:10, day:15 },
-  { name:'블랙프라이데이',       month:11, day:24 },
-  { name:'사이버먼데이',         month:12, day:1  },
-  { name:'연말 기획전',          month:12, day:10 },
-  { name:'크리스마스 프로모',    month:12, day:20 },
-];
-
-const DAILY_TIPS = [
-  '고객의 구매 여정을 단계별로 시각화하면 전환율 개선 포인트를 빠르게 찾을 수 있습니다.',
-  '상품 상세페이지에 고객 리뷰와 UGC를 배치하면 신뢰도와 전환율이 함께 올라갑니다.',
-  '세그먼트별 타겟 메시지 A/B 테스트는 최소 2주 이상 운영해야 유의미한 데이터가 나옵니다.',
-  '재구매 고객 LTV 분석을 통해 VIP 등급 기준을 재점검해보세요.',
-  '모바일 첫 화면 진입 후 3초 안에 핵심 가치를 전달해야 이탈률을 줄일 수 있습니다.',
-  '카카오 친구톡과 앱 푸시의 발송 시간대를 요일별로 최적화하면 CTR이 달라집니다.',
-  '시즌 기획전은 최소 3주 전 소재 제작을 완료해야 QA·수정 여유가 생깁니다.',
-  '검색 광고 키워드에서 브랜드명 검색 비율을 주기적으로 체크하면 브랜드 인지도 추이를 파악할 수 있습니다.',
-  '쿠폰 다운로드율과 실제 사용률 격차가 크면 유효기간·조건을 재검토할 필요가 있습니다.',
-  '콘텐츠 마케팅의 성과는 단기보다 3개월 이상 누적 트래픽으로 평가하는 것이 정확합니다.',
-];
-
-function getDday(month, day){
-  const now = new Date(); now.setHours(0,0,0,0);
-  const target = new Date(now.getFullYear(), month-1, day);
-  if(target < now) target.setFullYear(now.getFullYear()+1);
-  return Math.round((target - now) / 86400000);
-}
-
 function getImportantUpcoming(){
   const now = today();
   const items = [];
@@ -2784,13 +2746,6 @@ function buildDashStats(){
     panel.appendChild(ddList);
   }
 
-  // tip
-  const tipWrap=document.createElement('div'); tipWrap.className='tip-box'; tipWrap.style.marginTop='14px';
-  const tipLbl=document.createElement('div'); tipLbl.className='tip-label'; tipLbl.textContent='💡 오늘의 마케팅 인사이트';
-  const tipTxt=document.createElement('div'); tipTxt.className='tip-text';
-  tipTxt.textContent=DAILY_TIPS[new Date().getDate()%DAILY_TIPS.length];
-  tipWrap.appendChild(tipLbl); tipWrap.appendChild(tipTxt);
-  panel.appendChild(tipWrap);
 }
 
 function getSheetEvents(){
@@ -2818,60 +2773,98 @@ function getSheetEvents(){
 function buildDashCalendar(){
   const panel = document.getElementById('dashCalendar');
   panel.innerHTML = '';
-  const sheetEvts = getSheetEvents();
-  const hasSheet = sheetEvts.length > 0;
 
+  // ── 완료 통계 & 히스토리 ──
   const title = document.createElement('div'); title.className='dash-panel-title';
-  title.textContent = hasSheet ? '🏬 전관행사 일정' : '🗓 패션·리테일 마케팅 캘린더';
+  title.textContent = '📈 완료 통계 & 히스토리';
   panel.appendChild(title);
 
-  const list = document.createElement('div'); list.className='upcoming-list';
+  // 최근 8주 완료율 추이
+  const now = today();
+  const thisMonday = getMonday(now);
+  const weekStats = [];
+  for(let w=7;w>=0;w--){
+    const ws=new Date(thisMonday); ws.setDate(ws.getDate()-w*7);
+    let total=0,done=0;
+    for(let i=0;i<7;i++){
+      const d=new Date(ws); d.setDate(d.getDate()+i);
+      (tasks[dateKey(d)]||[]).forEach(t=>{ if(t){total++; if(t.checked)done++;} });
+    }
+    weekStats.push({ws,total,done,pct:total?Math.round(done/total*100):0});
+  }
+  const trendWrap=document.createElement('div'); trendWrap.className='week-bar-wrap'; trendWrap.style.marginBottom='14px';
+  weekStats.forEach(({ws,total,pct},i)=>{
+    const col=document.createElement('div'); col.className='week-bar-col';
+    const bar=document.createElement('div'); bar.className='week-bar'+(i===weekStats.length-1?' today':'');
+    bar.style.height=Math.round(pct/100*50+4)+'px';
+    bar.title=`${ws.getMonth()+1}/${ws.getDate()} 주 · ${pct}% (${total}개)`;
+    const lbl=document.createElement('div'); lbl.className='week-bar-day';
+    lbl.textContent=i===weekStats.length-1?'이번주':`${ws.getMonth()+1}/${ws.getDate()}`;
+    col.appendChild(bar); col.appendChild(lbl); trendWrap.appendChild(col);
+  });
+  const trendTitle=document.createElement('div'); trendTitle.className='dash-panel-title'; trendTitle.style.marginBottom='6px';
+  trendTitle.textContent='주별 완료율 (최근 8주)';
+  panel.appendChild(trendTitle);
+  panel.appendChild(trendWrap);
 
-  if(hasSheet){
-    sheetEvts.slice(0,10).forEach(e=>{
+  // 최근 완료 히스토리
+  const completed=[];
+  Object.entries(tasks).forEach(([dk,list])=>{
+    if(!Array.isArray(list))return;
+    list.forEach(t=>{ if(t&&t.checked) completed.push({dk,task:t,ts:t.completedAt||new Date(dk).getTime()}); });
+  });
+  completed.sort((a,b)=>b.ts-a.ts);
+  const histTitle=document.createElement('div'); histTitle.className='dash-panel-title'; histTitle.style.marginBottom='6px';
+  histTitle.textContent='✅ 최근 완료한 일';
+  panel.appendChild(histTitle);
+  if(completed.length){
+    const list=document.createElement('div'); list.className='upcoming-list';
+    completed.slice(0,8).forEach(({dk,task,ts})=>{
+      const item=document.createElement('div'); item.className='upcoming-item';
+      item.style.cursor='pointer';
+      const when=document.createElement('div'); when.className='upcoming-dday far';
+      const td=task.completedAt?new Date(ts):new Date(dk);
+      when.textContent=`${td.getMonth()+1}/${td.getDate()}`;
+      const info=document.createElement('div'); info.className='upcoming-info';
+      const name=document.createElement('div'); name.className='upcoming-name';
+      name.textContent=(task.starred?'★ ':'')+task.text;
+      info.appendChild(name);
+      item.appendChild(when); item.appendChild(info);
+      item.onclick=()=>{weekStart=getMonday(new Date(dk));setView('week');window.scrollTo({top:0,behavior:'smooth'});};
+      list.appendChild(item);
+    });
+    panel.appendChild(list);
+  } else {
+    const empty=document.createElement('div');
+    empty.style.cssText='font-size:12px;color:var(--text3);text-align:center;padding:14px';
+    empty.textContent='아직 완료한 일이 없습니다';
+    panel.appendChild(empty);
+  }
+
+  // 전관행사 (구글 시트 동기화 데이터가 있을 때만)
+  const sheetEvts = getSheetEvents();
+  if(sheetEvts.length){
+    const sTitle=document.createElement('div'); sTitle.className='dash-panel-title';
+    sTitle.style.cssText='margin-top:14px;margin-bottom:6px';
+    sTitle.textContent='🏬 전관행사 일정';
+    panel.appendChild(sTitle);
+    const list=document.createElement('div'); list.className='upcoming-list';
+    sheetEvts.slice(0,8).forEach(e=>{
       const item=document.createElement('div'); item.className='upcoming-item';
       const dd=document.createElement('div');
       dd.className='upcoming-dday '+(e.dday===0?'today':e.dday<=7?'soon':'far');
       dd.textContent=e.dday===0?'D-DAY':'D-'+e.dday;
       const info=document.createElement('div'); info.className='upcoming-info';
-      // 텍스트에서 [전관행사] 제거 후 표시
       const cleanName=e.text.replace('[전관행사]','').trim();
       const name=document.createElement('div'); name.className='upcoming-name'; name.textContent=cleanName||e.text;
       const dateEl=document.createElement('div'); dateEl.className='upcoming-date';
       dateEl.textContent=`${e.date.getMonth()+1}월 ${e.date.getDate()}일 (${['일','월','화','수','목','금','토'][e.date.getDay()]})`;
       info.appendChild(name); info.appendChild(dateEl);
-      const tag=document.createElement('div'); tag.className='upcoming-tag';
-      tag.textContent=e.dday===0?'🔴 오늘':e.dday<=7?'⚡ 임박':e.dday<=30?'📌 준비':'📋 예정';
-      item.appendChild(dd); item.appendChild(info); item.appendChild(tag);
+      item.appendChild(dd); item.appendChild(info);
       list.appendChild(item);
     });
-  } else {
-    // 시트 동기화 전 — 하드코딩 폴백
-    MARKETING_EVENTS
-      .map(e=>({ ...e, dday: getDday(e.month, e.day) }))
-      .sort((a,b)=>a.dday-b.dday).slice(0,8)
-      .forEach(e=>{
-        const item=document.createElement('div'); item.className='upcoming-item';
-        const dd=document.createElement('div');
-        dd.className='upcoming-dday '+(e.dday===0?'today':e.dday<=14?'soon':'far');
-        dd.textContent=e.dday===0?'D-DAY':'D-'+e.dday;
-        const info=document.createElement('div'); info.className='upcoming-info';
-        const name=document.createElement('div'); name.className='upcoming-name'; name.textContent=e.name;
-        const yr=new Date().getFullYear(); const target=new Date(yr,e.month-1,e.day);
-        const dateEl=document.createElement('div'); dateEl.className='upcoming-date';
-        dateEl.textContent=`${target.getMonth()+1}월 ${target.getDate()}일`;
-        info.appendChild(name); info.appendChild(dateEl);
-        const tag=document.createElement('div'); tag.className='upcoming-tag';
-        tag.textContent=e.dday<=7?'⚡ 임박':e.dday<=30?'📌 준비':'📋 예정';
-        item.appendChild(dd); item.appendChild(info); item.appendChild(tag);
-        list.appendChild(item);
-      });
-    const hint=document.createElement('div');
-    hint.style.cssText='font-size:11px;color:var(--text3);text-align:center;margin-top:10px';
-    hint.textContent='📥 아래 버튼으로 구글 시트 동기화 시 실제 전관행사 일정으로 업데이트됩니다';
-    list.appendChild(hint);
+    panel.appendChild(list);
   }
-  panel.appendChild(list);
 }
 
 // ── Google Sheet Sync ──
