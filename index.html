@@ -173,11 +173,15 @@
     .move-opt .move-opt-date { font-size:10px; color:var(--text3); margin-left:auto; }
     .move-popup-divider { height:1px; background:var(--border); margin:3px 0; }
     .add-sub-btn {
-      display:none; align-items:center; gap:2px; font-size:10px; color:var(--text3);
+      display:flex; align-items:center; gap:2px; font-size:10px; color:var(--text3);
       cursor:pointer; margin:2px 0 0 20px; background:none; border:none;
       padding:1px 4px; border-radius:4px; font-family:inherit; transition:color .12s;
     }
-    .task-item:hover .add-sub-btn { display:flex; }
+    /* 호버 가능한 기기(데스크탑)에서만 호버 시 노출, 터치 기기에서는 항상 표시 */
+    @media (hover:hover) {
+      .add-sub-btn { display:none; }
+      .task-item:hover .add-sub-btn { display:flex; }
+    }
     .add-sub-btn:hover { color:var(--primary); }
 
     /* empty state */
@@ -784,6 +788,7 @@
         <button class="repeat-opt" data-val="weekly">매주</button>
         <button class="repeat-opt" data-val="biweekly">격주</button>
         <button class="repeat-opt" data-val="monthly">매월</button>
+        <button class="repeat-opt" data-val="monthlyNth">N째 요일</button>
       </div>
     </div>
     <div class="modal-actions">
@@ -1122,6 +1127,12 @@ function getRepeatTasksForDate(date, dayIdx) {
         const originDay = originDate.getDate();
         const adj = adjustedMonthlyDate(date.getFullYear(), date.getMonth(), originDay);
         if (adj && dateKey(adj) === dk) out.push({task:t, originDk:oDk, instanceDk:dk, adjusted: adj.getDate()!==originDay});
+      }
+      if (t.repeat==='monthlyNth') {
+        // 매월 N번째 요일 (예: 둘째 화요일) — 원본 날짜의 주차·요일과 일치하는 날
+        if (date.getDay()===originDate.getDay() && Math.ceil(date.getDate()/7)===Math.ceil(originDate.getDate()/7)) {
+          out.push({task:t, originDk:oDk, instanceDk:dk});
+        }
       }
     });
   });
@@ -1531,7 +1542,12 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   if(!isSub&&task.repeat&&task.repeat!=='none'){
     const repeatLabels={weekly:'🔄 매주',biweekly:'🔄 격주',monthly:'🔄 매월'};
-    body.appendChild(el('div','repeat-badge',{textContent:repeatLabels[task.repeat]||'🔄'}));
+    let repLabel=repeatLabels[task.repeat]||'🔄';
+    if(task.repeat==='monthlyNth'){
+      const od=new Date(originDk||dk);
+      repLabel=`🔄 매월 ${Math.ceil(od.getDate()/7)}째 ${'일월화수목금토'[od.getDay()]}요일`;
+    }
+    body.appendChild(el('div','repeat-badge',{textContent:repLabel}));
   }
   if(!isSub&&adjusted){
     body.appendChild(el('div','repeat-adjusted-badge',{textContent:'📅 일정 앞당김'}));
@@ -1540,7 +1556,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     const subDone=task.subs.filter(s=>s&&s.checked).length;
     body.appendChild(el('div','checklist-badge',{textContent:`✓ ${subDone}/${task.subs.length}`}));
     const sl=el('div','subtask-list');
-    task.subs.forEach(s=>sl.appendChild(buildTaskItem(dk,s,true,task.id,false,null,null)));
+    task.subs.forEach(s=>sl.appendChild(buildTaskItem(isRepeatInst?originDk:dk,s,true,task.id,false,null,null)));
     body.appendChild(sl);
   }
   if(!isSub&&!isRepeatInst){
@@ -1615,7 +1631,7 @@ function buildInputForm(dk,parentId){
     });
     form.appendChild(ps);
     const rs=el('div','repeat-selector');
-    [['none','없음'],['weekly','매주'],['biweekly','격주'],['monthly','매월']].forEach(([val,label])=>{
+    [['none','없음'],['weekly','매주'],['biweekly','격주'],['monthly','매월'],['monthlyNth','N째 요일']].forEach(([val,label])=>{
       const btn=el('button',`repeat-opt${val==='none'?' active':''}`,{type:'button',textContent:label});
       btn.onclick=()=>{selRepeat=val;rs.querySelectorAll('.repeat-opt').forEach(b=>b.classList.remove('active'));btn.classList.add('active');};
       rs.appendChild(btn);
@@ -2113,6 +2129,10 @@ function buildICS(){
       if(t.repeat==='weekly') lines.push('RRULE:FREQ=WEEKLY');
       else if(t.repeat==='biweekly') lines.push('RRULE:FREQ=WEEKLY;INTERVAL=2');
       else if(t.repeat==='monthly') lines.push('RRULE:FREQ=MONTHLY');
+      else if(t.repeat==='monthlyNth'){
+        const od=new Date(dk);
+        lines.push(`RRULE:FREQ=MONTHLY;BYDAY=${Math.ceil(od.getDate()/7)}${['SU','MO','TU','WE','TH','FR','SA'][od.getDay()]}`);
+      }
       lines.push('END:VEVENT');
     });
   });
