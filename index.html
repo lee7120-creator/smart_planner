@@ -1565,10 +1565,10 @@ function el(tag,cls,attrs){const e=document.createElement(tag);if(cls)e.classNam
 function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
   const item=el('div',`task-item${isSub?' sub':''}`);
   const checked=isRepeatInst?isRepeatChecked(task,instanceDk):task.checked;
-  if(!isSub&&!isRepeatInst){
+  if(!isSub){
     item.draggable=true;
     item.ondragstart=e=>{
-      e.dataTransfer.setData('application/json',JSON.stringify({dk,id:task.id}));
+      e.dataTransfer.setData('application/json',JSON.stringify({dk:isRepeatInst?originDk:dk,id:task.id,isRepeat:!!isRepeatInst}));
       e.dataTransfer.effectAllowed='move';
       item.classList.add('dragging');
     };
@@ -1628,9 +1628,9 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     task.subs.forEach(s=>sl.appendChild(buildTaskItem(isRepeatInst?originDk:dk,s,true,task.id,false,null,null)));
     body.appendChild(sl);
   }
-  if(!isSub&&!isRepeatInst){
+  if(!isSub){
     const addSub=el('button','add-sub-btn',{textContent:'+ 하위 항목'});
-    addSub.onclick=e=>{e.stopPropagation();activeInput={dateKey:dk,parentId:task.id};render();};
+    addSub.onclick=e=>{e.stopPropagation();activeInput={dateKey:dk,dataKey:isRepeatInst?originDk:dk,parentId:task.id};render();};
     body.appendChild(addSub);
   }
   item.appendChild(body);
@@ -1642,11 +1642,13 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     const editBtn=el('button','task-act-btn',{textContent:'✏️',title:'수정'});
     editBtn.onclick=e=>{e.stopPropagation();openEdit(dk,task,isRepeatInst,originDk);};
     actions.appendChild(editBtn);
-    if(!isRepeatInst){
-      const moveBtn=el('button','task-act-btn move',{textContent:'📅',title:'다른 날짜로 이동'});
-      moveBtn.onclick=e=>{e.stopPropagation();openMovePopup(actions,dk,task.id);};
-      actions.appendChild(moveBtn);
-    }
+    const moveBtn=el('button','task-act-btn move',{textContent:'📅',title:isRepeatInst?'반복 일정 시작일 변경':'다른 날짜로 이동'});
+    moveBtn.onclick=e=>{
+      e.stopPropagation();
+      if(isRepeatInst&&!confirm('반복 일정 전체의 시작일을 변경합니다. 계속할까요?'))return;
+      openMovePopup(actions,isRepeatInst?originDk:dk,task.id);
+    };
+    actions.appendChild(moveBtn);
   }
   const delBtn=el('button','task-act-btn del',{textContent:'✕',title:'삭제'});
   delBtn.onclick=e=>{
@@ -1758,7 +1760,9 @@ function buildDayCol(date,dayIdx){
     col.classList.remove('drag-over');
     try{
       const data=JSON.parse(e.dataTransfer.getData('application/json'));
-      if(data&&data.dk&&data.id&&data.dk!==dk) moveTask(data.dk,data.id,dk);
+      if(!data||!data.dk||!data.id||data.dk===dk) return;
+      if(data.isRepeat&&!confirm('반복 일정 전체의 시작일을 변경합니다. 계속할까요?'))return;
+      moveTask(data.dk,data.id,dk);
     }catch(err){}
   };
   // header
@@ -1799,7 +1803,7 @@ function buildDayCol(date,dayIdx){
     list.appendChild(empty);
   }
   const ai=activeInput;
-  if(ai&&ai.dateKey===dk&&ai.parentId) list.appendChild(buildInputForm(dk,ai.parentId));
+  if(ai&&ai.dateKey===dk&&ai.parentId) list.appendChild(buildInputForm(ai.dataKey||dk,ai.parentId));
   col.appendChild(list);
   if(ai&&ai.dateKey===dk&&!ai.parentId) col.appendChild(buildInputForm(dk,null));
   else{
