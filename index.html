@@ -2964,45 +2964,71 @@ document.addEventListener('click',e=>{
   }
 });
 
-// ── Due-task notifications (매일 오전 9시 요약 알림) ──
-const NOTIFY_HOUR = 9;
-function getAllTasksForDate(date) {
-  const dk = dateKey(date);
-  const dayIdx = dateToDayIdx(date);
-  const direct = (tasks[dk]||[]).map(t=>({text:(t.time?t.time+' ':'')+t.text, checked:!!t.checked}));
-  const repeats = getRepeatTasksForDate(date,dayIdx).map(({task,instanceDk})=>({text:task.text, checked:isRepeatChecked(task,instanceDk)}));
-  return [...direct, ...repeats];
+// ── Notifications: 9시 오늘할일 / 마감 1시간 전 / 17시 미완료 ──
+const NOTIFY_HOUR = 9;       // 아침 요약
+const NOTIFY_EVENING = 17;   // 저녁 미완료 리마인드
+function notifyAllowed() {
+  return localStorage.getItem('notifyEnabled')==='true'
+    && 'Notification' in window && Notification.permission==='granted';
 }
-function buildDueSummary() {
-  const t = today();
-  const tomorrow = new Date(t); tomorrow.setDate(tomorrow.getDate()+1);
-  const todayTasks = getAllTasksForDate(t).filter(x=>!x.checked);
-  const tomorrowTasks = getAllTasksForDate(tomorrow).filter(x=>!x.checked);
-  return {todayTasks, tomorrowTasks};
+// 우선순위 가중치: 🔴 > 🟡 > 🟢 > ★ > 일반
+function priorityWeight(t){
+  return (t.priority==='high'?30:t.priority==='mid'?20:t.priority==='low'?10:0)+(t.starred?5:0);
 }
-function showDueNotification() {
-  const {todayTasks, tomorrowTasks} = buildDueSummary();
-  if(todayTasks.length===0 && tomorrowTasks.length===0) return;
-  const lines=[];
-  if(todayTasks.length) lines.push(`오늘: ${todayTasks.slice(0,3).map(t=>t.text).join(', ')}${todayTasks.length>3?` 외 ${todayTasks.length-3}개`:''}`);
-  if(tomorrowTasks.length) lines.push(`내일: ${tomorrowTasks.slice(0,3).map(t=>t.text).join(', ')}${tomorrowTasks.length>3?` 외 ${tomorrowTasks.length-3}개`:''}`);
-  new Notification('🗓 오늘의 할 일', {body: lines.join('\n')});
+function priorityFlag(t){
+  return t.priority==='high'?'🔴 ':t.priority==='mid'?'🟡 ':t.priority==='low'?'🟢 ':t.starred?'★ ':'';
 }
+// "우선순위 높은 일 외 N건이 남아있습니다" 형식 메시지
+function summarizeTasks(list){
+  if(!list.length) return null;
+  const sorted=[...list].sort((a,b)=>priorityWeight(b)-priorityWeight(a));
+  const top=sorted[0];
+  const name=(top.time?top.time+' ':'')+top.text;
+  return list.length===1
+    ? `${priorityFlag(top)}${name}`
+    : `${priorityFlag(top)}${name} 외 ${list.length-1}건이 남아있습니다`;
+}
+// 오늘의 미완료 태스크 (반복 인스턴스 포함)
+function getTodayIncomplete(){
+  const now=today(); const dk=dateKey(now);
+  const out=[];
+  (tasks[dk]||[]).forEach(t=>{ if(t&&!t.checked) out.push(t); });
+  try{
+    getRepeatTasksForDate(now,dateToDayIdx(now)).forEach(({task,instanceDk})=>{
+      if(!isRepeatChecked(task,instanceDk)) out.push(task);
+    });
+  }catch(e){}
+  return out;
+}
+// 1) 매일 오전 9시: 오늘 할 일 요약
 function checkNotificationSchedule() {
-  if(localStorage.getItem('notifyEnabled')!=='true') return;
-  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  if(!notifyAllowed()) return;
   const now = new Date();
   if(now.getHours() < NOTIFY_HOUR) return;
   const todayDk = dateKey(now);
   if(localStorage.getItem('lastNotifyDate')===todayDk) return;
   localStorage.setItem('lastNotifyDate', todayDk);
-  showDueNotification();
+  const list=getTodayIncomplete();
+  if(!list.length) return;
+  new Notification(`🗓 오늘의 할 일 ${list.length}건`, {body: summarizeTasks(list)});
+}
+// 3) 매일 오후 5시: 미완료 태스크 리마인드
+function checkEveningReminder() {
+  if(!notifyAllowed()) return;
+  const now = new Date();
+  if(now.getHours() < NOTIFY_EVENING) return;
+  const todayDk = dateKey(now);
+  if(localStorage.getItem('lastNotify5pm')===todayDk) return;
+  localStorage.setItem('lastNotify5pm', todayDk);
+  const list=getTodayIncomplete();
+  if(!list.length) return;
+  new Notification(`🔔 미완료 태스크 ${list.length}건`, {body: summarizeTasks(list)});
 }
 function updateNotifyBtn() {
   const enabled = localStorage.getItem('notifyEnabled')==='true' && 'Notification' in window && Notification.permission==='granted';
   const btn = document.getElementById('notifyBtn');
   document.getElementById('notifyIcon').textContent = enabled?'🔔':'🔕';
-  btn.title = enabled?'마감 알림 켜짐 (매일 오전 9시 요약)':'마감 알림 꺼짐 (클릭하여 켜기)';
+  btn.title = enabled?'알림 켜짐 (9시 오늘할일 · 마감 1시간 전 · 17시 미완료)':'알림 꺼짐 (클릭하여 켜기)';
 }
 document.getElementById('notifyBtn').onclick=()=>{
   if(!('Notification' in window)){ alert('이 브라우저는 알림을 지원하지 않습니다.'); return; }
@@ -3015,7 +3041,7 @@ document.getElementById('notifyBtn').onclick=()=>{
   Notification.requestPermission().then(perm=>{
     if(perm==='granted'){
       localStorage.setItem('notifyEnabled','true');
-      new Notification('🗓 마이플래너', {body:'매일 오전 9시에 마감 임박 태스크를 알려드릴게요!'});
+      new Notification('🗓 마이플래너', {body:'알림 설정 완료!\n· 매일 9시 오늘 할 일\n· 마감 1시간 전\n· 매일 17시 미완료 리마인드'});
     } else {
       alert('알림 권한이 거부되었습니다. 브라우저 설정에서 알림을 허용해주세요.');
     }
@@ -3023,10 +3049,9 @@ document.getElementById('notifyBtn').onclick=()=>{
   });
 };
 updateNotifyBtn();
-// ── 마감시간 도달 시 즉시 알림 ──
+// 2) 마감 1시간 전 알림
 function checkTimeNotifications(){
-  if(localStorage.getItem('notifyEnabled')!=='true')return;
-  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  if(!notifyAllowed())return;
   const now=new Date();
   const dk=dateKey(now);
   const nowMin=now.getHours()*60+now.getMinutes();
@@ -3043,10 +3068,10 @@ function checkTimeNotifications(){
   candidates.forEach(c=>{
     if(state.ids.includes(c.id))return;
     const [h,m]=c.time.split(':').map(Number);
-    const diffMin=nowMin-(h*60+m);
-    if(diffMin>=0){
-      // 10분 넘게 지난 항목은 알림 생략 (뒤늦게 페이지 열었을 때 과거 알림 폭주 방지)
-      if(diffMin<=10) new Notification('⏰ '+c.text,{body:`${c.time} 마감 시간입니다`});
+    const remainMin=(h*60+m)-nowMin; // 마감까지 남은 분
+    if(remainMin<=60&&remainMin>=0){
+      const msg=remainMin===0?'지금 마감 시간입니다':remainMin<=5?'곧 마감입니다':`마감 1시간 전입니다 (${c.time} 마감)`;
+      new Notification('⏰ '+c.text,{body:msg});
       state.ids.push(c.id);
     }
   });
@@ -3055,6 +3080,8 @@ function checkTimeNotifications(){
 
 setInterval(checkNotificationSchedule, 60*1000);
 checkNotificationSchedule();
+setInterval(checkEveningReminder, 60*1000);
+checkEveningReminder();
 setInterval(checkTimeNotifications, 60*1000);
 checkTimeNotifications();
 
