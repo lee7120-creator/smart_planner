@@ -3456,25 +3456,34 @@ function makeEventText(cellText){
 
 async function fetchSheetCSV(){
   const exportUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+  const gvizUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}`;
   const pubUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/pub?gid=${SHEET_GID}&single=true&output=csv`;
-  const proxies=[
-    u=>`https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
-    u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  // gviz 엔드포인트는 공개 시트에 CORS를 허용 → 프록시 없이 직접 시도 (가장 빠르고 안정적)
+  const candidates=[
+    gvizUrl,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(exportUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(exportUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(exportUrl)}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(exportUrl)}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(pubUrl)}`,
   ];
-  for(const makeProxy of proxies){
-    for(const srcUrl of [exportUrl, pubUrl]){
-      try{
-        const res=await fetch(makeProxy(srcUrl),{signal:AbortSignal.timeout(15000)});
-        if(!res.ok) continue;
-        const text=await res.text();
-        let csv=text;
-        try{ const j=JSON.parse(text); if(j.contents) csv=j.contents; }catch(e){}
-        // Validate: real CSV has commas and newlines
-        if(csv&&csv.includes(',')&&csv.includes('\n')) return csv;
-      }catch(e){ continue; }
-    }
+  let fallbackCsv=null;
+  for(const url of candidates){
+    try{
+      const res=await fetch(url,{signal:AbortSignal.timeout(10000)});
+      if(!res.ok) continue;
+      let csv=await res.text();
+      try{ const j=JSON.parse(csv); if(j.contents) csv=j.contents; }catch(e){}
+      if(!csv||!csv.includes(',')||!csv.includes('\n')) continue;
+      const rows=parseCSV(csv);
+      // 최우선: 전관행사 셀이 실제로 보이는 CSV
+      if(rows.some(r=>r.some(c=>c&&c.includes('[전관행사]')))) return csv;
+      // 차선: 컬럼 폭이 충분한 CSV (전관행사가 없는 기간일 수도 있으므로)
+      if(!fallbackCsv&&rows.some(r=>r.length>SHEET_COL_END)) fallbackCsv=csv;
+    }catch(e){ continue; }
   }
-  return null;
+  return fallbackCsv;
 }
 
 async function syncSheetEvents(manual=false){
@@ -3485,13 +3494,25 @@ async function syncSheetEvents(manual=false){
     if(!csv) throw new Error('CSV 로드 실패');
     const rows=parseCSV(csv);
 
-    // Determine starting year from first date row (CSV index 2 = spreadsheet row 3)
-    let contextYear=2026, prevWeekMonth=null;
+    // Determine starting year: 시트 상단에서 4자리 연도(20xx)를 직접 탐색
+    let contextYear=null, prevWeekMonth=null;
+    outer:
+    for(let ri=0;ri<Math.min(rows.length,5);ri++){
+      for(const cell of (rows[ri]||[])){
+        const ym=(cell||'').match(/20(2\d)\s*년?/);
+        if(ym){ contextYear=2000+(+ym[1]); break outer; }
+      }
+    }
     const firstDateRow=rows[2]||[];
     for(let ci=41;ci<=47;ci++){
       const m=(firstDateRow[ci]||'').match(/(\d{1,2})[월\/\s]\s*\d/);
-      if(m){ prevWeekMonth=+m[1]; contextYear=prevWeekMonth>=10?2025:2026; break; }
+      if(m){
+        prevWeekMonth=+m[1];
+        if(contextYear===null) contextYear=prevWeekMonth>=10?new Date().getFullYear()-(new Date().getMonth()>=9?0:1):new Date().getFullYear();
+        break;
+      }
     }
+    if(contextYear===null) contextYear=new Date().getFullYear();
 
     let added=0;
     // Date rows at CSV indices 2,8,14,20,...  Event rows: dateIdx+1 (가변탭1), dateIdx+2 (가변탭2)
@@ -3533,7 +3554,11 @@ async function syncSheetEvents(manual=false){
     const p=document.getElementById('dashCalendar'); if(p) appendSheetSyncRow(p);
     return {success:true,added};
   }catch(e){
-    if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent=`⚠️ 실패: ${e.message}`; }
+    if(syncBtn){
+      syncBtn.disabled=false; syncBtn.textContent=`⚠️ 실패`;
+      setTimeout(()=>{ if(syncBtn.isConnected) syncBtn.textContent='📥 지금 가져오기'; },4000);
+    }
+    if(manual) alert('시트 동기화에 실패했습니다.\n\n1) 구글시트가 "링크가 있는 모든 사용자" 공개로 설정되어 있는지 확인해주세요.\n2) 잠시 후 다시 시도해주세요. (외부 프록시 일시 장애일 수 있습니다)');
     console.warn('Sheet sync error:',e);
     return {success:false,error:e.message};
   }
