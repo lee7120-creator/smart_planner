@@ -542,47 +542,80 @@
       border-radius:4px; padding:1px 5px; margin-top:2px; font-weight:600;
     }
 
-    /* ─── Memo popup ─── */
-    .memo-overlay { position:fixed; inset:0; z-index:450; }
+    /* ─── Memo popup (태스크 메모 — 모던 디자인) ─── */
+    .memo-overlay { position:fixed; inset:0; z-index:450; pointer-events:none; }
     .memo-overlay.hidden { display:none; }
     .memo-popup {
-      position:fixed; width:300px; max-width:calc(100vw - 32px);
-      background:#fffef5; border:1px solid #e0d888;
-      border-radius:14px; overflow:hidden;
-      box-shadow:0 8px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
+      position:fixed; width:330px; max-width:calc(100vw - 32px);
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:16px; overflow:hidden; pointer-events:auto;
+      box-shadow:0 16px 48px rgba(0,0,0,.22), 0 3px 12px rgba(0,0,0,.10);
       animation:memoIn .15s ease; z-index:451;
+      display:flex; flex-direction:column;
     }
-    [data-theme="dark"] .memo-popup { background:#252318; border-color:#4a4630; }
+    .memo-popup::before { content:''; display:block; height:3px; flex-shrink:0;
+      background:linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24); }
+    .memo-popup.drag-over { outline:2px dashed var(--yellow); outline-offset:-4px; }
     @keyframes memoIn { from{opacity:0;transform:scale(.94) translateY(6px)} to{opacity:1;transform:scale(1) translateY(0)} }
     .memo-header {
       display:flex; align-items:center; gap:8px;
-      padding:11px 14px 10px; border-bottom:1px solid #e8e080;
-      background:#fff8cc;
+      padding:10px 12px; border-bottom:1px solid var(--border2);
+      background:var(--surface2); cursor:move; user-select:none;
     }
-    [data-theme="dark"] .memo-header { background:#2a2810; border-color:#4a4630; }
-    .memo-icon { font-size:15px; flex-shrink:0; }
-    .memo-task-title { flex:1; font-size:12px; font-weight:600; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    [data-theme="dark"] .memo-task-title { color:#aaa; }
+    .memo-icon {
+      width:26px; height:26px; border-radius:8px; background:#fef3c7;
+      display:flex; align-items:center; justify-content:center;
+      font-size:14px; flex-shrink:0;
+    }
+    [data-theme="dark"] .memo-icon { background:#3a3417; }
+    .memo-task-title { flex:1; font-size:13px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .memo-head-btn {
+      background:none; border:none; cursor:pointer; font-size:13px; color:var(--text3);
+      width:26px; height:26px; border-radius:7px; flex-shrink:0; transition:all .12s;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .memo-head-btn:hover { background:var(--border); color:var(--text); }
     .memo-close {
-      background:none; border:none; cursor:pointer; font-size:13px; color:#bbb;
-      padding:3px 5px; border-radius:5px; flex-shrink:0; transition:all .12s;
+      background:none; border:none; cursor:pointer; font-size:13px; color:var(--text3);
+      width:26px; height:26px; border-radius:7px; flex-shrink:0; transition:all .12s;
+      display:flex; align-items:center; justify-content:center;
     }
     .memo-close:hover { background:rgba(244,67,54,.12); color:#f44336; }
     .memo-textarea {
       width:100%; min-height:150px; max-height:320px; resize:vertical;
       border:none; outline:none; padding:13px 14px; font-size:13px;
-      font-family:inherit; line-height:1.65; background:transparent; color:#333;
+      font-family:inherit; line-height:1.65; background:transparent; color:var(--text);
     }
-    [data-theme="dark"] .memo-textarea { color:#ddd; }
-    .memo-textarea::placeholder { color:#bbb; }
+    .memo-textarea::placeholder { color:var(--text3); }
+    .memo-img-strip { display:none; flex-wrap:wrap; gap:6px; padding:0 12px 10px; }
+    .memo-thumb {
+      position:relative; width:64px; height:64px; border-radius:10px; overflow:hidden;
+      border:1px solid var(--border); background:var(--surface2); flex-shrink:0;
+    }
+    .memo-thumb img { width:100%; height:100%; object-fit:cover; cursor:zoom-in; display:block; }
+    .memo-thumb.missing::after { content:'🖼'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:18px; opacity:.4; }
+    .memo-thumb-del {
+      position:absolute; top:2px; right:2px; width:18px; height:18px; border:none;
+      border-radius:50%; background:rgba(0,0,0,.55); color:#fff; font-size:10px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+    }
+    .memo-thumb-del:hover { background:var(--red); }
     .memo-footer {
       display:flex; align-items:center; justify-content:space-between;
-      padding:6px 14px 10px; font-size:11px; color:#bbb;
-      border-top:1px dashed #e0d888;
+      padding:7px 14px 10px; font-size:11px; color:var(--text3);
+      border-top:1px dashed var(--border2);
     }
-    [data-theme="dark"] .memo-footer { border-color:#4a4630; }
-    .memo-status.ok { color:#43a047; }
-    .memo-status.saving { color:#f9a825; }
+    .memo-hint { font-size:10px; color:var(--text3); opacity:.8; }
+    .memo-status.ok { color:var(--green); }
+    .memo-status.saving { color:var(--yellow); }
+
+    /* 이미지 라이트박스 */
+    .lightbox {
+      position:fixed; inset:0; z-index:950; background:rgba(0,0,0,.82);
+      display:flex; align-items:center; justify-content:center; cursor:zoom-out;
+    }
+    .lightbox.hidden { display:none; }
+    .lightbox img { max-width:92vw; max-height:92vh; border-radius:10px; box-shadow:0 8px 40px rgba(0,0,0,.5); }
 
     .memo-dot {
       display:inline-block; width:6px; height:6px; border-radius:50%;
@@ -600,7 +633,7 @@
       }
       @keyframes memoUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
       .memo-textarea { min-height:180px; font-size:15px; }
-      .memo-overlay { background:rgba(0,0,0,.3); }
+      .memo-header { cursor:default; }
     }
 
     /* ─── 스탠드얼론 메모장 (플로팅 노트) ─── */
@@ -858,18 +891,25 @@
 <!-- Memo Popup -->
 <div class="memo-overlay hidden" id="memoOverlay">
   <div class="memo-popup" id="memoPopup" role="dialog" aria-label="태스크 메모">
-    <div class="memo-header">
+    <div class="memo-header" id="memoHeader" title="드래그해서 이동">
       <span class="memo-icon">📝</span>
       <span class="memo-task-title" id="memoTitle"></span>
+      <button class="memo-head-btn" id="memoImgBtn" title="이미지 첨부" aria-label="이미지 첨부">📷</button>
       <button class="memo-close" id="memoClose" aria-label="메모 닫기">✕</button>
     </div>
-    <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;(자동으로 저장됩니다)"></textarea>
+    <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;이미지는 끌어다 놓거나 붙여넣기(Ctrl+V)로 첨부됩니다.&#10;(자동으로 저장됩니다)"></textarea>
+    <div class="memo-img-strip" id="memoImgStrip"></div>
     <div class="memo-footer">
       <span class="memo-status" id="memoStatus">자동 저장됨 ✓</span>
+      <span class="memo-hint">🖼 드래그/붙여넣기로 이미지 첨부</span>
       <span id="memoCharCount">0자</span>
     </div>
   </div>
 </div>
+<input type="file" id="memoImgInput" accept="image/*" style="display:none">
+
+<!-- 이미지 라이트박스 -->
+<div class="lightbox hidden" id="lightbox"><img id="lightboxImg" alt=""></div>
 
 <!-- Edit Modal -->
 <div class="modal-overlay hidden" id="editModal">
@@ -1209,6 +1249,7 @@ function normalizeTasks(raw) {
       repeatEnd: t.repeatEnd || null,
       time: t.time || null,
       memo: t.memo || '',
+      memoImgs: Array.isArray(t.memoImgs) ? t.memoImgs.filter(x => typeof x === 'string') : [],
       completions: t.completions || {},
       skips: t.skips || {},
       subComp: t.subComp || {},
@@ -1384,7 +1425,7 @@ function uid() { return Date.now().toString(36)+Math.random().toString(36).slice
 function addTask(dk,text,color,starred,repeat,parentId,time) {
   if (READ_ONLY) return;
   if(!tasks[dk]) tasks[dk]=[];
-  const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',repeatEnd:null,time:time||null,memo:'',completions:{},skips:{},subComp:{},subs:[]};
+  const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',repeatEnd:null,time:time||null,memo:'',memoImgs:[],completions:{},skips:{},subComp:{},subs:[]};
   if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p)p.subs.push({id:t.id,text,checked:false});}
   else tasks[dk].push(t);
   saveTasks(); render();
@@ -1640,6 +1681,7 @@ function openMemo(dk, taskId, anchorEl) {
   ta.readOnly = READ_ONLY;
   updateMemoCount();
   setMemoStatus('saved');
+  renderMemoImgs(task);
   positionMemo(anchorEl);
   document.getElementById('memoOverlay').classList.remove('hidden');
   setTimeout(()=>ta.focus(), 60);
@@ -1649,13 +1691,13 @@ function positionMemo(anchor) {
   const pop = document.getElementById('memoPopup');
   if (window.innerWidth <= 768) return;
   const rect = anchor.getBoundingClientRect();
-  const popW = 300, popH = 260;
+  const popW = 330, popH = 280;
   let left = rect.right + 14;
-  let top  = rect.top + window.scrollY - 8;
+  let top  = rect.top - 8;
   if (left + popW > window.innerWidth - 12) left = rect.left - popW - 14;
   if (left < 12) left = 12;
-  if (top + popH > window.scrollY + window.innerHeight - 12) top = window.scrollY + window.innerHeight - popH - 12;
-  if (top < window.scrollY + 8) top = window.scrollY + 8;
+  if (top + popH > window.innerHeight - 12) top = window.innerHeight - popH - 12;
+  if (top < 8) top = 8;
   pop.style.left = left + 'px';
   pop.style.top  = top + 'px';
 }
@@ -1694,7 +1736,113 @@ document.getElementById('memoTextarea').addEventListener('input', ()=>{
   memoTimer = setTimeout(()=>{ saveMemoNow(); setMemoStatus('saved'); }, 700);
 });
 document.getElementById('memoClose').onclick = closeMemo;
-document.getElementById('memoOverlay').onclick = e=>{ if(e.target===document.getElementById('memoOverlay')) closeMemo(); };
+// 바깥 클릭으로는 닫히지 않음 — ✕ 버튼 또는 ESC로만 닫힘 (오버레이는 클릭 통과)
+
+// ── 메모 팝업 드래그 이동 (데스크톱) ──
+document.getElementById('memoHeader').addEventListener('mousedown', e => {
+  if (window.innerWidth <= 768) return;
+  if (e.target.closest('button')) return;
+  e.preventDefault();
+  const pop = document.getElementById('memoPopup');
+  const sx = e.clientX, sy = e.clientY, ox = pop.offsetLeft, oy = pop.offsetTop;
+  const mv = ev => {
+    let nx = ox + ev.clientX - sx, ny = oy + ev.clientY - sy;
+    nx = Math.max(4, Math.min(nx, window.innerWidth - 80));
+    ny = Math.max(4, Math.min(ny, window.innerHeight - 50));
+    pop.style.left = nx + 'px'; pop.style.top = ny + 'px';
+  };
+  const up = () => {
+    document.removeEventListener('mousemove', mv);
+    document.removeEventListener('mouseup', up);
+  };
+  document.addEventListener('mousemove', mv);
+  document.addEventListener('mouseup', up);
+});
+
+// ── 메모 이미지 첨부 (IndexedDB 로컬 저장) ──
+function renderMemoImgs(task) {
+  const strip = document.getElementById('memoImgStrip');
+  strip.innerHTML = '';
+  const imgs = task.memoImgs || [];
+  strip.style.display = imgs.length ? 'flex' : 'none';
+  imgs.forEach(id => {
+    const wrap = el('div', 'memo-thumb');
+    const img = el('img', '', {alt: '첨부 이미지'});
+    idbGet(id).then(data => {
+      if (data) {
+        img.src = data;
+        img.onclick = () => openLightbox(data);
+      } else {
+        wrap.classList.add('missing');
+        wrap.title = '이미지는 첨부한 기기에서만 보여요';
+      }
+    });
+    wrap.appendChild(img);
+    if (!READ_ONLY) {
+      const x = el('button', 'memo-thumb-del', {textContent: '✕', title: '이미지 삭제'});
+      x.onclick = () => {
+        const t = (tasks[memoCtx.dk]||[]).find(tt => tt.id === memoCtx.taskId);
+        if (!t) return;
+        t.memoImgs = (t.memoImgs||[]).filter(i => i !== id);
+        saveTasks(); renderMemoImgs(t); render();
+      };
+      wrap.appendChild(x);
+    }
+    strip.appendChild(wrap);
+  });
+}
+async function attachMemoImage(file) {
+  if (!memoCtx || READ_ONLY || !file) return;
+  const task = (tasks[memoCtx.dk]||[]).find(t => t.id === memoCtx.taskId);
+  if (!task) return;
+  const dataUrl = await compressImage(file);
+  if (!dataUrl) { showToast('⚠️ 이미지를 읽을 수 없어요'); return; }
+  const id = uid();
+  await idbPut(id, dataUrl);
+  if (!task.memoImgs) task.memoImgs = [];
+  task.memoImgs.push(id);
+  saveTasks(); renderMemoImgs(task); render();
+  showToast('🖼 이미지 첨부됨 (이 기기에만 저장)');
+}
+document.getElementById('memoImgBtn').onclick = () => {
+  if (READ_ONLY) return;
+  document.getElementById('memoImgInput').click();
+};
+document.getElementById('memoImgInput').addEventListener('change', e => {
+  attachMemoImage(e.target.files[0]);
+  e.target.value = '';
+});
+// 드래그앤드롭 첨부
+const memoPopupEl = document.getElementById('memoPopup');
+memoPopupEl.addEventListener('dragover', e => {
+  if ([...(e.dataTransfer?.types||[])].includes('Files')) {
+    e.preventDefault();
+    memoPopupEl.classList.add('drag-over');
+  }
+});
+memoPopupEl.addEventListener('dragleave', () => memoPopupEl.classList.remove('drag-over'));
+memoPopupEl.addEventListener('drop', e => {
+  memoPopupEl.classList.remove('drag-over');
+  const files = [...(e.dataTransfer?.files||[])].filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  files.forEach(f => attachMemoImage(f));
+});
+// 붙여넣기 첨부
+document.getElementById('memoTextarea').addEventListener('paste', e => {
+  const items = [...(e.clipboardData?.items||[])].filter(i => i.type.startsWith('image/'));
+  if (!items.length) return;
+  e.preventDefault();
+  items.forEach(it => attachMemoImage(it.getAsFile()));
+});
+
+// ── 라이트박스 ──
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
+document.getElementById('lightbox').onclick = closeLightbox;
 
 // ── Weather ──
 async function fetchWeather(lat,lon) {
@@ -1768,7 +1916,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   const textWrap=el('div','task-text-wrap');
   const txt=el('div',`task-text${checked?' done':''}`,{textContent:task.text});
   textWrap.appendChild(txt);
-  if(!isSub&&task.memo){ const dot=el('span','memo-dot',{title:'메모 있음'}); textWrap.appendChild(dot); }
+  if(!isSub&&(task.memo||(task.memoImgs&&task.memoImgs.length))){ const dot=el('span','memo-dot',{title:'메모 있음'}); textWrap.appendChild(dot); }
   if(!isSub){
     textWrap.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
   }
@@ -2542,7 +2690,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='s'||e.key==='S'){document.getElementById('btnStats').click();}
   if(e.key==='Escape'){
     closeMemo();closeEdit();closeRepeatDel();closeDayModal();
-    closeNoteHist();closeCanvas();closeSlashMenu();
+    closeNoteHist();closeCanvas();closeSlashMenu();closeLightbox();
     settingsMenu.classList.add('hidden');
     notesMenu.classList.add('hidden');
     activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();
@@ -3163,7 +3311,7 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
     // 이미지 하이드레이션 (IndexedDB)
     view.querySelectorAll('img[data-img]').forEach(img => {
       idbGet(img.dataset.img).then(data => {
-        if (data) img.src = data;
+        if (data) { img.src = data; img.onclick = ev => { ev.stopPropagation(); openLightbox(data); }; }
         else { img.alt = '🖼 이미지는 첨부한 기기에서만 보여요'; img.classList.add('missing'); }
       });
     });
