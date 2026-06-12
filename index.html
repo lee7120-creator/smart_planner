@@ -174,7 +174,7 @@
     }
 
     .subtask-list { margin-top:2px; }
-    .task-item.sub { margin-left:20px; }
+    .task-item.sub { margin-left:14px; }
     .task-item.sub .task-cb { width:13px; height:13px; }
     .task-item.sub .task-text { font-size:11px; color:var(--text2); }
 
@@ -185,6 +185,10 @@
       align-items:center; justify-content:center; transition:all .12s;
     }
     .task-act-btn:hover { background:var(--border); color:var(--text); }
+    /* 터치 기기: 액션을 ⋯ 버튼 뒤로 접어 텍스트 폭 확보 */
+    .task-actions.collapsible .task-act-btn:not(.more) { display:none; }
+    .task-item.show-acts .task-actions.collapsible .task-act-btn { display:flex; }
+    .task-item.show-acts .task-actions.collapsible .more { background:var(--border); }
     .task-act-btn.del:hover { background:var(--red); color:#fff; }
 
     .add-sub-btn {
@@ -402,7 +406,7 @@
       .calendar-wrap::-webkit-scrollbar { display:none; }
       .calendar-grid { display:flex; gap:8px; min-width:unset; width:max-content; padding-bottom:2px; }
       .day-col {
-        width:82vw; min-width:82vw; flex-shrink:0; min-height:480px;
+        width:88vw; min-width:88vw; flex-shrink:0; min-height:480px;
         scroll-snap-align:start;
       }
 
@@ -414,8 +418,13 @@
       .task-item.sub .task-cb { width:16px; height:16px; }
       .task-item.sub .task-text { font-size:12px; }
 
-      .task-actions { opacity:1; }
-      .task-act-btn { width:28px; height:28px; font-size:14px; }
+      .task-actions { opacity:1; gap:0; }
+      .task-act-btn { width:26px; height:28px; font-size:13px; }
+      /* 서브태스크: 부모 들여쓰기를 회수해 컬럼 전체 폭 사용 */
+      .subtask-list { margin-left:-32px; }
+      .task-item.sub { margin-left:14px; }
+      .task-item.sub .task-act-btn { width:20px; }
+      .task-text { min-width:80px; }
 
       .add-task-btn { padding:10px; font-size:13px; margin:8px; width:calc(100% - 16px); }
 
@@ -1786,6 +1795,13 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   item.appendChild(body);
   if (!READ_ONLY) {
     const actions=el('div','task-actions');
+    if(!isSub && IS_TOUCH){
+      actions.classList.add('collapsible');
+      const more=el('button','task-act-btn more',{textContent:'⋯',title:'더보기'});
+      more.setAttribute('aria-label','작업 메뉴 펼치기');
+      more.onclick=e=>{e.stopPropagation();item.classList.toggle('show-acts');};
+      actions.appendChild(more);
+    }
     if(!isSub){
       const editBtn=el('button','task-act-btn',{textContent:'✏️',title:'수정'});
       editBtn.setAttribute('aria-label','수정');
