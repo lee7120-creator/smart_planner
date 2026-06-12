@@ -918,7 +918,7 @@
       position:fixed; min-width:240px; min-height:170px;
       background:var(--surface); border:1px solid var(--border); border-radius:12px;
       box-shadow:var(--shadow-md); display:flex; flex-direction:column;
-      resize:both; overflow:hidden;
+      resize:none; overflow:hidden;
     }
     .note-head {
       display:flex; align-items:center; gap:6px; padding:8px 10px;
@@ -1004,6 +1004,39 @@
     .nv-img { max-width:100%; border-radius:8px; margin:4px 0; display:block; cursor:zoom-in; }
     .nv-img.missing { font-size:11px; color:var(--text3); min-height:24px; }
     .nv-placeholder { color:var(--text3); font-size:12px; }
+    /* 노션식 페이지 링크 블록 */
+    .nv-page {
+      display:flex; align-items:center; gap:6px; padding:5px 8px; margin:2px 0;
+      border:1px solid var(--border2); border-radius:8px; background:var(--surface2);
+      cursor:pointer; user-select:none; transition:all .12s;
+    }
+    .nv-page:hover { border-color:var(--primary); background:var(--primary-l); }
+    .nv-page.missing { opacity:.5; cursor:default; }
+    .nv-page-icon { flex-shrink:0; }
+    .nv-page-title { flex:1; font-weight:600; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .nv-page-title small { color:var(--text3); font-weight:500; }
+    .nv-page-arrow { color:var(--text3); font-size:13px; }
+    /* 이미지 블록 (드래그 이동) */
+    .nv-imgblock { position:relative; margin:4px 0; cursor:grab; }
+    .nv-imgblock:active { cursor:grabbing; }
+    .nv-imgblock img { -webkit-user-drag:none; user-select:none; }
+    .nv-imgmove {
+      position:absolute; top:4px; right:4px; background:rgba(0,0,0,.45); color:#fff;
+      border-radius:5px; font-size:10px; padding:2px 4px; opacity:0; transition:opacity .12s;
+      pointer-events:none;
+    }
+    .nv-imgblock:hover .nv-imgmove { opacity:1; }
+    /* 드롭 위치 표시 */
+    .nv-drop-before { box-shadow:0 -2px 0 0 var(--primary); }
+    .nv-drop-after { box-shadow:0 2px 0 0 var(--primary); }
+    /* 리사이즈 핸들 */
+    .note-resize { position:absolute; right:2px; bottom:2px; width:18px; height:18px; cursor:nwse-resize; opacity:.45; z-index:2; }
+    .note-resize::after {
+      content:''; position:absolute; right:4px; bottom:4px; width:8px; height:8px;
+      border-right:2px solid var(--text3); border-bottom:2px solid var(--text3); border-radius:0 0 3px 0;
+    }
+    .note-resize:hover { opacity:1; }
+    @media (max-width:768px) { .note-resize { display:none; } }
     .note-btn.pinned { color:var(--red); transform:rotate(-20deg); }
 
     /* 슬래시 명령 메뉴 */
@@ -2651,29 +2684,30 @@ document.getElementById('memoAllModal').onclick=e=>{if(e.target===document.getEl
 // ── 메모 이미지 (IndexedDB 로컬 저장 — 기기 간 동기화되지 않음) ──
 let imgDB=null;
 function openImgDB(){
-  return new Promise((res,rej)=>{
+  return new Promise((res)=>{
+    if(typeof indexedDB==='undefined'||!indexedDB)return res(null); // 미지원 환경 가드
     if(imgDB)return res(imgDB);
     const r=indexedDB.open('plannerImages',1);
     r.onupgradeneeded=()=>r.result.createObjectStore('images');
     r.onsuccess=()=>{imgDB=r.result;res(imgDB);};
-    r.onerror=()=>rej(r.error);
+    r.onerror=()=>res(null);
   });
 }
 function idbPutImage(id,blob){
-  return openImgDB().then(db=>new Promise((res,rej)=>{
+  return openImgDB().then(db=>db&&new Promise((res,rej)=>{
     const tx=db.transaction('images','readwrite');
     tx.objectStore('images').put(blob,id);
     tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
   }));
 }
 function idbGetImage(id){
-  return openImgDB().then(db=>new Promise((res,rej)=>{
+  return openImgDB().then(db=>db?new Promise((res,rej)=>{
     const rq=db.transaction('images','readonly').objectStore('images').get(id);
     rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>rej(rq.error);
-  }));
+  }):null);
 }
 function idbDeleteImage(id){
-  return openImgDB().then(db=>new Promise((res,rej)=>{
+  return openImgDB().then(db=>db&&new Promise((res,rej)=>{
     const tx=db.transaction('images','readwrite');
     tx.objectStore('images').delete(id);
     tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
@@ -4002,22 +4036,46 @@ function renderMarkdown(text) {
   let html = '';
   lines.forEach((line, i) => {
     let m;
-    if (/^---+\s*$/.test(line)) { html += '<hr class="nv-hr">'; return; }
+    const DL = ` data-line="${i}"`;
+    // 노션식 페이지 링크 블록: [[memoId]]
+    if ((m = line.match(/^\s*\[\[([a-z0-9]+)\]\]\s*$/))) {
+      const mm = memos[m[1]];
+      const label = mm ? memoLabel(mm) : '삭제된 메모';
+      const cnt = mm ? memoChildren(mm.id).length : 0;
+      html += `<div class="nv-page${mm?'':' missing'}" draggable="true"${DL} data-note="${m[1]}"><span class="nv-page-icon">📄</span><span class="nv-page-title">${escapeHtml(label)}${cnt?` <small>(${cnt})</small>`:''}</span><span class="nv-page-arrow">›</span></div>`;
+      return;
+    }
+    // 이미지 단독 라인 → 드래그 가능한 블록
+    if ((m = line.match(/^\s*!\[([^\]]*)\]\(local:([a-z0-9_]+)\)\s*$/))) {
+      html += `<div class="nv-imgblock" draggable="true"${DL}><img class="nv-img" data-img="${m[2]}" alt="${escapeHtml(m[1])}" draggable="false"><span class="nv-imgmove" title="드래그해서 위치 이동">⠿</span></div>`;
+      return;
+    }
+    if (/^---+\s*$/.test(line)) { html += `<hr class="nv-hr"${DL}>`; return; }
     if ((m = line.match(/^(#{1,3})\s+(.+)/))) {
-      html += `<div class="nv-h${m[1].length}">${mdInline(escapeHtml(m[2]))}</div>`; return;
+      html += `<div class="nv-h${m[1].length}"${DL}>${mdInline(escapeHtml(m[2]))}</div>`; return;
     }
     if ((m = line.match(/^\s*\[( |x)\]\s?(.*)$/))) {
       const done = m[1] === 'x';
-      html += `<button class="nv-check${done?' done':''}" data-line="${i}"><span class="nv-cb${done?' on':''}"></span><span class="nv-check-text">${mdInline(escapeHtml(m[2]))}</span></button>`;
+      html += `<button class="nv-check${done?' done':''}"${DL}><span class="nv-cb${done?' on':''}"></span><span class="nv-check-text">${mdInline(escapeHtml(m[2]))}</span></button>`;
       return;
     }
     if ((m = line.match(/^\s*-\s+(.+)/))) {
-      html += `<div class="nv-li">•&nbsp;${mdInline(escapeHtml(m[1]))}</div>`; return;
+      html += `<div class="nv-li"${DL}>•&nbsp;${mdInline(escapeHtml(m[1]))}</div>`; return;
     }
-    if (line.trim() === '') { html += '<div class="nv-gap"></div>'; return; }
-    html += `<div class="nv-p">${mdInline(escapeHtml(line))}</div>`;
+    if (line.trim() === '') { html += `<div class="nv-gap"${DL}></div>`; return; }
+    html += `<div class="nv-p"${DL}>${mdInline(escapeHtml(line))}</div>`;
   });
   return html || '<div class="nv-placeholder">클릭해서 작성... ( / 로 블록 삽입 )</div>';
+}
+// 블록(라인)을 다른 위치로 이동 — 페이지 링크/이미지 드래그 재배치
+function moveNoteLine(text, from, to) {
+  const lines = text.split('\n');
+  if (from < 0 || from >= lines.length) return text;
+  const [ln] = lines.splice(from, 1);
+  if (from < to) to -= 1;
+  to = Math.max(0, Math.min(to, lines.length));
+  lines.splice(to, 0, ln);
+  return lines.join('\n');
 }
 // 체크리스트 라인 토글 (뷰 모드에서 클릭)
 function toggleCheckLine(text, i) {
@@ -4176,6 +4234,7 @@ function createMemo(parentId, x, y) {
 
 function deleteMemoTree(id) {
   if (READ_ONLY) return;
+  const parentId = memos[id] ? memos[id].parentId : null;
   const removed = {};
   (function collect(mid) {
     if (!memos[mid]) return;
@@ -4183,10 +4242,19 @@ function deleteMemoTree(id) {
     memoChildren(mid).forEach(c => collect(c.id));
     delete memos[mid];
   })(id);
+  // 부모 본문의 페이지 링크 토큰 제거 (실행취소 대비 원본 보관)
+  const removedIds = Object.keys(removed);
+  let parentPrevText = null;
+  if (parentId && memos[parentId]) {
+    parentPrevText = memos[parentId].text;
+    memos[parentId].text = memos[parentId].text.split('\n')
+      .filter(l => !removedIds.some(rid => l.trim() === `[[${rid}]]`)).join('\n');
+  }
   saveMemos(); renderNoteWins();
-  const cnt = Object.keys(removed).length;
+  const cnt = removedIds.length;
   showToast(`메모 ${cnt}개 삭제됨`, () => {
     Object.assign(memos, removed);
+    if (parentPrevText !== null && memos[parentId]) memos[parentId].text = parentPrevText;
     saveMemos(); renderNoteWins();
   });
 }
@@ -4316,8 +4384,9 @@ function buildNoteWin(m) {
   win.appendChild(bodyWrap);
   renderNoteBody(m, bodyWrap, win, noteEditState[m.id] === true);
 
-  // ── 하위 메모 목록 ──
-  const kids = memoChildren(m.id);
+  // ── 하위 메모 목록 (본문에 페이지 링크로 박힌 자식은 제외) ──
+  const linkedIds = new Set([...m.text.matchAll(/^\s*\[\[([a-z0-9]+)\]\]\s*$/gm)].map(x => x[1]));
+  const kids = memoChildren(m.id).filter(c => !linkedIds.has(c.id));
   if (kids.length || !READ_ONLY) {
     const box = el('div', 'note-children');
     kids.forEach(c => {
@@ -4336,7 +4405,11 @@ function buildNoteWin(m) {
       const add = el('button', 'note-add-child', {textContent: '+ 하위 메모'});
       add.onclick = () => {
         const cid = createMemo(m.id);
-        if (cid) navigateNote(m.id, cid);
+        if (!cid) return;
+        // 노션처럼 본문에 페이지 링크 블록으로 삽입
+        m.text = (m.text.trim() ? m.text.replace(/\s+$/, '') + '\n' : '') + `[[${cid}]]\n`;
+        saveMemos();
+        navigateNote(m.id, cid);
       };
       box.appendChild(add);
     }
@@ -4346,9 +4419,12 @@ function buildNoteWin(m) {
   // 이미지 드래그앤드롭 첨부
   if (!READ_ONLY) {
     win.addEventListener('dragover', e => {
-      if ([...(e.dataTransfer?.types||[])].includes('Files')) e.preventDefault();
+      const types = [...(e.dataTransfer?.types||[])];
+      if (types.includes('text/note-block')) return; // 내부 블록 재배치는 뷰에서 처리
+      if (types.includes('Files')) e.preventDefault();
     });
     win.addEventListener('drop', async e => {
+      if ([...(e.dataTransfer?.types||[])].includes('text/note-block')) return;
       const files = [...(e.dataTransfer?.files||[])].filter(f => f.type.startsWith('image/'));
       if (!files.length) return;
       e.preventDefault();
@@ -4360,6 +4436,29 @@ function buildNoteWin(m) {
         renderNoteWins();
       }
     });
+  }
+
+  // 커스텀 리사이즈 핸들 (우하단 드래그로 자유 조절)
+  if (window.innerWidth > 768) {
+    const rh = el('div', 'note-resize', {title: '드래그해서 크기 조절'});
+    rh.addEventListener('mousedown', e => {
+      e.preventDefault(); e.stopPropagation();
+      bringNoteToFront(m.id);
+      const sx = e.clientX, sy = e.clientY, ow = win.offsetWidth, oh = win.offsetHeight;
+      const mv = ev => {
+        win.style.width = Math.max(240, Math.min(ow + ev.clientX - sx, window.innerWidth - 16)) + 'px';
+        win.style.height = Math.max(170, Math.min(oh + ev.clientY - sy, window.innerHeight - 16)) + 'px';
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+        m.w = win.offsetWidth; m.h = win.offsetHeight;
+        saveMemos();
+      };
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+    win.appendChild(rh);
   }
 
   // 리사이즈 추적 (CSS resize 핸들)
@@ -4446,7 +4545,49 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
         else { img.alt = '🖼 이미지는 첨부한 기기에서만 보여요'; img.classList.add('missing'); }
       });
     });
+    // 블록 드래그: 페이지 링크/이미지를 줄 사이로 이동 (그 외 요소의 네이티브 드래그 차단 → 이미지 복사 버그 수정)
+    view.addEventListener('dragstart', e => {
+      const blk = e.target.closest('.nv-page,.nv-imgblock');
+      if (!blk || READ_ONLY) { e.preventDefault(); return; }
+      e.dataTransfer.setData('text/note-block', JSON.stringify({memo: m.id, line: +blk.dataset.line}));
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    const clearDropMarks = () => view.querySelectorAll('.nv-drop-before,.nv-drop-after').forEach(x => x.classList.remove('nv-drop-before','nv-drop-after'));
+    view.addEventListener('dragover', e => {
+      if (![...e.dataTransfer.types].includes('text/note-block')) return;
+      e.preventDefault(); e.stopPropagation();
+      clearDropMarks();
+      const blk = e.target.closest('[data-line]');
+      if (blk) {
+        const r = blk.getBoundingClientRect();
+        blk.classList.add(e.clientY < r.top + r.height/2 ? 'nv-drop-before' : 'nv-drop-after');
+      }
+    });
+    view.addEventListener('dragleave', e => { if (e.target === view) clearDropMarks(); });
+    view.addEventListener('drop', e => {
+      if (![...e.dataTransfer.types].includes('text/note-block')) return;
+      e.preventDefault(); e.stopPropagation();
+      clearDropMarks();
+      if (READ_ONLY) return;
+      let data; try { data = JSON.parse(e.dataTransfer.getData('text/note-block')); } catch { return; }
+      if (data.memo !== m.id) return;
+      const blk = e.target.closest('[data-line]');
+      let to = m.text.split('\n').length;
+      if (blk) {
+        const r = blk.getBoundingClientRect();
+        to = +blk.dataset.line + (e.clientY < r.top + r.height/2 ? 0 : 1);
+      }
+      m.text = moveNoteLine(m.text, data.line, to);
+      saveMemos();
+      renderNoteBody(m, bodyWrap, win);
+    });
     view.addEventListener('click', e => {
+      const page = e.target.closest('.nv-page');
+      if (page) {
+        e.stopPropagation();
+        if (memos[page.dataset.note]) navigateNote(m.id, page.dataset.note);
+        return;
+      }
       const cb = e.target.closest('.nv-check');
       if (cb) {
         e.stopPropagation();
