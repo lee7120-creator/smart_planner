@@ -1604,45 +1604,62 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     body.appendChild(addSub);
   }
   item.appendChild(body);
-  const actions=el('div','task-actions');
-  if(!isSub){
-    const pomoBtn=el('button','task-act-btn',{textContent:'🍅',title:'25분 포모도로 시작'});
-    pomoBtn.onclick=e=>{e.stopPropagation();startPomodoroForTask(task.text);};
-    actions.appendChild(pomoBtn);
-    const editBtn=el('button','task-act-btn',{textContent:'✏️',title:'수정'});
-    editBtn.onclick=e=>{e.stopPropagation();openEdit(dk,task,isRepeatInst,originDk);};
-    actions.appendChild(editBtn);
-    const moveBtn=el('button','task-act-btn move',{textContent:'📅',title:isRepeatInst?'반복 일정 시작일 변경':'다른 날짜로 이동'});
-    moveBtn.onclick=e=>{
+
+  if(isSub){
+    // 하위 항목: 인라인 삭제 버튼만 (기능 버튼 없음 → 텍스트 폭 확보)
+    const actions=el('div','task-actions');
+    const delBtn=el('button','task-act-btn del',{textContent:'✕',title:'삭제'});
+    delBtn.onclick=e=>{
       e.stopPropagation();
-      if(isRepeatInst&&!confirm('반복 일정 전체의 시작일을 변경합니다. 계속할까요?'))return;
-      openMovePopup(actions,isRepeatInst?originDk:dk,task.id);
+      if(confirm('삭제할까요?')){ deleteTask(isRepeatInst?originDk:dk,parentId,task.id); }
     };
-    actions.appendChild(moveBtn);
-    if(!isRepeatInst){
-      const pstBtn=el('button','task-act-btn',{textContent:'⏭',title:'다음 영업일로 미루기'});
-      pstBtn.onclick=e=>{e.stopPropagation();postponeTask(dk,task.id);};
-      actions.appendChild(pstBtn);
-    }
+    actions.appendChild(delBtn);
+    item.appendChild(actions);
+    return item;
   }
-  if(!isSub){
-    const cmtBtn=el('button','task-act-btn',{textContent:'💬',title:'댓글'});
-    cmtBtn.onclick=e=>{e.stopPropagation();openComments(dk,task.id,isRepeatInst,originDk);};
-    actions.appendChild(cmtBtn);
-  }
-  const delBtn=el('button','task-act-btn del',{textContent:'✕',title:'삭제'});
-  delBtn.onclick=e=>{
-    e.stopPropagation();
-    if(!isSub&&(isRepeatInst||(task.repeat&&task.repeat!=='none'))){
+
+  // 상위 항목: 기능 아이콘들을 ⋯ 트레이(드롭다운)로 모아 가로 공간 확보
+  const actionsWrap=el('div','task-actions-wrap');
+  const moreBtn=el('button','task-more-btn',{textContent:'⋯',title:'작업 메뉴'});
+  moreBtn.setAttribute('aria-label','작업 메뉴 열기');
+  const tray=el('div','task-actions-tray hidden');
+  const closeTray=()=>tray.classList.add('hidden');
+  const trayItem=(icon,label,extraCls,handler)=>{
+    const b=el('button',`tray-item${extraCls?' '+extraCls:''}`,{type:'button'});
+    b.appendChild(el('span','tray-ico',{textContent:icon}));
+    b.appendChild(el('span',null,{textContent:label}));
+    b.onclick=e=>{e.stopPropagation();closeTray();handler(e);};
+    tray.appendChild(b);
+    return b;
+  };
+  trayItem('🍅','포모도로 시작',null,()=>startPomodoroForTask(task.text));
+  trayItem('✏️','수정',null,()=>openEdit(dk,task,isRepeatInst,originDk));
+  trayItem('📅',isRepeatInst?'반복 시작일 변경':'다른 날짜로 이동',null,()=>{
+    if(isRepeatInst&&!confirm('반복 일정 전체의 시작일을 변경합니다. 계속할까요?'))return;
+    openMovePopup(actionsWrap,isRepeatInst?originDk:dk,task.id);
+  });
+  if(!isRepeatInst) trayItem('⏭','다음 영업일로 미루기',null,()=>postponeTask(dk,task.id));
+  trayItem('💬','댓글',null,()=>openComments(dk,task.id,isRepeatInst,originDk));
+  trayItem('✕','삭제','del',()=>{
+    if(isRepeatInst||(task.repeat&&task.repeat!=='none')){
       openRepeatDel(isRepeatInst?originDk:dk, task.id, dk);
     } else if(confirm('삭제할까요?')) {
-      const tDk=isRepeatInst?originDk:dk;
-      if(isSub) deleteTask(tDk,parentId,task.id);
-      else deleteTask(tDk,task.id,null);
+      deleteTask(isRepeatInst?originDk:dk,task.id,null);
+    }
+  });
+  moreBtn.onclick=e=>{
+    e.stopPropagation();
+    closeMovePopup();
+    const willOpen=tray.classList.contains('hidden');
+    document.querySelectorAll('.task-actions-tray:not(.hidden)').forEach(t=>t.classList.add('hidden'));
+    if(willOpen){
+      tray.classList.remove('hidden');
+      setTimeout(()=>document.addEventListener('click',closeTray,{once:true}),0);
     }
   };
-  actions.appendChild(delBtn);
-  item.appendChild(actions);
+  actionsWrap.appendChild(moreBtn);
+  actionsWrap.appendChild(tray);
+  item.appendChild(actionsWrap);
   return item;
 }
 

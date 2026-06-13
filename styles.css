@@ -154,7 +154,10 @@
     @keyframes cbPop { 0%{transform:scale(.6)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
 
     .task-body { flex:1; min-width:0; }
-    .task-text { font-size:13px; line-height:1.5; word-break:break-word; color:var(--text); }
+    /* 한글은 keep-all로 어절(띄어쓰기) 단위 줄바꿈 → 좁은 컬럼에서 한 글자씩 세로로 깨지지 않음.
+       overflow-wrap:break-word는 min-content를 줄이지 않아(anywhere와 달리) 어절 단위를 유지하면서
+       한 줄에 도저히 안 들어가는 긴 토큰만 예외로 끊는다 */
+    .task-text { font-size:13px; line-height:1.5; word-break:keep-all; overflow-wrap:break-word; color:var(--text); }
     .task-text.done { text-decoration:line-through; color:var(--text3); }
 
     .repeat-badge {
@@ -177,6 +180,32 @@
     .task-act-btn:hover { background:var(--border); color:var(--text); }
     .task-act-btn.del:hover { background:var(--red); color:#fff; }
     .task-act-btn.move:hover { background:var(--primary-l); color:var(--primary); }
+
+    /* ─── 상위 태스크 작업 메뉴 트레이 (⋯) ─── */
+    .task-actions-wrap { position:relative; flex-shrink:0; display:flex; align-items:flex-start; }
+    .task-more-btn {
+      width:20px; height:20px; border:none; background:none; cursor:pointer; border-radius:4px;
+      font-size:14px; line-height:1; color:var(--text3); display:flex; align-items:center; justify-content:center;
+      transition:all .12s; opacity:.5;
+    }
+    .task-item:hover .task-more-btn { opacity:1; }
+    .task-more-btn:hover { background:var(--border); color:var(--text); }
+    .task-actions-tray {
+      position:absolute; right:0; top:100%; z-index:400; margin-top:2px;
+      background:var(--surface); border:1px solid var(--border); border-radius:10px;
+      box-shadow:var(--shadow-lg,0 10px 25px rgba(0,0,0,.15)); padding:5px;
+      display:flex; flex-direction:column; gap:1px; min-width:148px;
+    }
+    .task-actions-tray.hidden { display:none; }
+    .tray-item {
+      display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:7px;
+      font-size:12px; color:var(--text); cursor:pointer; border:none; background:none;
+      font-family:inherit; text-align:left; width:100%; white-space:nowrap; transition:background .1s;
+    }
+    .tray-item:hover { background:var(--surface2); }
+    .tray-item.del { color:var(--red); }
+    .tray-item.del:hover { background:var(--red); color:#fff; }
+    .tray-ico { width:16px; text-align:center; flex-shrink:0; }
 
     /* ─── Move popup ─── */
     .move-popup {
@@ -621,6 +650,11 @@
       /* Always show action buttons on mobile (no hover) */
       .task-actions { opacity:1; }
       .task-act-btn { width:28px; height:28px; font-size:14px; }
+      /* 모바일: ⋯ 트레이 버튼 항상 노출 + 터치 영역 확대 */
+      .task-more-btn { opacity:1; width:28px; height:28px; font-size:18px; }
+      /* 하위 항목 들여쓰기 축소로 텍스트 폭 확보 */
+      .task-item.sub { margin-left:12px; }
+      .tray-item { padding:9px 12px; font-size:13px; }
 
       /* Add task button */
       .add-task-btn { padding:10px; font-size:13px; margin:8px; width:calc(100% - 16px); }
