@@ -136,6 +136,14 @@
     .task-item:hover { background:var(--surface2); box-shadow:0 1px 4px rgba(0,0,0,.05); }
     .task-item:hover .task-actions { opacity:1; }
 
+    /* 중요도(우선순위)에 따른 배경색 — 높음:빨강 / 보통:노랑 / 낮음:초록 */
+    .task-item.prio-high { background:color-mix(in srgb, var(--red) 9%, transparent); }
+    .task-item.prio-mid  { background:color-mix(in srgb, var(--yellow) 13%, transparent); }
+    .task-item.prio-low  { background:color-mix(in srgb, var(--green) 9%, transparent); }
+    .task-item.prio-high:hover { background:color-mix(in srgb, var(--red) 16%, transparent); }
+    .task-item.prio-mid:hover  { background:color-mix(in srgb, var(--yellow) 20%, transparent); }
+    .task-item.prio-low:hover  { background:color-mix(in srgb, var(--green) 16%, transparent); }
+
     .task-star { font-size:13px; cursor:pointer; color:var(--border); flex-shrink:0; margin-top:2px; transition:color .15s,transform .15s; user-select:none; }
     .task-star.on { color:var(--yellow); }
     .task-star:hover { transform:scale(1.2); color:var(--yellow); }
@@ -873,6 +881,23 @@
       padding:3px 8px; font-size:11px; cursor:pointer; color:var(--text3); font-family:inherit; white-space:nowrap;
     }
     .share-toggle.on { background:var(--primary-l); color:var(--primary); border-color:var(--primary); font-weight:600; }
+
+    /* ─── 태스크 보내기 모달 (검색·복수선택) ─── */
+    .send-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+    .send-chip {
+      display:inline-flex; align-items:center; gap:4px; background:var(--primary-l); color:var(--primary);
+      border-radius:14px; padding:3px 6px 3px 10px; font-size:12px; font-weight:600;
+    }
+    .send-chip button { border:none; background:none; cursor:pointer; color:var(--primary); font-size:13px; line-height:1; padding:0 2px; }
+    .send-results { display:flex; flex-direction:column; gap:3px; max-height:34vh; overflow-y:auto; }
+    .send-result-item {
+      display:flex; align-items:center; gap:6px; padding:8px 10px; border-radius:8px; border:none;
+      background:var(--surface2); color:var(--text); cursor:pointer; font-size:13px; font-family:inherit;
+      text-align:left; width:100%; transition:background .1s;
+    }
+    .send-result-item:hover { background:var(--primary-l); color:var(--primary); }
+    .send-add-typed { background:none; border:1px dashed var(--border); color:var(--primary); font-weight:600; }
+    .send-empty { padding:10px; text-align:center; color:var(--text3); font-size:12px; line-height:1.6; }
     .repeat-adjusted-badge {
       display:inline-flex; align-items:center; gap:2px; font-size:9px;
       color:var(--orange); background:color-mix(in srgb, var(--orange) 12%, transparent);

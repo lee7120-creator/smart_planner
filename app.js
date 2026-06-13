@@ -1480,7 +1480,8 @@ function el(tag,cls,attrs){const e=document.createElement(tag);if(cls)e.classNam
 
 // ── Task item builder ──
 function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
-  const item=el('div',`task-item${isSub?' sub':''}`);
+  const prioCls = (!isSub && task.priority) ? ' prio-'+task.priority : '';
+  const item=el('div',`task-item${isSub?' sub':''}${prioCls}`);
   const checked=isRepeatInst?isRepeatChecked(task,instanceDk):task.checked;
   if(!isSub&&!READ_ONLY){
     item.draggable=true;
@@ -3866,8 +3867,118 @@ function sendTaskToUser(dk, taskId) {
     .catch(() => showUndoToast('⚠️ 전송 실패 — 네트워크를 확인해주세요'));
 }
 document.getElementById('editSendBtn').onclick = () => {
-  if (editCtx) sendTaskToUser(editCtx.dk, editCtx.taskId);
+  if (editCtx) openSendModal(editCtx.dk, editCtx.taskId);
 };
+
+// ── 사용자 디렉터리 (전체 사용자 검색용) ──
+function sanitizeId(s){ return (s||'').replace(/[.#$\[\]\/]/g,'').trim().slice(0,40); }
+function userDirFbRef(){
+  const key = sanitizeId(USER_ID);
+  return (fbDb && key && USER_ID !== 'demo') ? fbDb.ref('userDirectory/' + key) : null;
+}
+function registerUserDirectory(){
+  const ref = userDirFbRef(); if (!ref) return;
+  ref.set({ name: USER_ID, ts: Date.now() }).catch(()=>{});
+}
+let _userDirCache = [];
+function fetchUserDirectory(cb){
+  if (!fbDb) { cb(_userDirCache); return; }
+  fbDb.ref('userDirectory').once('value').then(snap => {
+    const v = snap.val() || {};
+    _userDirCache = Object.keys(v).filter(id => id && id !== sanitizeId(USER_ID));
+    cb(_userDirCache);
+  }).catch(() => cb(_userDirCache));
+}
+
+// ── 태스크 보내기 모달 (검색·복수선택, 수락 필요) ──
+let sendCtx = null;          // {dk, taskId}
+let sendSelected = [];       // 선택된 받는 사람 id 목록
+let sendDirIds = [];         // 디렉터리 전체 id
+function openSendModal(dk, taskId){
+  if (!fbDb) { showUndoToast('⚠️ 오프라인 상태예요'); return; }
+  if (!USER_ID || USER_ID === 'demo') { showUndoToast('내 캘린더 URL(?u=이름)에서만 보낼 수 있어요'); return; }
+  const t = (tasks[dk] || []).find(x => x.id === taskId); if (!t) return;
+  sendCtx = { dk, taskId };
+  sendSelected = [];
+  sendDirIds = [];
+  document.getElementById('sendTaskName').textContent = t.text;
+  document.getElementById('sendSearchInput').value = '';
+  renderSendChips();
+  document.getElementById('sendResults').innerHTML = '<div class="send-empty">불러오는 중…</div>';
+  document.getElementById('sendModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('sendSearchInput').focus(), 60);
+  fetchUserDirectory(ids => { sendDirIds = ids; renderSendResults(); });
+}
+function closeSendModal(){ document.getElementById('sendModal').classList.add('hidden'); sendCtx = null; }
+function renderSendChips(){
+  const box = document.getElementById('sendSelected'); box.innerHTML = '';
+  sendSelected.forEach(id => {
+    const chip = el('span', 'send-chip', { textContent: '👤 ' + id });
+    const x = el('button', null, { type:'button', textContent: '✕', title: '제거' });
+    x.onclick = () => { sendSelected = sendSelected.filter(s => s !== id); renderSendChips(); renderSendResults(); };
+    chip.appendChild(x); box.appendChild(chip);
+  });
+}
+function renderSendResults(){
+  const q = sanitizeId(document.getElementById('sendSearchInput').value).toLowerCase();
+  const box = document.getElementById('sendResults'); box.innerHTML = '';
+  let list = sendDirIds.filter(id => !sendSelected.includes(id));
+  if (q) list = list.filter(id => id.toLowerCase().includes(q));
+  // 검색어로 직접 추가 (디렉터리에 없는 사람도 보낼 수 있게)
+  const typed = sanitizeId(document.getElementById('sendSearchInput').value);
+  if (typed && typed !== USER_ID && !sendSelected.includes(typed) && !sendDirIds.some(id => id.toLowerCase() === typed.toLowerCase())) {
+    const add = el('button', 'send-result-item send-add-typed', { textContent: `+ "${typed}" 직접 추가` });
+    add.onclick = () => { sendSelected.push(typed); document.getElementById('sendSearchInput').value=''; renderSendChips(); renderSendResults(); };
+    box.appendChild(add);
+  }
+  if (!sendDirIds.length && !typed) {
+    box.appendChild(el('div', 'send-empty', { textContent: '아직 등록된 사용자가 없어요. 상대가 자기 캘린더(?u=이름)를 한 번 열면 검색에 나타나요. 이름을 직접 입력해 보낼 수도 있어요.' }));
+    return;
+  }
+  list.slice(0, 60).forEach(id => {
+    const row = el('button', 'send-result-item', { type:'button', textContent: '👤 ' + id });
+    row.onclick = () => { sendSelected.push(id); document.getElementById('sendSearchInput').value=''; renderSendChips(); renderSendResults(); };
+    box.appendChild(row);
+  });
+  if (!list.length && typed) { /* 직접추가 버튼만 노출된 상태 */ }
+  else if (!list.length) box.appendChild(el('div', 'send-empty', { textContent: '검색 결과가 없어요' }));
+}
+function confirmSend(){
+  if (!sendCtx) return;
+  const typed = sanitizeId(document.getElementById('sendSearchInput').value);
+  if (typed && typed !== USER_ID && !sendSelected.includes(typed)) sendSelected.push(typed);
+  const recipients = [...new Set(sendSelected.filter(id => id && id !== USER_ID))];
+  if (!recipients.length) { showUndoToast('받는 사람을 선택하세요'); return; }
+  const { dk, taskId } = sendCtx;
+  const t = (tasks[dk] || []).find(x => x.id === taskId);
+  if (!t) { closeSendModal(); return; }
+  let done = 0, fail = 0;
+  Promise.all(recipients.map(to => {
+    const copy = {
+      id: uid(), text: t.text, checked: false, starred: !!t.starred,
+      color: t.color || null, repeat: 'none', priority: t.priority || null,
+      time: t.time || null, memo: t.memo || '', completions: {}, skips: {},
+      subs: (t.subs || []).map(s => ({ id: uid(), text: s.text, checked: false, starred: false, color: null, subs: [] })),
+      from: USER_ID, pending: true,
+    };
+    const ref = fbDb.ref(`users/${to}/tasks/${dk}`);
+    return ref.once('value').then(snap => {
+      const raw = snap.val();
+      const list = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw || {});
+      list.push(copy);
+      return ref.set(list);
+    }).then(() => { done++; }).catch(() => { fail++; });
+  })).then(() => {
+    closeSendModal();
+    if (done) showUndoToast(`👥 ${done}명에게 보냈어요 — 상대가 수락하면 추가돼요`);
+    if (fail) showUndoToast(`⚠️ ${fail}명 전송 실패 — 네트워크를 확인해주세요`);
+  });
+}
+document.getElementById('sendCancelBtn').onclick = closeSendModal;
+document.getElementById('sendConfirmBtn').onclick = confirmSend;
+document.getElementById('sendModal').onclick = e => { if (e.target === document.getElementById('sendModal')) closeSendModal(); };
+document.getElementById('sendSearchInput').addEventListener('input', renderSendResults);
+document.getElementById('sendSearchInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); confirmSend(); } });
 
 // ═══════════════════════════════════════
 // 🎯 목표 & 연속달성(streak)
@@ -4297,6 +4408,7 @@ renderNoteWins();
 initMemoSync();
 initOffSync();
 initShareSync();
+registerUserDirectory();
 initGoalSync();
 rebuildIcsEvents();
 setInterval(()=>{ if(fbRef()) fbUpload(); }, 5*60*1000);
