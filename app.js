@@ -378,6 +378,7 @@ function initFirebaseSync() {
         tasks = normalizeTasks(remote);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
         render();
+        if (typeof checkPendingNotifications === 'function') checkPendingNotifications();
       }
     });
   }).catch(() => setSyncStatus('offline'));
@@ -2479,6 +2480,7 @@ if (_celebrateOverlayEl) _celebrateOverlayEl.onclick = hideCelebration;
 let _renderedWeekKey=null, _weekScroll={key:null,left:0};
 function render(){
   _repeatCache.clear();  // 반복 일정 캐시 무효화(상태 변경 후 매 렌더 시작)
+  if(typeof updatePendingBadge==='function') updatePendingBadge();
   const view=document.getElementById('mainView');
   // 모바일 주간뷰: 다시 그리기 전에 현재 가로 스크롤 위치 저장 (체크/별표 시 화면 점프 방지)
   if(window.innerWidth<=768){
@@ -2624,8 +2626,9 @@ document.addEventListener('click',e=>{
 });
 
 // ── Notifications: 9시 오늘할일 / 마감 1시간 전 / 17시 미완료 ──
-const NOTIFY_HOUR = 9;       // 아침 요약
-const NOTIFY_EVENING = 17;   // 저녁 미완료 리마인드
+let NOTIFY_HOUR = (()=>{ const v=parseInt(localStorage.getItem('notifyMorningHour'),10); return isNaN(v)?9:v; })();      // 아침 요약
+let NOTIFY_EVENING = (()=>{ const v=parseInt(localStorage.getItem('notifyEveningHour'),10); return isNaN(v)?17:v; })();  // 저녁 미완료 리마인드
+let NOTIFY_LEAD = (()=>{ const v=parseInt(localStorage.getItem('notifyLeadMin'),10); return isNaN(v)?60:v; })();         // 마감 N분 전
 function notifyAllowed() {
   return localStorage.getItem('notifyEnabled')==='true'
     && 'Notification' in window && Notification.permission==='granted';
@@ -2728,14 +2731,55 @@ function checkTimeNotifications(){
     if(state.ids.includes(c.id))return;
     const [h,m]=c.time.split(':').map(Number);
     const remainMin=(h*60+m)-nowMin; // 마감까지 남은 분
-    if(remainMin<=60&&remainMin>=0){
-      const msg=remainMin===0?'지금 마감 시간입니다':remainMin<=5?'곧 마감입니다':`마감 1시간 전입니다 (${c.time} 마감)`;
+    if(remainMin<=NOTIFY_LEAD&&remainMin>=0){
+      const msg=remainMin===0?'지금 마감 시간입니다':remainMin<=5?'곧 마감입니다':`마감 ${remainMin}분 전입니다 (${c.time} 마감)`;
       new Notification('⏰ '+c.text,{body:msg});
       state.ids.push(c.id);
     }
   });
   localStorage.setItem('timeNotified',JSON.stringify(state));
 }
+
+// 받은 일정(pending) 도착 알림 + 제목 배지
+function updatePendingBadge(){
+  let cnt=0;
+  Object.values(tasks).forEach(list=>{ if(Array.isArray(list)) list.forEach(t=>{ if(t&&t.pending) cnt++; }); });
+  document.title = (cnt>0 ? `(${cnt}) ` : '') + '마이플래너';
+}
+function checkPendingNotifications(){
+  if(READ_ONLY) return;
+  let seen=[]; try{ seen=JSON.parse(localStorage.getItem('pendingNotified')||'[]'); }catch{}
+  const seenSet=new Set(seen);
+  const current=[], fresh=[];
+  Object.entries(tasks).forEach(([dk,list])=>{
+    if(!Array.isArray(list)) return;
+    list.forEach(t=>{ if(t&&t.pending){ current.push(t.id); if(!seenSet.has(t.id)) fresh.push({text:t.text,from:t.from}); } });
+  });
+  if(fresh.length && notifyAllowed()){
+    try{ new Notification('👤 받은 일정 '+fresh.length+'건', {body: fresh.map(x=>`· ${x.from||'누군가'}: ${x.text}`).join('\n').slice(0,180)}); }catch(e){}
+  }
+  localStorage.setItem('pendingNotified', JSON.stringify(current));
+  updatePendingBadge();
+}
+
+// 알림 시간 설정
+const _notifySettingsBtn = document.getElementById('notifySettingsBtn');
+if (_notifySettingsBtn) _notifySettingsBtn.onclick = () => {
+  document.getElementById('moreMenu').classList.add('hidden');
+  const mh = prompt('아침 요약 알림 시각 (0~23시)', NOTIFY_HOUR);
+  if (mh === null) return;
+  const eh = prompt('저녁 미완료 리마인드 시각 (0~23시)', NOTIFY_EVENING);
+  if (eh === null) return;
+  const lead = prompt('마감 몇 분 전에 알릴까요? (분)', NOTIFY_LEAD);
+  if (lead === null) return;
+  const mhi = Math.max(0, Math.min(23, parseInt(mh, 10)));
+  const ehi = Math.max(0, Math.min(23, parseInt(eh, 10)));
+  const li = Math.max(1, Math.min(1440, parseInt(lead, 10)));
+  if (!isNaN(mhi)) { NOTIFY_HOUR = mhi; localStorage.setItem('notifyMorningHour', mhi); }
+  if (!isNaN(ehi)) { NOTIFY_EVENING = ehi; localStorage.setItem('notifyEveningHour', ehi); }
+  if (!isNaN(li)) { NOTIFY_LEAD = li; localStorage.setItem('notifyLeadMin', li); }
+  alert(`알림 시간을 저장했어요.\n· 아침 ${NOTIFY_HOUR}시 · 저녁 ${NOTIFY_EVENING}시 · 마감 ${NOTIFY_LEAD}분 전`);
+};
 
 setInterval(checkNotificationSchedule, 60*1000);
 checkNotificationSchedule();
