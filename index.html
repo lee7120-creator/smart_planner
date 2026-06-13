@@ -606,8 +606,10 @@
       .view-toggle { order:2; flex-wrap:wrap; }
       .nav-group { order:3; flex:1; justify-content:flex-end; gap:4px; }
       .search-wrap { order:5; max-width:100%; flex:1 1 100%; }
-      .header-actions { order:4; margin-left:0; gap:6px; }
-      .user-chip { max-width:110px; }
+      .header-actions { order:4; margin-left:0; gap:4px; }
+      /* 기본 .user-chip(max-width:180px)가 소스 순서상 뒤에 와서 덮어쓰므로 명시도를 높여 모바일 캡 적용 */
+      .header-actions .user-chip { max-width:96px; padding:4px 8px; gap:4px; }
+      .header-actions .icon-btn { width:28px; height:28px; font-size:14px; }
       .progress-pill { display:none; }
       .week-label { font-size:12px; min-width:unset; }
       .nav-btn { padding:5px 10px; font-size:12px; }
@@ -1195,9 +1197,9 @@
     .user-chip {
       display:flex; align-items:center; gap:5px; background:var(--primary-l);
       border-radius:20px; padding:4px 10px; font-size:12px; font-weight:600;
-      color:var(--primary); white-space:nowrap; max-width:180px; overflow:hidden;
+      color:var(--primary); white-space:nowrap; max-width:180px; overflow:hidden; min-width:0;
     }
-    .user-chip span { overflow:hidden; text-overflow:ellipsis; }
+    .user-chip span { display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; min-width:0; }
     .more-menu-wrap { position:relative; }
     .more-menu {
       position:absolute; top:calc(100% + 6px); right:0; z-index:60;
@@ -1224,6 +1226,39 @@
     .sync-dot.syncing { background:var(--orange); animation:pulse .8s infinite; }
     .sync-dot.offline { background:var(--red); }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ─── 당일 완료 축하 ─── */
+    .celebrate-overlay {
+      position:fixed; inset:0; z-index:960; display:flex; align-items:center; justify-content:center;
+      pointer-events:none; opacity:0; visibility:hidden; transition:opacity .25s, visibility .25s;
+      background:rgba(0,0,0,.28);
+    }
+    .celebrate-overlay.show { opacity:1; visibility:visible; pointer-events:auto; }
+    .celebrate-confetti { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+    .confetti-piece {
+      position:absolute; top:-24px; width:10px; height:14px; border-radius:2px;
+      opacity:.95; will-change:transform; animation:confetti-fall linear forwards;
+    }
+    @keyframes confetti-fall {
+      0%   { transform:translateY(-24px) rotateZ(0deg);   opacity:1; }
+      100% { transform:translateY(104vh)  rotateZ(720deg); opacity:.85; }
+    }
+    .celebrate-card {
+      position:relative; background:var(--surface); border-radius:20px; padding:30px 40px;
+      box-shadow:var(--shadow-md); text-align:center; max-width:80vw;
+      transform:scale(.55); opacity:0; transition:transform .42s cubic-bezier(.18,.89,.32,1.28), opacity .28s;
+    }
+    .celebrate-overlay.show .celebrate-card { transform:scale(1); opacity:1; }
+    .celebrate-emoji { font-size:58px; line-height:1; animation:celebrate-bounce .6s ease-in-out infinite alternate; }
+    .celebrate-title { font-size:22px; font-weight:800; color:var(--text); margin-top:10px; }
+    .celebrate-sub { font-size:13px; color:var(--text2); margin-top:6px; }
+    @keyframes celebrate-bounce { from{transform:translateY(0)} to{transform:translateY(-12px)} }
+
+    @media (prefers-reduced-motion: reduce) {
+      .confetti-piece { display:none; }
+      .celebrate-emoji { animation:none; }
+      .celebrate-card { transition:opacity .2s; transform:none; }
+    }
   </style>
 </head>
 <body>
@@ -1610,6 +1645,16 @@
   <div class="pomodoro-controls">
     <button class="pomodoro-ctrl-btn" id="pomodoroStartBtn">시작</button>
     <button class="pomodoro-ctrl-btn" id="pomodoroResetBtn">리셋</button>
+  </div>
+</div>
+
+<!-- 당일 할 일 전부 완료 시 축하 -->
+<div class="celebrate-overlay" id="celebrateOverlay" aria-hidden="true">
+  <div class="celebrate-confetti" id="celebrateConfetti"></div>
+  <div class="celebrate-card" role="alertdialog" aria-label="축하">
+    <div class="celebrate-emoji" id="celebrateEmoji">🎉</div>
+    <div class="celebrate-title" id="celebrateTitle"></div>
+    <div class="celebrate-sub" id="celebrateSub"></div>
   </div>
 </div>
 
@@ -3929,6 +3974,97 @@ function calcProgress(){
   return {total,done};
 }
 
+// ── 당일 완료 축하 ──
+const CELEBRATE_MSGS = [
+  ['오늘 할 일 끝!', '완벽한 하루를 보냈어요 🙌'],
+  ['전부 완료! 🎉', '오늘의 목표를 모두 달성했어요'],
+  ['수고했어요!', '깔끔하게 비운 오늘, 멋져요 ✨'],
+  ['올 클리어! 🏆', '이 기세 그대로 내일도 화이팅'],
+  ['굿잡! 👏', '미루지 않고 다 해낸 당신, 최고예요'],
+];
+const CELEBRATE_EMOJIS = ['🎉','🎊','🥳','🏆','✨','🙌','💪'];
+let _celebrateArmed = false;   // 최초 렌더(로드)에서는 축하 띄우지 않음
+let _celebratedDayKey = null;  // 오늘 축하했는지(다시 미완료되면 해제 → 재완료 시 재발동)
+let _celebrateTimer = null;
+
+// 오늘 하루치 진행률 — calcProgress의 하루 집계 로직과 동일하게 계산
+function todayProgress() {
+  const d = today();
+  const i = dateToDayIdx(d);
+  const dk = dateKey(d);
+  let total = 0, done = 0;
+  (tasks[dk]||[]).forEach(t => {
+    if (!t) return;
+    total++; if (t.checked) done++;
+    (t.subs||[]).forEach(s => { total++; if (s.checked) done++; });
+  });
+  try {
+    getRepeatTasksForDate(d, i).forEach(({task, instanceDk}) => {
+      total++; if (isRepeatChecked(task, instanceDk)) done++;
+    });
+  } catch (e) {}
+  return { total, done };
+}
+
+function maybeCelebrate() {
+  const tk = todayKey();
+  const { total, done } = todayProgress();
+  const allDone = total > 0 && done === total;
+  if (!_celebrateArmed) {            // 페이지 로드 직후: 상태만 기록, 팝업 억제
+    _celebrateArmed = true;
+    if (allDone) _celebratedDayKey = tk;
+    return;
+  }
+  if (allDone) {
+    if (_celebratedDayKey !== tk) { _celebratedDayKey = tk; showCelebration(); }
+  } else if (_celebratedDayKey === tk) {
+    _celebratedDayKey = null;        // 다시 할 일이 생기거나 체크 해제 → 재발동 허용
+  }
+}
+
+function showCelebration() {
+  const overlay = document.getElementById('celebrateOverlay');
+  if (!overlay) return;
+  const [title, sub] = CELEBRATE_MSGS[Math.floor(Math.random()*CELEBRATE_MSGS.length)];
+  document.getElementById('celebrateEmoji').textContent = CELEBRATE_EMOJIS[Math.floor(Math.random()*CELEBRATE_EMOJIS.length)];
+  document.getElementById('celebrateTitle').textContent = title;
+  document.getElementById('celebrateSub').textContent = sub;
+  spawnConfetti();
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden','false');
+  clearTimeout(_celebrateTimer);
+  _celebrateTimer = setTimeout(hideCelebration, 3600);
+}
+
+function hideCelebration() {
+  const overlay = document.getElementById('celebrateOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden','true');
+  clearTimeout(_celebrateTimer);
+  setTimeout(() => { const c=document.getElementById('celebrateConfetti'); if(c) c.innerHTML=''; }, 300);
+}
+
+function spawnConfetti() {
+  const box = document.getElementById('celebrateConfetti');
+  if (!box) return;
+  box.innerHTML = '';
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#1a73e8','#43a047','#e53935','#fb8c00','#f9a825','#8e24aa','#00acc1'];
+  const n = 90;
+  for (let i = 0; i < n; i++) {
+    const p = el('div','confetti-piece');
+    p.style.left = Math.random()*100 + '%';
+    p.style.background = colors[i % colors.length];
+    p.style.animationDuration = (2 + Math.random()*1.6) + 's';
+    p.style.animationDelay = (Math.random()*0.5) + 's';
+    if (Math.random() < 0.5) p.style.borderRadius = '50%';
+    box.appendChild(p);
+  }
+}
+const _celebrateOverlayEl = document.getElementById('celebrateOverlay');
+if (_celebrateOverlayEl) _celebrateOverlayEl.onclick = hideCelebration;
+
 // ── Render ──
 let _renderedWeekKey=null, _weekScroll={key:null,left:0};
 function render(){
@@ -4007,6 +4143,8 @@ function render(){
   if(activeInput){
     setTimeout(()=>{const inp=document.getElementById(`inp-${activeInput.dataKey||activeInput.dateKey}-${activeInput.parentId||'main'}`);if(inp)inp.focus();},30);
   }
+  // 당일 할 일 전부 완료 시 축하 (미완료→완료 전환 순간에만)
+  if(!READ_ONLY) maybeCelebrate();
 }
 
 // ── Nav ──
