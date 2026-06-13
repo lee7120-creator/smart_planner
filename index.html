@@ -64,16 +64,16 @@
   </div>
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
-    <div class="sync-dot offline" id="syncDot" title="동기화 상태" style="display:none"></div>
-    <button class="icon-btn" id="guideBtn" title="사용 가이드">❓</button>
+    <div class="sync-dot offline" id="syncDot" title="동기화 상태" role="status" aria-live="polite" aria-label="동기화 상태" style="display:none"></div>
+    <button class="icon-btn" id="guideBtn" title="사용 가이드" aria-label="사용 가이드">❓</button>
     <button class="save-btn" id="forceSyncBtn" style="display:none" title="지금 바로 저장">☁️ <span>저장</span></button>
     <div class="more-menu-wrap">
-      <button class="icon-btn" id="notesBtn" title="메모장 (빈 곳 더블클릭으로도 생성)">📝</button>
+      <button class="icon-btn" id="notesBtn" title="메모장 (빈 곳 더블클릭으로도 생성)" aria-label="메모장 열기">📝</button>
       <div class="more-menu hidden" id="notesMenu"></div>
     </div>
-    <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
+    <button class="icon-btn" id="darkBtn" title="다크 모드" aria-label="다크 모드 전환">🌙</button>
     <div class="more-menu-wrap">
-      <button class="icon-btn" id="moreBtn" title="더보기">⋯</button>
+      <button class="icon-btn" id="moreBtn" title="더보기" aria-label="더보기 메뉴" aria-haspopup="true">⋯</button>
       <div class="more-menu hidden" id="moreMenu">
         <button class="more-menu-item" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
         <button class="more-menu-item" id="shareRoBtn" style="display:none">👁 <span>읽기전용 링크 복사</span></button>
@@ -190,7 +190,7 @@
 
 <!-- Memo Popup -->
 <div class="memo-overlay hidden" id="memoOverlay">
-  <div class="memo-popup" id="memoPopup">
+  <div class="memo-popup" id="memoPopup" role="dialog" aria-modal="true" aria-label="메모">
     <div class="memo-header" id="memoHeader" title="드래그해서 이동">
       <span class="memo-icon">📝</span>
       <span class="memo-task-title" id="memoTitle"></span>
@@ -215,7 +215,7 @@
 
 <!-- Edit Modal -->
 <div class="modal-overlay hidden" id="editModal">
-  <div class="modal-box">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="태스크 수정">
     <div class="modal-title">태스크 수정</div>
     <input class="modal-input" id="editInput" type="text" placeholder="할 일 내용">
     <div class="modal-row">
@@ -404,7 +404,7 @@
 
 
 <!-- Undo Toast -->
-<div class="undo-toast hidden" id="undoToast">
+<div class="undo-toast hidden" id="undoToast" role="status" aria-live="polite">
   <span id="undoMsg"></span>
   <button id="undoBtn">실행 취소</button>
 </div>

@@ -2,7 +2,7 @@
       /* 라이트: 살짝 따뜻한 회백 배경 + 진회색 텍스트 (순흑 대비보다 눈이 편함) */
       --bg:#f3f5f8; --surface:#ffffff; --surface2:#f4f6f9; --surface3:#e8ecf1;
       --border:#e4e8ee; --border2:#eef1f5;
-      --text:#2a3342; --text2:#5b6678; --text3:#9aa3b2;
+      --text:#2a3342; --text2:#5b6678; --text3:#6b7280;
       --primary:#5b6cf0; --primary-h:#4856d8; --primary-l:#eef0fe;
       --green:#16a37a; --red:#e35454; --orange:#ee8434; --yellow:#e8a521;
       --shadow:0 1px 3px rgba(35,45,65,.05),0 1px 2px rgba(35,45,65,.04);
@@ -13,7 +13,7 @@
       /* 다크: 순흑 대신 짙은 청회색 + 순백 대신 밝은 회백 텍스트 (눈부심 감소) */
       --bg:#14181f; --surface:#1d232c; --surface2:#272f3a; --surface3:#14181f;
       --border:#333c49; --border2:#232a34;
-      --text:#e6eaf0; --text2:#9aa6b5; --text3:#5d6878;
+      --text:#e6eaf0; --text2:#9aa6b5; --text3:#8a94a6;
       --primary:#8b97f5; --primary-h:#6d7bee; --primary-l:#262b48;
       --green:#2cb893; --red:#e57373; --orange:#ef9a55; --yellow:#e0b13e;
       --shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2);
@@ -1300,8 +1300,17 @@
     .celebrate-sub { font-size:13px; color:var(--text2); margin-top:6px; }
     @keyframes celebrate-bounce { from{transform:translateY(0)} to{transform:translateY(-12px)} }
 
+    .task-cb:focus-visible, .task-star:focus-visible, .task-text-wrap:focus-visible,
+    .icon-btn:focus-visible, .more-menu-item:focus-visible, .view-btn:focus-visible,
+    button:focus-visible, [role="button"]:focus-visible, [tabindex]:focus-visible {
+      outline:2px solid var(--primary); outline-offset:2px; border-radius:6px;
+    }
     @media (prefers-reduced-motion: reduce) {
       .confetti-piece { display:none; }
       .celebrate-emoji { animation:none; }
       .celebrate-card { transition:opacity .2s; transform:none; }
+      *, *::before, *::after {
+        animation-duration:.001ms !important; animation-iteration-count:1 !important;
+        transition-duration:.001ms !important; scroll-behavior:auto !important;
+      }
     }

@@ -1483,6 +1483,8 @@ document.getElementById('locationBtn').onclick=()=>{
 
 // ── DOM helper ──
 function el(tag,cls,attrs){const e=document.createElement(tag);if(cls)e.className=cls;if(attrs)Object.assign(e,attrs);return e;}
+// Enter/Space로도 활성화되는 키보드 핸들러 부착 (div/span 기반 컨트롤 접근성)
+function addKbd(elem,handler){elem.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handler(e);}};}
 
 // ── Task item builder ──
 function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
@@ -1517,12 +1519,20 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   if(!isSub){
     const star=el('span',`task-star${task.starred?' on':''}`,{textContent:'★',title:'중요 표시'});
-    star.onclick=e=>{e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
+    const starToggle=e=>{e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
+    star.onclick=starToggle; addKbd(star,starToggle);
+    star.setAttribute('role','button'); star.tabIndex=0;
+    star.setAttribute('aria-pressed',task.starred?'true':'false');
+    star.setAttribute('aria-label','중요 표시 전환');
     item.appendChild(star);
   }
   if(task.color){const dot=el('div','color-dot');dot.style.background=task.color;item.appendChild(dot);}
   const cb=el('div',`task-cb${checked?' checked':''}`);
-  cb.onclick=e=>{e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
+  const cbToggle=e=>{e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
+  cb.onclick=cbToggle; addKbd(cb,cbToggle);
+  cb.setAttribute('role','checkbox'); cb.tabIndex=0;
+  cb.setAttribute('aria-checked',checked?'true':'false');
+  cb.setAttribute('aria-label',(task.text||'할 일')+' 완료');
   item.appendChild(cb);
   const body=el('div','task-body');
   // text + memo dot (clickable to open memo)
@@ -1542,7 +1552,10 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   textWrap.appendChild(txt);
   if(!isSub&&task.memo){ const dot=el('span','memo-dot',{title:'메모 있음'}); textWrap.appendChild(dot); }
   if(!isSub){
-    textWrap.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
+    const openMemoH=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
+    textWrap.onclick=openMemoH; addKbd(textWrap,openMemoH);
+    textWrap.setAttribute('role','button'); textWrap.tabIndex=0;
+    textWrap.setAttribute('aria-label',(task.text||'할 일')+' — 메모 보기/편집');
   }
   body.appendChild(textWrap);
   if(!isSub){
@@ -4923,3 +4936,41 @@ if (_restoreBtn && _restoreInput) {
   _restoreBtn.onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); _restoreInput.click(); };
   _restoreInput.onchange = () => { if (_restoreInput.files && _restoreInput.files[0]) importAllData(_restoreInput.files[0]); _restoreInput.value = ''; };
 }
+
+// ── 모달 접근성: 포커스 트랩 + 열기 시 포커스 이동 + 닫기 시 복원 ──
+let _lastFocusBeforeModal = null;
+function _modalFocusables(modal) {
+  return [...modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+    .filter(x => x.offsetParent !== null);
+}
+// 보이는 모달 안에서 Tab 순환
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const overlays = [...document.querySelectorAll('.modal-overlay:not(.hidden), .memo-overlay:not(.hidden)')];
+  const modal = overlays[overlays.length - 1];
+  if (!modal) return;
+  const f = _modalFocusables(modal);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+// 열림/닫힘 감지 → 첫 컨트롤 포커스 / 트리거로 복원
+const _modalObserver = new MutationObserver(muts => {
+  muts.forEach(m => {
+    const t = m.target; if (!t.classList) return;
+    const wasHidden = (m.oldValue || '').includes('hidden');
+    const nowHidden = t.classList.contains('hidden');
+    if (wasHidden && !nowHidden) {
+      _lastFocusBeforeModal = document.activeElement;
+      const f = _modalFocusables(t);
+      if (f.length) setTimeout(() => { try { f[0].focus(); } catch {} }, 40);
+    } else if (!wasHidden && nowHidden) {
+      const r = _lastFocusBeforeModal; _lastFocusBeforeModal = null;
+      if (r && r.focus && document.body.contains(r)) { try { r.focus(); } catch {} }
+    }
+  });
+});
+[...document.querySelectorAll('.modal-overlay, .memo-overlay')].forEach(ov =>
+  _modalObserver.observe(ov, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }));
