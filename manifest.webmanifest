@@ -1,15 +1,12 @@
 {
-  "name": "캘린더 태스크",
-  "short_name": "태스크",
-  "description": "주간/월간 태스크 관리 캘린더",
+  "name": "마이플래너",
+  "short_name": "마이플래너",
+  "description": "주간·월간 할일 플래너",
   "start_url": "./",
-  "scope": "./",
   "display": "standalone",
-  "background_color": "#f0f2f5",
-  "theme_color": "#1a73e8",
-  "lang": "ko",
+  "background_color": "#f8fafc",
+  "theme_color": "#6366f1",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

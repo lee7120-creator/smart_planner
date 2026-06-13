@@ -1,16 +1,15 @@
 <!DOCTYPE html>
+<!-- v6d14cf4 -->
 <html lang="ko" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1a73e8">
-  <title>Task 관리 캘린더</title>
+  <title>마이플래너</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <script>
-    // 다크모드 FOUC 방지: CSS 파싱 전에 테마를 즉시 적용
-    (function(){try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'light';}catch(e){}})();
-  </script>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <link rel="stylesheet" href="styles.css">
@@ -19,10 +18,10 @@
 
 <!-- Landing page (shown when no ?u= param) -->
 <div class="landing-overlay" id="landingOverlay" style="display:none">
-  <button class="landing-dark-btn" id="landingDarkBtn" aria-label="다크 모드 전환">🌙</button>
+  <button class="landing-dark-btn" id="landingDarkBtn">🌙</button>
   <div class="landing-card">
     <div class="landing-icon">📅</div>
-    <div class="landing-title">캘린더 태스크</div>
+    <div class="landing-title">마이플래너</div>
     <div class="landing-sub">이름을 입력하면 나만의 캘린더 URL이 생성됩니다</div>
     <div class="landing-input-wrap">
       <input class="landing-input" id="landingInput" type="text" placeholder="이름 입력 (예: 홍길동)" maxlength="30">
@@ -31,75 +30,176 @@
     <div class="landing-hint">📌 URL을 북마크하거나 저장해두면 다음에 바로 접근 가능해요</div>
     <div class="landing-features">
       <span class="landing-feat">✅ 체크리스트</span>
-      <span class="landing-feat">🔄 매일·매주·격주·매월 반복</span>
+      <span class="landing-feat">🔄 주간·월간 반복</span>
       <span class="landing-feat">📅 월간 보기</span>
-      <span class="landing-feat">📊 통계</span>
       <span class="landing-feat">🔍 검색</span>
       <span class="landing-feat">🌤️ 날씨</span>
       <span class="landing-feat">🌙 다크모드</span>
-      <span class="landing-feat">📲 앱 설치(PWA)</span>
     </div>
     <a href="?u=demo" class="landing-demo">📋 데모 보기</a>
   </div>
 </div>
 
 <header class="header">
-  <span class="header-title">📅 태스크</span>
-  <div class="view-toggle" role="tablist">
-    <button class="view-btn active" id="btnWeek" role="tab">주간</button>
-    <button class="view-btn" id="btnMonth" role="tab">월간</button>
-    <button class="view-btn" id="btnStats" role="tab">통계</button>
+  <span class="header-title">🗓 마이플래너</span>
+  <div class="view-toggle">
+    <button class="view-btn" id="btnDay">일간</button>
+    <button class="view-btn active" id="btnWeek">주간</button>
+    <button class="view-btn" id="btnMonth">월간</button>
+    <button class="view-btn" id="btnYear">연간</button>
+    <button class="view-btn" id="btnTimeblock">시간표</button>
+    <button class="view-btn" id="btnTimeline">타임라인</button>
+    <button class="view-btn" id="btnFocus">포커스</button>
   </div>
   <div class="nav-group">
-    <button class="nav-btn" id="prevBtn" aria-label="이전">‹</button>
+    <button class="nav-btn" id="prevBtn">‹</button>
     <span class="week-label" id="weekLabel"></span>
-    <button class="nav-btn" id="nextBtn" aria-label="다음">›</button>
+    <button class="nav-btn" id="nextBtn">›</button>
     <button class="nav-btn today-btn" id="todayBtn">오늘</button>
   </div>
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
-    <input class="search-input" id="searchInput" placeholder="태스크·메모 검색... (/)" aria-label="태스크 검색">
+    <input class="search-input" id="searchInput" placeholder="찾기... (/)">
   </div>
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
-    <span class="ro-chip" id="roChip" style="display:none">👁 읽기 전용</span>
     <div class="sync-dot offline" id="syncDot" title="동기화 상태" style="display:none"></div>
-    <span class="visually-hidden" aria-live="polite" id="syncLive"></span>
-    <button class="copy-url-btn" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
-    <button class="copy-url-btn" id="switchUserBtn" style="display:none" title="다른 사용자로 전환">↩ <span>전환</span></button>
-    <div class="settings-wrap">
-      <button class="icon-btn" id="notesBtn" title="메모장" aria-label="메모장 메뉴" aria-haspopup="true">📝</button>
-      <div class="settings-menu hidden" id="notesMenu" role="menu"></div>
+    <button class="icon-btn" id="guideBtn" title="사용 가이드">❓</button>
+    <button class="save-btn" id="forceSyncBtn" style="display:none" title="지금 바로 저장">☁️ <span>저장</span></button>
+    <div class="more-menu-wrap">
+      <button class="icon-btn" id="notesBtn" title="메모장 (빈 곳 더블클릭으로도 생성)">📝</button>
+      <div class="more-menu hidden" id="notesMenu"></div>
     </div>
-    <button class="icon-btn" id="locationBtn" title="내 위치 날씨" aria-label="내 위치 날씨">📍</button>
-    <button class="icon-btn" id="darkBtn" title="다크 모드" aria-label="다크 모드 전환">🌙</button>
-    <div class="settings-wrap">
-      <button class="icon-btn" id="settingsBtn" title="설정" aria-label="설정 메뉴" aria-haspopup="true">⚙️</button>
-      <div class="settings-menu hidden" id="settingsMenu" role="menu">
-        <button class="settings-item" id="exportBtn" role="menuitem">📤 JSON 내보내기 (백업)</button>
-        <button class="settings-item" id="importBtn" role="menuitem">📥 JSON 가져오기 (복원)</button>
-        <button class="settings-item" id="roLinkBtn" role="menuitem">👁 읽기전용 링크 복사</button>
-        <button class="settings-item" id="notifyBtn" role="menuitem">🔔 시간 알림 켜기</button>
+    <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
+    <div class="more-menu-wrap">
+      <button class="icon-btn" id="moreBtn" title="더보기">⋯</button>
+      <div class="more-menu hidden" id="moreMenu">
+        <button class="more-menu-item" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
+        <button class="more-menu-item" id="shareRoBtn" style="display:none">👁 <span>읽기전용 링크 복사</span></button>
+        <button class="more-menu-item" id="templateBtn">📑 <span>템플릿</span></button>
+        <button class="more-menu-item" id="switchUserBtn" style="display:none">↩ <span>다른 사용자로 전환</span></button>
+        <div class="more-menu-divider"></div>
+        <button class="more-menu-item" id="locationBtn">📍 <span>내 위치 날씨</span></button>
+        <button class="more-menu-item" id="notifyBtn"><span id="notifyIcon">🔕</span> <span>마감 알림</span></button>
+        <button class="more-menu-item" id="memoAllBtn">📝 <span>메모 모아보기</span></button>
+        <button class="more-menu-item" id="shareCalBtn">👥 <span>일정 공유</span></button>
+        <button class="more-menu-item" id="trashBtn">🗑 <span>휴지통</span></button>
+        <button class="more-menu-item" id="pomodoroBtn">🍅 <span>포모도로 타이머</span></button>
+        <button class="more-menu-item" id="goalsBtn">🎯 <span>목표 &amp; 연속달성</span></button>
+        <button class="more-menu-item" id="reviewBtn">📋 <span>주간 리뷰</span></button>
+        <button class="more-menu-item" id="icsImportBtn">📥 <span>외부 캘린더 구독</span></button>
+        <button class="more-menu-item" id="teamBtn">🤝 <span>팀 캘린더</span></button>
+        <button class="more-menu-item" id="icsExportBtn">📤 <span>캘린더 내보내기</span></button>
+        <button class="more-menu-item" id="printBtn">🖨 <span>인쇄 / 이미지 저장</span></button>
       </div>
-      <input type="file" id="importFile" accept="application/json" style="display:none">
     </div>
     <div class="progress-pill" id="progressInfo"></div>
   </div>
 </header>
 
+<button class="fab-add" id="fabAdd" title="빠른 추가 (N)" aria-label="빠른 추가">+</button>
+
+<!-- 빠른 추가 모달 -->
+<div class="modal-overlay hidden" id="quickModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="빠른 추가">
+    <div class="modal-title">⚡ 빠른 추가</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">
+      날짜·시간·태그를 한 줄로: <b>내일 오후 3시 팀미팅 #업무</b>
+    </p>
+    <input class="modal-input" id="quickInput" type="text" placeholder="예: 다음주 화요일 보고서 제출 #업무" style="margin-bottom:6px">
+    <div id="quickPreview" style="font-size:12px;color:var(--text3);min-height:18px;margin-bottom:10px"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="quickCancel">취소</button>
+      <button class="btn-primary" id="quickAdd">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 목표 & 연속달성 모달 -->
+<div class="modal-overlay hidden" id="goalsModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="목표">
+    <div class="modal-title">🎯 목표 &amp; 연속달성</div>
+    <div id="goalsStreakBox" style="margin-bottom:14px"></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <input class="modal-input" id="goalInput" type="text" placeholder="새 목표 (예: 매일 운동하기)" style="margin-bottom:0;flex:1">
+      <select id="goalTarget" class="time-input" style="width:auto">
+        <option value="7">매일</option><option value="5">주 5회</option>
+        <option value="3">주 3회</option><option value="1">주 1회</option>
+      </select>
+      <button class="btn-primary" id="goalAddBtn" type="button">추가</button>
+    </div>
+    <div id="goalsList" style="display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn-secondary" id="goalsClose">닫기</button></div>
+  </div>
+</div>
+
+<!-- 주간 리뷰 모달 -->
+<div class="modal-overlay hidden" id="reviewModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="주간 리뷰" style="width:420px">
+    <div class="modal-title">📋 주간 리뷰</div>
+    <div id="reviewBody"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="reviewClose">닫기</button>
+      <button class="btn-primary" id="reviewCarry">미완료 다음 주로 이월</button>
+    </div>
+  </div>
+</div>
+
+<!-- 외부 캘린더 구독 모달 -->
+<div class="modal-overlay hidden" id="icsModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="외부 캘린더 구독">
+    <div class="modal-title">📥 외부 캘린더 구독</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">
+      구글/회사 캘린더의 <b>.ics 공개 URL</b>을 등록하거나 .ics 파일을 올리면, 그 일정이 읽기 전용으로 함께 표시돼요.
+    </p>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input class="modal-input" id="icsUrlInput" type="text" placeholder="https://calendar.google.com/.../basic.ics" style="margin-bottom:0;flex:1">
+      <button class="btn-primary" id="icsUrlAdd" type="button">구독</button>
+    </div>
+    <button class="more-menu-item" id="icsFileBtn" style="border:1px dashed var(--border);border-radius:8px;justify-content:center;margin-bottom:10px">📎 .ics 파일 올리기</button>
+    <input type="file" id="icsFileInput" accept=".ics,text/calendar" style="display:none">
+    <div id="icsList" style="display:flex;flex-direction:column;gap:6px;max-height:36vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn-secondary" id="icsClose">닫기</button></div>
+  </div>
+</div>
+
+<!-- 댓글 모달 -->
+<div class="modal-overlay hidden" id="commentModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="댓글">
+    <div class="modal-title">💬 댓글 · <span id="commentTaskTitle" style="font-weight:500;color:var(--text2)"></span></div>
+    <div id="commentList" style="display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow-y:auto;margin-bottom:10px"></div>
+    <div style="display:flex;gap:6px">
+      <input class="modal-input" id="commentInput" type="text" placeholder="댓글 입력..." style="margin-bottom:0;flex:1">
+      <button class="btn-primary" id="commentAdd" type="button">등록</button>
+    </div>
+    <div class="modal-actions"><button class="btn-secondary" id="commentClose">닫기</button></div>
+  </div>
+</div>
+
 <div id="mainView"></div>
+
+<div class="dashboard" id="dashboard">
+  <div class="dash-panel" id="dashStats"></div>
+  <div class="dash-panel" id="dashCalendar"></div>
+</div>
 
 <!-- Memo Popup -->
 <div class="memo-overlay hidden" id="memoOverlay">
-  <div class="memo-popup" id="memoPopup" role="dialog" aria-label="태스크 메모">
+  <div class="memo-popup" id="memoPopup">
     <div class="memo-header" id="memoHeader" title="드래그해서 이동">
       <span class="memo-icon">📝</span>
       <span class="memo-task-title" id="memoTitle"></span>
-      <button class="memo-head-btn" id="memoImgBtn" title="이미지 첨부" aria-label="이미지 첨부">📷</button>
-      <button class="memo-close" id="memoClose" aria-label="메모 닫기">✕</button>
+      <button class="memo-attach" id="memoViewBtn" title="보기/편집 전환">👁</button>
+      <button class="memo-attach" id="memoHistBtn" title="버전 히스토리">🕐</button>
+      <button class="memo-attach" id="memoAttachBtn" title="이미지 첨부 (붙여넣기도 가능)">📷</button>
+      <button class="memo-close" id="memoClose">✕</button>
     </div>
-    <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;이미지는 끌어다 놓거나 붙여넣기(Ctrl+V)로 첨부됩니다.&#10;(자동으로 저장됩니다)"></textarea>
-    <div class="memo-img-strip" id="memoImgStrip"></div>
+    <input type="file" id="memoFileInput" accept="image/*" multiple style="display:none">
+    <div class="memo-md hidden" id="memoMD"></div>
+    <div class="memo-history hidden" id="memoHistory"></div>
+    <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;(자동으로 저장됩니다)"></textarea>
+    <div class="memo-images" id="memoImages"></div>
+    <div class="memo-links" id="memoLinks"></div>
     <div class="memo-footer">
       <span class="memo-status" id="memoStatus">자동 저장됨 ✓</span>
       <span class="memo-hint">🖼 드래그/붙여넣기로 이미지 첨부</span>
@@ -107,77 +207,160 @@
     </div>
   </div>
 </div>
-<input type="file" id="memoImgInput" accept="image/*" style="display:none">
-
-<!-- 이미지 라이트박스 -->
-<div class="lightbox hidden" id="lightbox"><img id="lightboxImg" alt=""></div>
 
 <!-- Edit Modal -->
 <div class="modal-overlay hidden" id="editModal">
-  <div class="modal-box" role="dialog" aria-modal="true" aria-label="태스크 수정">
+  <div class="modal-box">
     <div class="modal-title">태스크 수정</div>
     <input class="modal-input" id="editInput" type="text" placeholder="할 일 내용">
     <div class="modal-row">
-      <span class="modal-label">시간</span>
-      <input class="time-input" id="editTime" type="time">
-      <button class="btn-secondary" id="editTimeClear" type="button" style="padding:4px 8px;font-size:11px">지우기</button>
-    </div>
-    <div class="modal-row">
       <span class="modal-label">색상</span>
-      <div class="color-picker" id="editColors" style="margin-bottom:0"></div>
+      <div class="color-picker" id="editColors"></div>
     </div>
     <div class="modal-row">
       <span class="modal-label">중요</span>
-      <button class="star-toggle" id="editStarBtn" type="button" aria-label="중요 표시">★</button>
+      <button class="star-toggle" id="editStarBtn" type="button">★</button>
+    </div>
+    <div class="modal-row">
+      <span class="modal-label">우선순위</span>
+      <div class="priority-selector" id="editPrioritySel" style="flex:1">
+        <button class="priority-opt" data-val="">⚪</button>
+        <button class="priority-opt" data-val="high">🔴</button>
+        <button class="priority-opt" data-val="mid">🟡</button>
+        <button class="priority-opt" data-val="low">🟢</button>
+      </div>
     </div>
     <div class="modal-row">
       <span class="modal-label">반복</span>
-      <div class="repeat-selector" id="editRepeatSel" style="flex:1;margin-bottom:0"></div>
+      <div class="repeat-selector" id="editRepeatSel" style="flex:1">
+        <button class="repeat-opt" data-val="none">없음</button>
+        <button class="repeat-opt" data-val="daily">매일</button>
+        <button class="repeat-opt" data-val="weekdays">평일</button>
+        <button class="repeat-opt" data-val="weekly">매주</button>
+        <button class="repeat-opt" data-val="biweekly">격주</button>
+        <button class="repeat-opt" data-val="monthly">매월</button>
+        <button class="repeat-opt" data-val="monthlyNth">N째 요일</button>
+        <button class="repeat-opt" data-val="monthlyFirstBiz">월초 영업일</button>
+        <button class="repeat-opt" data-val="monthlyLastBiz">월말 영업일</button>
+      </div>
     </div>
-    <div class="modal-row" id="editRepeatEndRow">
+    <div class="modal-row">
       <span class="modal-label">종료</span>
       <input class="time-input" id="editRepeatEnd" type="date" style="width:auto;flex:1">
       <button class="btn-secondary" id="editRepeatEndClear" type="button" style="padding:4px 8px;font-size:11px">없음</button>
     </div>
+    <div class="modal-row">
+      <span class="modal-label">마감시간</span>
+      <input type="time" class="time-input" id="editTimeInput">
+      <button type="button" class="time-clear-btn" id="editTimeClear" title="시간 제거">✕</button>
+    </div>
+    <div class="modal-row">
+      <span class="modal-label">소요시간</span>
+      <select id="editDuration" class="time-input" style="width:auto">
+        <option value="">미지정</option><option value="30">30분</option><option value="60">1시간</option>
+        <option value="90">1시간 30분</option><option value="120">2시간</option><option value="180">3시간</option><option value="240">4시간</option>
+      </select>
+    </div>
     <div class="modal-actions">
+      <button class="btn-secondary" id="editSendBtn" style="margin-right:auto">👥 보내기</button>
       <button class="btn-secondary" id="editCancelBtn">취소</button>
       <button class="btn-primary" id="editSaveBtn">저장</button>
     </div>
   </div>
 </div>
 
-<!-- Repeat delete choice modal -->
-<div class="modal-overlay hidden" id="repeatDelModal">
-  <div class="modal-box" role="dialog" aria-modal="true" aria-label="반복 태스크 삭제">
-    <div class="modal-title">🔄 반복 태스크 삭제</div>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:16px" id="repeatDelText"></p>
-    <div class="modal-actions" style="flex-direction:column;align-items:stretch;gap:8px">
-      <button class="btn-secondary" id="repeatDelOnce">이 날짜만 삭제</button>
-      <button class="btn-danger" id="repeatDelAll">전체 반복 삭제</button>
-      <button class="btn-secondary" id="repeatDelCancel">취소</button>
+<!-- Share Modal -->
+<div class="modal-overlay hidden" id="shareModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="일정 공유">
+    <div class="modal-title">👥 일정 공유</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+      상대의 캘린더 이름을 추가하면 그 사람의 일정이 내 캘린더에 함께 표시돼요 (보기 전용).<br>
+      내 이름: <b id="shareMyId" style="color:var(--primary)"></b>
+      <button class="copy-url-btn" id="shareMyCopy" style="padding:1px 8px;font-size:10px">복사</button><br>
+      <span style="color:var(--text3);font-size:11px">반복 일정은 시작 날짜 기준으로 표시됩니다</span>
+    </p>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <input class="modal-input" id="shareAddInput" type="text" placeholder="상대 이름 (캘린더 URL의 u= 값)" style="margin-bottom:0;flex:1">
+      <button class="btn-primary" id="shareAddBtn" type="button">추가</button>
+    </div>
+    <div id="shareList" style="display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow-y:auto"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="shareCloseBtn">닫기</button>
     </div>
   </div>
 </div>
 
-<!-- Day detail modal (month view) -->
-<div class="modal-overlay hidden" id="dayModal">
-  <div class="day-modal-box" role="dialog" aria-modal="true" aria-label="날짜 상세">
-    <div class="day-modal-title">
-      <span id="dayModalTitle"></span>
-      <button class="memo-close" id="dayModalClose" aria-label="닫기">✕</button>
-    </div>
-    <div class="day-modal-sub" id="dayModalSub"></div>
-    <div class="day-modal-list" id="dayModalList"></div>
-    <div class="day-modal-addrow" id="dayModalAddRow">
-      <input class="task-input" id="dayModalInput" type="text" placeholder="할 일 추가...">
-      <button class="btn-add" id="dayModalAddBtn" type="button">추가</button>
-    </div>
-    <div class="modal-actions" style="margin-top:4px">
-      <button class="btn-primary" id="dayModalGoWeek">주간 보기에서 열기</button>
+<!-- Send Task Modal (단위 태스크 보내기 — 검색·복수선택·수락) -->
+<div class="modal-overlay hidden" id="sendModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="태스크 보내기">
+    <div class="modal-title">👥 태스크 보내기</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">
+      "<b id="sendTaskName" style="color:var(--primary)"></b>" 일정을 보낼 사람을 검색해 선택하세요. 여러 명 지정할 수 있어요.<br>
+      <span style="color:var(--text3);font-size:11px">받는 사람이 <b>수락</b>해야 캘린더에 추가됩니다.</span>
+    </p>
+    <input class="modal-input" id="sendSearchInput" type="text" placeholder="이름 검색 또는 직접 입력..." style="margin-bottom:8px">
+    <div id="sendSelected" class="send-chips"></div>
+    <div id="sendResults" class="send-results"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="sendCancelBtn">취소</button>
+      <button class="btn-primary" id="sendConfirmBtn">보내기</button>
     </div>
   </div>
 </div>
 
+<!-- Guide Modal -->
+<div class="modal-overlay hidden" id="guideModal">
+  <div class="modal-box" style="width:480px;max-height:84vh;display:flex;flex-direction:column">
+    <div class="modal-title">📖 사용 가이드</div>
+    <div id="guideBody" style="overflow-y:auto;flex:1;margin-bottom:14px"></div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="guideCloseBtn">알겠어요!</button>
+    </div>
+  </div>
+</div>
+
+<!-- Template Modal -->
+<div class="modal-overlay hidden" id="templateModal">
+  <div class="modal-box" style="width:400px;max-height:76vh;display:flex;flex-direction:column">
+    <div class="modal-title">📑 템플릿 <span style="font-weight:400;font-size:11px;color:var(--text3)">(자주 쓰는 할일 묶음)</span></div>
+    <div id="templateList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">새 템플릿 만들기 — 특정 날짜의 할 일을 묶어서 저장</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <input class="task-input" id="tplNameInput" placeholder="템플릿 이름" style="flex:1;min-width:120px">
+        <input type="date" class="time-input" id="tplSrcDate">
+        <button class="btn-add" id="tplCreateBtn">저장</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="templateCloseBtn">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Memo All Modal -->
+<div class="modal-overlay hidden" id="memoAllModal">
+  <div class="modal-box" style="width:420px;max-height:76vh;display:flex;flex-direction:column">
+    <div class="modal-title">📝 메모 모아보기</div>
+    <div id="memoAllList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="memoAllCloseBtn">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Trash Modal -->
+<div class="modal-overlay hidden" id="trashModal">
+  <div class="modal-box" style="width:380px;max-height:72vh;display:flex;flex-direction:column">
+    <div class="modal-title">🗑 휴지통 <span style="font-weight:400;font-size:11px;color:var(--text3)">(30일간 보관 후 자동 삭제)</span></div>
+    <div id="trashList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="trashCloseBtn">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pomodoro Widget -->
 <!-- 슬래시 명령 메뉴 -->
 <div class="slash-menu hidden" id="slashMenu" role="menu"></div>
 
@@ -201,7 +384,40 @@
 
 <input type="file" id="noteImgInput" accept="image/*" style="display:none">
 
-<div class="toast-container" id="toastContainer"></div>
+<!-- Repeat delete choice modal -->
+<div class="modal-overlay hidden" id="repeatDelModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="반복 태스크 삭제">
+    <div class="modal-title">🔄 반복 태스크 삭제</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px" id="repeatDelText"></p>
+    <div class="modal-actions" style="flex-direction:column;align-items:stretch;gap:8px">
+      <button class="btn-secondary" id="repeatDelOnce">이 날짜만 삭제</button>
+      <button class="btn-danger" id="repeatDelAll">전체 반복 삭제</button>
+      <button class="btn-secondary" id="repeatDelCancel">취소</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Undo Toast -->
+<div class="undo-toast hidden" id="undoToast">
+  <span id="undoMsg"></span>
+  <button id="undoBtn">실행 취소</button>
+</div>
+
+<!-- Image Lightbox -->
+<div class="img-lightbox hidden" id="imgLightbox">
+  <img id="imgLightboxImg" alt="첨부 이미지">
+</div>
+
+<div class="pomodoro-widget" id="pomodoroWidget" style="position:fixed">
+  <button class="pomodoro-close" id="pomodoroCloseBtn">✕</button>
+  <div class="pomodoro-task" id="pomodoroTaskLabel">🍅 집중 타이머</div>
+  <div class="pomodoro-time" id="pomodoroTime">25:00</div>
+  <div class="pomodoro-controls">
+    <button class="pomodoro-ctrl-btn" id="pomodoroStartBtn">시작</button>
+    <button class="pomodoro-ctrl-btn" id="pomodoroResetBtn">리셋</button>
+  </div>
+</div>
 
 <!-- 당일 할 일 전부 완료 시 축하 -->
 <div class="celebrate-overlay" id="celebrateOverlay" aria-hidden="true">
@@ -214,16 +430,14 @@
 </div>
 
 <div class="shortcuts-hint">
-  <span class="shortcut-key">←</span><span class="shortcut-key">→</span> 이동 &nbsp;
+  <span class="shortcut-key">←</span><span class="shortcut-key">→</span> 주 이동 &nbsp;
   <span class="shortcut-key">T</span> 오늘 &nbsp;
+  <span class="shortcut-key">N</span> 새 할일 &nbsp;
+  <span class="shortcut-key">F</span> 포커스 &nbsp;
   <span class="shortcut-key">/</span> 검색 &nbsp;
-  <span class="shortcut-key">D</span> 다크모드 &nbsp;
-  <span class="shortcut-key">W</span><span class="shortcut-key">M</span><span class="shortcut-key">S</span> 보기 전환 &nbsp;
-  <span class="shortcut-key">더블클릭</span> 새 메모
+  <span class="shortcut-key">D</span> 다크모드
 </div>
 
-<script src="logic.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
-
