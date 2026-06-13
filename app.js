@@ -912,6 +912,7 @@ function openEdit(dk,task,isRepeatInst,originDk) {
   document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
     b.classList.toggle('active',b.dataset.val===_editRepeat);
   });
+  document.getElementById('editRepeatCapHint').style.display = (_editRepeat!=='none'?'flex':'none');
   document.getElementById('editTimeInput').value=targetTask.time||'';
   document.getElementById('editDuration').value=targetTask.duration||'';
   document.getElementById('editInput').value=targetTask.text;
@@ -927,6 +928,7 @@ document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
     _editRepeat=b.dataset.val;
     document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
+    document.getElementById('editRepeatCapHint').style.display = (_editRepeat!=='none'?'flex':'none');
   };
 });
 document.querySelectorAll('#editPrioritySel .priority-opt').forEach(b=>{
@@ -2462,7 +2464,7 @@ function spawnConfetti() {
   box.innerHTML = '';
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const colors = ['#1a73e8','#43a047','#e53935','#fb8c00','#f9a825','#8e24aa','#00acc1'];
-  const n = 90;
+  const n = 40;
   for (let i = 0; i < n; i++) {
     const p = el('div','confetti-piece');
     p.style.left = Math.random()*100 + '%';
@@ -2472,6 +2474,8 @@ function spawnConfetti() {
     if (Math.random() < 0.5) p.style.borderRadius = '50%';
     box.appendChild(p);
   }
+  // 애니메이션 종료 후 DOM에서 제거(불필요한 노드/페인트 정리)
+  setTimeout(() => { if (box) box.innerHTML = ''; }, 4500);
 }
 const _celebrateOverlayEl = document.getElementById('celebrateOverlay');
 if (_celebrateOverlayEl) _celebrateOverlayEl.onclick = hideCelebration;
