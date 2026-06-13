@@ -353,8 +353,8 @@ function initFirebaseSync() {
   ref.once('value').then(snapshot => {
     const remote = snapshot.val();
     if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
-      // Firebase에 데이터 있음 → 로컬에 덮어쓰기
-      tasks = remote;
+      // Firebase에 데이터 있음 → 로컬에 덮어쓰기 (실시간 리스너와 동일하게 정규화)
+      tasks = normalizeTasks(remote);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
       render();
       setSyncStatus('synced');
@@ -385,7 +385,7 @@ function getMonday(d) {
 }
 function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function today() { const d=new Date(); d.setHours(0,0,0,0); return d; }
-function dateToDayIdx(d) { const day=new Date(d).getDay(); return day===0?6:day-1; }
+function dateToDayIdx(d) { const dd=(typeof d==='string')?parseDk(d):d; const day=dd.getDay(); return day===0?6:day-1; }
 
 // ── Repeat helpers ──
 function getRepeatTasksForDate(date, dayIdx) {
@@ -398,8 +398,8 @@ function getRepeatTasksForDate(date, dayIdx) {
       if (!t||!t.repeat||t.repeat==='none') return;
       if (t.repeatEnd && dk > t.repeatEnd) return;   // 반복 종료일
       if (t.skips && t.skips[dk]) return;            // "이 날짜만 삭제"
-      const originDate = new Date(oDk);
-      const limitDate = new Date(oDk);
+      const originDate = parseDk(oDk);
+      const limitDate = parseDk(oDk);
       limitDate.setFullYear(limitDate.getFullYear() + 1);
       if (date > limitDate) return; // 생성일로부터 1년 초과 시 반복 종료
       if (t.repeat==='daily') {
@@ -523,7 +523,7 @@ function postponeTask(dk, id) {
 // ── 어제 미완료 이월 ──
 function carryOverFrom(fromDk, toDk) {
   if (READ_ONLY) return;
-  const pending = (tasks[fromDk]||[]).filter(t => t && !t.checked && (!t.repeat||t.repeat==='none'));
+  const pending = (tasks[fromDk]||[]).filter(t => t && !t.pending && !t.checked && (!t.repeat||t.repeat==='none'));
   if (!pending.length) return;
   const ids = pending.map(t => t.id);
   ids.forEach(id => {
@@ -1789,9 +1789,10 @@ function buildDayCol(date,dayIdx){
   }
   // task count + mini progress (반복 인스턴스는 해당 날짜의 체크 상태 기준)
   const dayTasks=(tasks[dk]||[]).filter(t=>!(t&&t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk]));
+  const countTasks=dayTasks.filter(t=>!(t&&t.pending));
   const repeatEntries=getRepeatTasksForDate(date,dayIdx);
-  const total=dayTasks.length+repeatEntries.length;
-  const done=dayTasks.filter(t=>t&&t.checked).length
+  const total=countTasks.length+repeatEntries.length;
+  const done=countTasks.filter(t=>t&&t.checked).length
     +repeatEntries.filter(({task,instanceDk})=>isRepeatChecked(task,instanceDk)).length;
   if(total>0){
     const meta=el('div','day-meta');
@@ -1806,7 +1807,7 @@ function buildDayCol(date,dayIdx){
   if(isToday && !READ_ONLY){
     const y=new Date(date); y.setDate(y.getDate()-1);
     const ydk=dateKey(y);
-    const pendingCnt=(tasks[ydk]||[]).filter(t=>t&&!t.checked&&(!t.repeat||t.repeat==='none')).length;
+    const pendingCnt=(tasks[ydk]||[]).filter(t=>t&&!t.pending&&!t.checked&&(!t.repeat||t.repeat==='none')).length;
     if(pendingCnt>0){
       const banner=el('button','carryover-banner',{textContent:`⏬ 어제 미완료 ${pendingCnt}개 가져오기`});
       banner.onclick=()=>carryOverFrom(ydk,dk);
@@ -2065,7 +2066,7 @@ function buildDayTimeline(){
   const dayIdx=dateToDayIdx(dayDate);
   const box=el('div','timeblock-box');
   const items=[];
-  (tasks[dk]||[]).filter(matchesQuery).forEach(t=>items.push({task:t,isRepeat:false,originDk:null,instanceDk:null}));
+  (tasks[dk]||[]).filter(t=>matchesQuery(t)&&!(t&&t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])).forEach(t=>items.push({task:t,isRepeat:false,originDk:null,instanceDk:null}));
   try{
     getRepeatTasksForDate(dayDate,dayIdx).filter(({task})=>matchesQuery(task)).forEach(({task,originDk,instanceDk})=>
       items.push({task,isRepeat:true,originDk,instanceDk}));
@@ -2311,7 +2312,7 @@ function calcProgress(){
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(d.getDate()+i);
     const dk=dateKey(d);
-    (tasks[dk]||[]).forEach(t=>{if(!t)return;total++;if(t.checked)done++;(t.subs||[]).forEach(s=>{total++;if(s.checked)done++;});});
+    (tasks[dk]||[]).forEach(t=>{if(!t||t.pending)return;total++;if(t.checked)done++;(t.subs||[]).forEach(s=>{total++;if(s.checked)done++;});});
     // 반복 인스턴스 포함 (해당 날짜의 체크 상태 기준)
     try{
       getRepeatTasksForDate(d,i).forEach(({task,instanceDk})=>{
@@ -2342,7 +2343,7 @@ function todayProgress() {
   const dk = dateKey(d);
   let total = 0, done = 0;
   (tasks[dk]||[]).forEach(t => {
-    if (!t) return;
+    if (!t || t.pending) return;
     total++; if (t.checked) done++;
     (t.subs||[]).forEach(s => { total++; if (s.checked) done++; });
   });
@@ -2876,7 +2877,7 @@ function compressImage(file) {
       URL.revokeObjectURL(img.src);
       res(cv.toDataURL('image/jpeg', .82));
     };
-    img.onerror = () => res(null);
+    img.onerror = () => { URL.revokeObjectURL(img.src); res(null); };
     img.src = URL.createObjectURL(file);
   });
 }
@@ -3841,31 +3842,6 @@ document.getElementById('shareAddInput').addEventListener('keydown', e => {
 });
 
 // ── 일정 보내기 (에디트 모달에서) ──
-function sendTaskToUser(dk, taskId) {
-  if (!fbDb) { showUndoToast('⚠️ 오프라인 상태예요'); return; }
-  if (!USER_ID || USER_ID === 'demo') { showUndoToast('내 캘린더 URL에서만 보낼 수 있어요'); return; }
-  const t = (tasks[dk] || []).find(x => x.id === taskId);
-  if (!t) return;
-  let to = prompt(`"${t.text}" 일정을 보낼 사람의 이름(캘린더 ID)을 입력하세요`);
-  if (!to) return;
-  to = to.replace(/[.#$\[\]\/]/g, '').trim().slice(0, 40);
-  if (!to || to === USER_ID) { showUndoToast('⚠️ 받는 사람 이름을 확인해주세요'); return; }
-  const copy = {
-    id: uid(), text: t.text, checked: false, starred: !!t.starred,
-    color: t.color || null, repeat: 'none', priority: t.priority || null,
-    time: t.time || null, memo: t.memo || '', completions: {}, skips: {},
-    subs: (t.subs || []).map(s => ({id: uid(), text: s.text, checked: false, starred: false, color: null, subs: []})),
-    from: USER_ID, pending: true,
-  };
-  const ref = fbDb.ref(`users/${to}/tasks/${dk}`);
-  ref.once('value').then(snap => {
-    const raw = snap.val();
-    const list = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw || {});
-    list.push(copy);
-    return ref.set(list);
-  }).then(() => showUndoToast(`👥 "${t.text}" 일정을 ${to}님에게 보냈어요`))
-    .catch(() => showUndoToast('⚠️ 전송 실패 — 네트워크를 확인해주세요'));
-}
 document.getElementById('editSendBtn').onclick = () => {
   if (editCtx) openSendModal(editCtx.dk, editCtx.taskId);
 };
@@ -4392,8 +4368,8 @@ document.addEventListener('keydown',e=>{
     weekStart=getMonday(new Date());
     activeInput={dateKey:dateKey(new Date()),parentId:null};
     render();
+    return;
   }
-  if((e.key==='n'||e.key==='N')&&!e.target.closest('input,textarea')){e.preventDefault();openQuickAdd();return;}
   if(e.key==='Escape'){closeMemo();closeEdit();closeRepeatDel();closeNoteHist();closeCanvas();closeSlashMenu();closeLightbox();closeShareModal();
     ['quickModal','goalsModal','reviewModal','icsModal','commentModal'].forEach(id=>document.getElementById(id).classList.add('hidden'));
     document.getElementById('notesMenu').classList.add('hidden');activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
@@ -4454,6 +4430,8 @@ function buildDashStats(){
     list.forEach(t=>{
       if(!t) return;
       totalAll++; if(t.checked) doneAll++;
+      // 반복 태스크는 아래 루프에서 인스턴스로 집계하므로 주간 버킷에서 제외(이중집계 방지)
+      if(t.repeat && t.repeat!=='none') return;
       const d = new Date(dk); d.setHours(0,0,0,0);
       const diff = Math.round((d-monday)/86400000);
       if(diff>=0 && diff<7){ weekTotal++; if(t.checked) weekDone++; dayTotals[diff]+=1; }
