@@ -769,6 +769,73 @@
     .shared-text { font-size:12px; line-height:1.45; word-break:break-word; color:var(--text2); }
     .shared-text.done { text-decoration:line-through; color:var(--text3); }
     .month-shared { font-size:9px; color:#8e24aa; font-weight:700; }
+    /* 빠른추가 FAB */
+    .fab-add {
+      position:fixed; right:20px; bottom:20px; z-index:200; width:52px; height:52px;
+      border-radius:50%; border:none; background:var(--primary); color:#fff; font-size:28px;
+      line-height:1; cursor:pointer; box-shadow:0 4px 16px rgba(26,115,232,.4); transition:transform .12s, background .15s;
+    }
+    .fab-add:hover { background:var(--primary-h); transform:scale(1.08); }
+    .readonly-mode .fab-add { display:none; }
+    @media print { .fab-add { display:none; } }
+    /* 서브태스크 진행률 바 */
+    .subprog { display:flex; align-items:center; gap:6px; margin-top:3px; }
+    .subprog-bar { flex:1; max-width:90px; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+    .subprog-fill { height:100%; background:var(--primary); border-radius:2px; transition:width .3s; }
+    .subprog-fill.done { background:var(--green); }
+    /* 목표 */
+    .goal-row { display:flex; align-items:center; gap:10px; padding:7px 8px; border:1px solid var(--border2); border-radius:8px; }
+    .goal-check { width:28px; height:28px; border-radius:50%; border:2px solid var(--border); background:var(--surface); cursor:pointer; font-size:14px; color:#fff; flex-shrink:0; transition:all .15s; }
+    .goal-check.on { background:var(--green); border-color:var(--green); }
+    .goal-info { flex:1; min-width:0; }
+    .goal-name { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .goal-meta { font-size:11px; color:var(--text3); }
+    /* 주간 리뷰 */
+    .review-row { display:flex; align-items:center; gap:8px; padding:5px 6px; border-bottom:1px solid var(--border2); }
+    /* 태그 필터바 */
+    .tag-filter-bar { display:flex; flex-wrap:wrap; gap:6px; padding:8px 16px 0; align-items:center; }
+    .tag-filter-chip { font-size:11px; padding:3px 10px; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--text2); cursor:pointer; font-family:inherit; transition:all .12s; }
+    .tag-filter-chip:hover { border-color:var(--primary); }
+    .tag-filter-chip.active { background:var(--primary); color:#fff; border-color:var(--primary); font-weight:600; }
+    /* 인쇄 */
+    @media print {
+      .header, .fab-add, .dashboard, .weather-bar, .scroll-hint, .add-task-btn, .task-actions, .offday-btn { display:none !important; }
+      .day-col { break-inside:avoid; box-shadow:none !important; border:1px solid #ccc !important; }
+      .calendar-grid { min-width:0 !important; }
+      body { background:#fff !important; }
+    }
+    /* 시간표(타임블로킹) 뷰 */
+    .timeblock-wrap { padding:12px 16px; max-width:760px; margin:0 auto; }
+    .tb-grid { display:flex; position:relative; }
+    .tb-axis { width:48px; flex-shrink:0; }
+    .tb-hour { border-top:1px solid var(--border2); position:relative; }
+    .tb-hour-label { position:absolute; top:-7px; left:0; font-size:10px; color:var(--text3); background:var(--bg); padding-right:4px; }
+    .tb-lane { position:relative; flex:1; border-left:1px solid var(--border); }
+    .tb-block {
+      position:absolute; left:2px; right:4px; background:var(--primary-l); border-left:3px solid var(--primary);
+      border-radius:6px; padding:3px 6px; overflow:hidden; cursor:pointer; box-shadow:var(--shadow); transition:transform .1s;
+    }
+    .tb-block:hover { transform:scale(1.01); z-index:5; }
+    .tb-block.tb-overlap { right:auto; width:46px; }
+    .tb-block.done { opacity:.55; }
+    .tb-block.done .tb-block-text { text-decoration:line-through; }
+    .tb-block-time { font-size:9px; color:var(--text3); font-weight:600; }
+    .tb-block-text { font-size:11px; color:var(--text); line-height:1.3; word-break:break-word; }
+    .tb-nowline { position:absolute; left:0; right:0; height:2px; background:var(--red); z-index:6; }
+    .tb-now-label { position:absolute; left:0; top:-7px; font-size:9px; color:#fff; background:var(--red); border-radius:3px; padding:0 4px; }
+    .tb-untimed { margin-top:16px; border-top:1px dashed var(--border); padding-top:10px; }
+    .tb-untimed-title { font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px; }
+    .accept-row { display:flex; gap:5px; margin-top:4px; }
+    .accept-btn, .reject-btn { font-size:10px; padding:2px 8px; border-radius:6px; border:none; cursor:pointer; font-family:inherit; font-weight:600; }
+    .accept-btn { background:var(--green); color:#fff; }
+    .reject-btn { background:var(--surface2); color:var(--text2); border:1px solid var(--border); }
+    .comment-badge { display:inline-block; font-size:9px; color:var(--text2); background:var(--surface2); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; margin-top:2px; cursor:pointer; }
+    .comment-badge:hover { color:var(--primary); border-color:var(--primary); }
+    .comment-row { background:var(--surface2); border-radius:8px; padding:7px 10px; }
+    .comment-head { display:flex; justify-content:space-between; gap:8px; margin-bottom:2px; }
+    .comment-author { font-size:11px; font-weight:700; color:var(--primary); }
+    .comment-time { font-size:10px; color:var(--text3); }
+    .comment-text { font-size:13px; color:var(--text); word-break:break-word; }
     .from-badge {
       display:inline-flex; align-items:center; gap:2px; font-size:9px;
       color:#8e24aa; background:color-mix(in srgb, #8e24aa 12%, transparent);
@@ -1192,6 +1259,7 @@
     <button class="view-btn active" id="btnWeek">주간</button>
     <button class="view-btn" id="btnMonth">월간</button>
     <button class="view-btn" id="btnYear">연간</button>
+    <button class="view-btn" id="btnTimeblock">시간표</button>
     <button class="view-btn" id="btnTimeline">타임라인</button>
     <button class="view-btn" id="btnFocus">포커스</button>
   </div>
@@ -1229,12 +1297,96 @@
         <button class="more-menu-item" id="shareCalBtn">👥 <span>일정 공유</span></button>
         <button class="more-menu-item" id="trashBtn">🗑 <span>휴지통</span></button>
         <button class="more-menu-item" id="pomodoroBtn">🍅 <span>포모도로 타이머</span></button>
+        <button class="more-menu-item" id="goalsBtn">🎯 <span>목표 &amp; 연속달성</span></button>
+        <button class="more-menu-item" id="reviewBtn">📋 <span>주간 리뷰</span></button>
+        <button class="more-menu-item" id="icsImportBtn">📥 <span>외부 캘린더 구독</span></button>
+        <button class="more-menu-item" id="teamBtn">🤝 <span>팀 캘린더</span></button>
         <button class="more-menu-item" id="icsExportBtn">📤 <span>캘린더 내보내기</span></button>
+        <button class="more-menu-item" id="printBtn">🖨 <span>인쇄 / 이미지 저장</span></button>
       </div>
     </div>
     <div class="progress-pill" id="progressInfo"></div>
   </div>
 </header>
+
+<button class="fab-add" id="fabAdd" title="빠른 추가 (N)" aria-label="빠른 추가">+</button>
+
+<!-- 빠른 추가 모달 -->
+<div class="modal-overlay hidden" id="quickModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="빠른 추가">
+    <div class="modal-title">⚡ 빠른 추가</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">
+      날짜·시간·태그를 한 줄로: <b>내일 오후 3시 팀미팅 #업무</b>
+    </p>
+    <input class="modal-input" id="quickInput" type="text" placeholder="예: 다음주 화요일 보고서 제출 #업무" style="margin-bottom:6px">
+    <div id="quickPreview" style="font-size:12px;color:var(--text3);min-height:18px;margin-bottom:10px"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="quickCancel">취소</button>
+      <button class="btn-primary" id="quickAdd">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 목표 & 연속달성 모달 -->
+<div class="modal-overlay hidden" id="goalsModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="목표">
+    <div class="modal-title">🎯 목표 &amp; 연속달성</div>
+    <div id="goalsStreakBox" style="margin-bottom:14px"></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <input class="modal-input" id="goalInput" type="text" placeholder="새 목표 (예: 매일 운동하기)" style="margin-bottom:0;flex:1">
+      <select id="goalTarget" class="time-input" style="width:auto">
+        <option value="7">매일</option><option value="5">주 5회</option>
+        <option value="3">주 3회</option><option value="1">주 1회</option>
+      </select>
+      <button class="btn-primary" id="goalAddBtn" type="button">추가</button>
+    </div>
+    <div id="goalsList" style="display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn-secondary" id="goalsClose">닫기</button></div>
+  </div>
+</div>
+
+<!-- 주간 리뷰 모달 -->
+<div class="modal-overlay hidden" id="reviewModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="주간 리뷰" style="width:420px">
+    <div class="modal-title">📋 주간 리뷰</div>
+    <div id="reviewBody"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="reviewClose">닫기</button>
+      <button class="btn-primary" id="reviewCarry">미완료 다음 주로 이월</button>
+    </div>
+  </div>
+</div>
+
+<!-- 외부 캘린더 구독 모달 -->
+<div class="modal-overlay hidden" id="icsModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="외부 캘린더 구독">
+    <div class="modal-title">📥 외부 캘린더 구독</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">
+      구글/회사 캘린더의 <b>.ics 공개 URL</b>을 등록하거나 .ics 파일을 올리면, 그 일정이 읽기 전용으로 함께 표시돼요.
+    </p>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input class="modal-input" id="icsUrlInput" type="text" placeholder="https://calendar.google.com/.../basic.ics" style="margin-bottom:0;flex:1">
+      <button class="btn-primary" id="icsUrlAdd" type="button">구독</button>
+    </div>
+    <button class="more-menu-item" id="icsFileBtn" style="border:1px dashed var(--border);border-radius:8px;justify-content:center;margin-bottom:10px">📎 .ics 파일 올리기</button>
+    <input type="file" id="icsFileInput" accept=".ics,text/calendar" style="display:none">
+    <div id="icsList" style="display:flex;flex-direction:column;gap:6px;max-height:36vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn-secondary" id="icsClose">닫기</button></div>
+  </div>
+</div>
+
+<!-- 댓글 모달 -->
+<div class="modal-overlay hidden" id="commentModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="댓글">
+    <div class="modal-title">💬 댓글 · <span id="commentTaskTitle" style="font-weight:500;color:var(--text2)"></span></div>
+    <div id="commentList" style="display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow-y:auto;margin-bottom:10px"></div>
+    <div style="display:flex;gap:6px">
+      <input class="modal-input" id="commentInput" type="text" placeholder="댓글 입력..." style="margin-bottom:0;flex:1">
+      <button class="btn-primary" id="commentAdd" type="button">등록</button>
+    </div>
+    <div class="modal-actions"><button class="btn-secondary" id="commentClose">닫기</button></div>
+  </div>
+</div>
 
 <div id="mainView"></div>
 
@@ -1313,6 +1465,13 @@
       <span class="modal-label">마감시간</span>
       <input type="time" class="time-input" id="editTimeInput">
       <button type="button" class="time-clear-btn" id="editTimeClear" title="시간 제거">✕</button>
+    </div>
+    <div class="modal-row">
+      <span class="modal-label">소요시간</span>
+      <select id="editDuration" class="time-input" style="width:auto">
+        <option value="">미지정</option><option value="30">30분</option><option value="60">1시간</option>
+        <option value="90">1시간 30분</option><option value="120">2시간</option><option value="180">3시간</option><option value="240">4시간</option>
+      </select>
     </div>
     <div class="modal-actions">
       <button class="btn-secondary" id="editSendBtn" style="margin-right:auto">👥 보내기</button>
@@ -1611,7 +1770,9 @@ const SEED_TASKS = {
 
 // ── URL User ──
 const URL_PARAMS = new URLSearchParams(window.location.search);
-const USER_ID = URL_PARAMS.get('u') || '';
+const _rawTeam = URL_PARAMS.get('team');
+const IS_TEAM = !!_rawTeam;
+const USER_ID = IS_TEAM ? ('team-' + _rawTeam.replace(/[.#$\[\]\/]/g,'').trim().slice(0,40)) : (URL_PARAMS.get('u') || '');
 const STORAGE_KEY = USER_ID ? `calTasks_${USER_ID}` : 'calTasks';
 
 // ── 사용자 지정 휴무일 (할 일 입력하듯 날짜별 지정, 기기 간 동기화) ──
@@ -1674,6 +1835,23 @@ if (!USER_ID) {
   // 읽기 전용 보기 — 방문자의 lastUser를 덮어쓰지 않음
   document.getElementById('userChip').style.display = 'flex';
   document.getElementById('userChipName').textContent = decodeURIComponent(USER_ID) + ' · 👁 읽기 전용';
+} else if (IS_TEAM) {
+  // 팀 캘린더 — 개인 lastUser는 보존, 팀 배지 표시
+  document.getElementById('userChip').style.display = 'flex';
+  document.getElementById('userChipName').textContent = '🤝 ' + _rawTeam + ' (팀)';
+  document.getElementById('copyUrlBtn').style.display = 'flex';
+  document.getElementById('copyUrlBtn').onclick = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      const btn = document.getElementById('copyUrlBtn'); const o = btn.innerHTML;
+      btn.innerHTML = '✅ <span>복사됨!</span>'; setTimeout(() => { btn.innerHTML = o; }, 1800);
+    });
+  };
+  document.getElementById('switchUserBtn').style.display = 'flex';
+  document.getElementById('switchUserBtn').innerHTML = '↩ <span>내 캘린더로</span>';
+  document.getElementById('switchUserBtn').onclick = () => {
+    const last = localStorage.getItem('lastUser');
+    window.location.href = window.location.pathname + (last ? `?u=${encodeURIComponent(last)}` : '');
+  };
 } else {
   // Remember this user for future visits
   localStorage.setItem('lastUser', USER_ID);
@@ -1745,6 +1923,7 @@ function normalizeTasks(raw) {
       skips: t.skips || {},
       memoImages: Array.isArray(t.memoImages) ? t.memoImages : [],
       memoHistory: Array.isArray(t.memoHistory) ? t.memoHistory : [],
+      comments: Array.isArray(t.comments) ? t.comments : [],
     }));
     if (clean.length) out[dk] = clean;
   });
@@ -2346,6 +2525,7 @@ function openEdit(dk,task,isRepeatInst,originDk) {
     b.classList.toggle('active',b.dataset.val===_editRepeat);
   });
   document.getElementById('editTimeInput').value=targetTask.time||'';
+  document.getElementById('editDuration').value=targetTask.duration||'';
   document.getElementById('editInput').value=targetTask.text;
   document.getElementById('editModal').classList.remove('hidden');
   setTimeout(()=>{const inp=document.getElementById('editInput');inp.focus();inp.select();},50);
@@ -2373,7 +2553,7 @@ document.getElementById('editSaveBtn').onclick=()=>{
   const text=document.getElementById('editInput').value.trim();
   if(!text)return;
   const t=(tasks[editCtx.dk]||[]).find(x=>x.id===editCtx.taskId);
-  if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;t.priority=_editPriority;t.time=document.getElementById('editTimeInput').value||null;t.repeatEnd=_editRepeat!=='none'?(document.getElementById('editRepeatEnd').value||null):null;if(!t.completions)t.completions={};}
+  if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;t.priority=_editPriority;t.time=document.getElementById('editTimeInput').value||null;t.duration=document.getElementById('editDuration').value||null;t.repeatEnd=_editRepeat!=='none'?(document.getElementById('editRepeatEnd').value||null):null;if(!t.completions)t.completions={};}
   saveTasks(editCtx.dk); closeEdit(); render();
 };
 document.getElementById('editTimeClear').onclick=()=>{document.getElementById('editTimeInput').value='';};
@@ -3013,13 +3193,32 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   if(!isSub&&task.from){
     body.appendChild(el('div','from-badge',{textContent:'👤 '+task.from+'님이 보냄'}));
+    if(task.pending&&!READ_ONLY){
+      const ar=el('div','accept-row');
+      const ok=el('button','accept-btn',{textContent:'✅ 수락'});
+      ok.onclick=e=>{e.stopPropagation();acceptTask(dk,task.id);};
+      const no=el('button','reject-btn',{textContent:'🚫 거절'});
+      no.onclick=e=>{e.stopPropagation();rejectTask(dk,task.id);};
+      ar.appendChild(ok); ar.appendChild(no); body.appendChild(ar);
+    }
+  }
+  if(!isSub&&Array.isArray(task.comments)&&task.comments.length){
+    const cb=el('div','comment-badge',{textContent:`💬 ${task.comments.length}`});
+    cb.onclick=e=>{e.stopPropagation();openComments(dk,task.id,isRepeatInst,originDk);};
+    body.appendChild(cb);
   }
   if(!isSub&&adjusted){
     body.appendChild(el('div','repeat-adjusted-badge',{textContent:'📅 일정 앞당김'}));
   }
   if(!isSub&&Array.isArray(task.subs)&&task.subs.length){
     const subDone=task.subs.filter(s=>s&&s.checked).length;
-    body.appendChild(el('div','checklist-badge',{textContent:`✓ ${subDone}/${task.subs.length}`}));
+    const subPct=Math.round(subDone/task.subs.length*100);
+    const pbWrap=el('div','subprog');
+    pbWrap.appendChild(el('span','checklist-badge',{textContent:`✓ ${subDone}/${task.subs.length}`}));
+    const bar=el('div','subprog-bar'); const fill=el('div','subprog-fill'); fill.style.width=subPct+'%';
+    if(subPct===100)fill.classList.add('done');
+    bar.appendChild(fill); pbWrap.appendChild(bar);
+    body.appendChild(pbWrap);
     const sl=el('div','subtask-list');
     task.subs.forEach(s=>sl.appendChild(buildTaskItem(isRepeatInst?originDk:dk,s,true,task.id,false,null,null)));
     body.appendChild(sl);
@@ -3050,6 +3249,11 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       pstBtn.onclick=e=>{e.stopPropagation();postponeTask(dk,task.id);};
       actions.appendChild(pstBtn);
     }
+  }
+  if(!isSub){
+    const cmtBtn=el('button','task-act-btn',{textContent:'💬',title:'댓글'});
+    cmtBtn.onclick=e=>{e.stopPropagation();openComments(dk,task.id,isRepeatInst,originDk);};
+    actions.appendChild(cmtBtn);
   }
   const delBtn=el('button','task-act-btn del',{textContent:'✕',title:'삭제'});
   delBtn.onclick=e=>{
@@ -3234,7 +3438,18 @@ function buildDayCol(date,dayIdx){
     row.title = `${owner}님의 일정`;
     list.appendChild(row);
   });
-  if(total===0&&sharedRows.length===0){
+  const icsRows = icsEventsFor(dk);
+  icsRows.forEach(ev => {
+    const row = el('div', 'shared-task');
+    const chip = el('span', 'shared-owner', {textContent: '📅'});
+    chip.style.background = ev.color;
+    chip.title = ev.src;
+    row.appendChild(chip);
+    row.appendChild(el('span', 'shared-text', {textContent: (ev.time ? ev.time + ' ' : '') + ev.title}));
+    row.title = `${ev.src} (외부 캘린더)`;
+    list.appendChild(row);
+  });
+  if(total===0&&sharedRows.length===0&&icsEventsFor(dk).length===0){
     const empty=el('div','day-empty');
     empty.appendChild(el('div','day-empty-icon',{textContent:'○'}));
     empty.appendChild(el('div','day-empty-text',{textContent:'할 일 없음'}));
@@ -3251,6 +3466,89 @@ function buildDayCol(date,dayIdx){
   }
   col.appendChild(buildWeatherBar(dk));
   return col;
+}
+
+// ── 시간표(타임블로킹) 뷰 ──
+function buildTimeblockView(){
+  const wrap=el('div','timeblock-wrap');
+  const dk=dateKey(dayDate);
+  const dayIdx=dateToDayIdx(dayDate);
+  // 그 날의 모든 항목 수집 (직접+반복)
+  const items=[];
+  (tasks[dk]||[]).forEach(t=>{ if(t&&!(t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])&&matchesQuery(t)) items.push({t,isRepeat:false}); });
+  getRepeatTasksForDate(dayDate,dayIdx).forEach(({task,originDk,instanceDk})=>{ if(matchesQuery(task)) items.push({t:task,isRepeat:true,originDk,instanceDk}); });
+  const timed=items.filter(x=>x.t.time).sort((a,b)=>a.t.time<b.t.time?-1:1);
+  const untimed=items.filter(x=>!x.t.time);
+
+  const START_H=6, END_H=24, HOUR_PX=52;
+  const grid=el('div','tb-grid');
+  // 시간 눈금
+  const axis=el('div','tb-axis');
+  for(let h=START_H;h<END_H;h++){
+    const row=el('div','tb-hour');
+    row.style.height=HOUR_PX+'px';
+    row.appendChild(el('span','tb-hour-label',{textContent:`${String(h).padStart(2,'0')}:00`}));
+    axis.appendChild(row);
+  }
+  grid.appendChild(axis);
+  // 일정 레인
+  const lane=el('div','tb-lane');
+  lane.style.height=(END_H-START_H)*HOUR_PX+'px';
+  // 시간선 (지금)
+  if(dk===todayKey()){
+    const now=new Date();
+    const mins=(now.getHours()*60+now.getMinutes())-START_H*60;
+    if(mins>=0&&mins<=(END_H-START_H)*60){
+      const nl=el('div','tb-nowline'); nl.style.top=(mins/60*HOUR_PX)+'px';
+      nl.appendChild(el('span','tb-now-label',{textContent:'지금'}));
+      lane.appendChild(nl);
+    }
+  }
+  // 겹침 감지용
+  const placed=[];
+  timed.forEach(({t,isRepeat,originDk,instanceDk})=>{
+    const [hh,mm]=t.time.split(':').map(Number);
+    const startMin=hh*60+mm-START_H*60;
+    if(startMin<0||startMin>(END_H-START_H)*60) return;
+    const dur=+t.duration||30;
+    const checked=isRepeat?isRepeatChecked(t,instanceDk):t.checked;
+    const blk=el('div',`tb-block${checked?' done':''}`);
+    blk.style.top=(startMin/60*HOUR_PX)+'px';
+    blk.style.height=Math.max(20,dur/60*HOUR_PX-3)+'px';
+    if(t.color)blk.style.borderLeftColor=t.color;
+    // 겹침 → 가로 분할
+    const endMin=startMin+dur;
+    const overlaps=placed.filter(p=>startMin<p.end&&endMin>p.start);
+    const col=overlaps.length;
+    blk.style.left=`calc(${col*48}px + 2px)`;
+    if(col>0)blk.classList.add('tb-overlap');
+    placed.push({start:startMin,end:endMin});
+    blk.appendChild(el('div','tb-block-time',{textContent:t.time+(t.duration?`~${addMin(t.time,dur)}`:'')}));
+    blk.appendChild(el('div','tb-block-text',{textContent:t.text}));
+    blk.onclick=()=>openEdit(dk,t,isRepeat,originDk);
+    lane.appendChild(blk);
+  });
+  grid.appendChild(lane);
+  wrap.appendChild(grid);
+
+  // 시간 미지정 항목
+  if(untimed.length){
+    const ut=el('div','tb-untimed');
+    ut.appendChild(el('div','tb-untimed-title',{textContent:'🕒 시간 미지정'}));
+    const ul=el('div','tasks-list');
+    untimed.forEach(({t,isRepeat,originDk,instanceDk})=>ul.appendChild(buildTaskItem(dk,t,false,null,isRepeat,originDk,instanceDk)));
+    ut.appendChild(ul);
+    wrap.appendChild(ut);
+  }
+  if(!items.length){
+    wrap.appendChild(el('div','focus-empty',{textContent:'이 날 일정이 없습니다 — 시간을 지정하면 여기 블록으로 표시돼요'}));
+  }
+  return wrap;
+}
+function addMin(time,min){
+  const [h,m]=time.split(':').map(Number);
+  const tot=h*60+m+min;
+  return `${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;
 }
 
 // ── Focus view (오늘 포커스) ──
@@ -3521,10 +3819,35 @@ function buildTimelineView(){
 }
 
 // ── Search ──
+let tagFilter = null;
+function allTaskTags(){
+  const set = new Set();
+  Object.values(tasks).forEach(list => Array.isArray(list) && list.forEach(t => {
+    if (!t || !t.text) return;
+    (t.text.match(/#[\w가-힣]+/g) || []).forEach(tag => set.add(tag));
+  }));
+  return [...set].sort();
+}
 function matchesQuery(t){
+  if(tagFilter && !(t.text && t.text.includes(tagFilter))) return false;
   if(!searchQuery) return true;
   const q=searchQuery.toLowerCase();
   return (t.text&&t.text.toLowerCase().includes(q))||(t.memo&&t.memo.toLowerCase().includes(q))||(Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q)));
+}
+function buildTagFilterBar(){
+  const tags = allTaskTags();
+  if (!tags.length) return null;
+  const bar = el('div', 'tag-filter-bar');
+  bar.appendChild(el('span', '', {textContent: '🏷', style: 'font-size:12px'}));
+  const allChip = el('button', `tag-filter-chip${tagFilter ? '' : ' active'}`, {textContent: '전체'});
+  allChip.onclick = () => { tagFilter = null; render(); };
+  bar.appendChild(allChip);
+  tags.forEach(tag => {
+    const chip = el('button', `tag-filter-chip${tagFilter === tag ? ' active' : ''}`, {textContent: tag});
+    chip.onclick = () => { tagFilter = (tagFilter === tag ? null : tag); render(); };
+    bar.appendChild(chip);
+  });
+  return bar;
 }
 
 function buildSearchView(query){
@@ -3622,7 +3945,7 @@ function render(){
     document.getElementById('weekLabel').textContent=`${weekStart.getFullYear()}년 ${weekStart.getMonth()+1}월 ${weekStart.getDate()}일 ~ ${end.getMonth()+1}월 ${end.getDate()}일`;
   } else if(currentView==='month'||currentView==='timeline') {
     document.getElementById('weekLabel').textContent=`${monthDate.getFullYear()}년 ${monthDate.getMonth()+1}월`;
-  } else if(currentView==='day') {
+  } else if(currentView==='day'||currentView==='timeblock') {
     document.getElementById('weekLabel').textContent=`${dayDate.getFullYear()}년 ${dayDate.getMonth()+1}월 ${dayDate.getDate()}일 (${DAY_NAMES[dateToDayIdx(dayDate)]})`;
   } else if(currentView==='year') {
     document.getElementById('weekLabel').textContent=`${yearNum}년`;
@@ -3639,7 +3962,10 @@ function render(){
     view.appendChild(buildYearView());
   } else if(currentView==='timeline'){
     view.appendChild(buildTimelineView());
+  } else if(currentView==='timeblock'){
+    view.appendChild(buildTimeblockView());
   } else if(currentView==='week'){
+    const tagBar=buildTagFilterBar(); if(tagBar) view.appendChild(tagBar);
     const wrap=el('div','calendar-wrap');
     // scroll hint on mobile
     if(window.innerWidth<=768){
@@ -3687,14 +4013,14 @@ function render(){
 document.getElementById('prevBtn').onclick=()=>{
   if(currentView==='week')weekStart.setDate(weekStart.getDate()-7);
   else if(currentView==='month'||currentView==='timeline')monthDate.setMonth(monthDate.getMonth()-1);
-  else if(currentView==='day')dayDate.setDate(dayDate.getDate()-1);
+  else if(currentView==='day'||currentView==='timeblock')dayDate.setDate(dayDate.getDate()-1);
   else if(currentView==='year')yearNum--;
   render();
 };
 document.getElementById('nextBtn').onclick=()=>{
   if(currentView==='week')weekStart.setDate(weekStart.getDate()+7);
   else if(currentView==='month'||currentView==='timeline')monthDate.setMonth(monthDate.getMonth()+1);
-  else if(currentView==='day')dayDate.setDate(dayDate.getDate()+1);
+  else if(currentView==='day'||currentView==='timeblock')dayDate.setDate(dayDate.getDate()+1);
   else if(currentView==='year')yearNum++;
   render();
 };
@@ -3702,7 +4028,7 @@ document.getElementById('todayBtn').onclick=()=>{
   weekStart=getMonday(new Date()); monthDate=new Date(); monthDate.setDate(1);
   dayDate=today(); yearNum=new Date().getFullYear(); render();
 };
-const VIEW_BTNS={day:'btnDay',week:'btnWeek',month:'btnMonth',year:'btnYear',timeline:'btnTimeline',focus:'btnFocus'};
+const VIEW_BTNS={day:'btnDay',week:'btnWeek',month:'btnMonth',timeblock:'btnTimeblock',year:'btnYear',timeline:'btnTimeline',focus:'btnFocus'};
 function setView(v){
   currentView=v;
   Object.entries(VIEW_BTNS).forEach(([view,id])=>document.getElementById(id).classList.toggle('active',v===view));
@@ -5043,7 +5369,7 @@ function sendTaskToUser(dk, taskId) {
     color: t.color || null, repeat: 'none', priority: t.priority || null,
     time: t.time || null, memo: t.memo || '', completions: {}, skips: {},
     subs: (t.subs || []).map(s => ({id: uid(), text: s.text, checked: false, starred: false, color: null, subs: []})),
-    from: USER_ID,
+    from: USER_ID, pending: true,
   };
   const ref = fbDb.ref(`users/${to}/tasks/${dk}`);
   ref.once('value').then(snap => {
@@ -5057,6 +5383,403 @@ function sendTaskToUser(dk, taskId) {
 document.getElementById('editSendBtn').onclick = () => {
   if (editCtx) sendTaskToUser(editCtx.dk, editCtx.taskId);
 };
+
+// ═══════════════════════════════════════
+// 🎯 목표 & 연속달성(streak)
+// ═══════════════════════════════════════
+const GOALS_KEY = USER_ID ? `calGoals_${USER_ID}` : 'calGoals';
+let goals = (() => { try { return JSON.parse(localStorage.getItem(GOALS_KEY) || '[]') || []; } catch { return []; } })();
+let goalSaveTimer = null, pendingGoalLocal = false;
+function goalsFbRef() { return fbDb && USER_ID && USER_ID !== 'demo' ? fbDb.ref(`users/${USER_ID}/goals`) : null; }
+function saveGoals() {
+  if (READ_ONLY) return;
+  localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  const ref = goalsFbRef(); if (!ref) return;
+  pendingGoalLocal = true;
+  clearTimeout(goalSaveTimer);
+  goalSaveTimer = setTimeout(() => { goalSaveTimer = null; ref.set(goals).then(()=>{pendingGoalLocal=false;}).catch(()=>{}); }, 300);
+}
+function initGoalSync() {
+  const ref = goalsFbRef(); if (!ref) return;
+  ref.on('value', snap => {
+    if (pendingGoalLocal) return;
+    const r = snap.val();
+    goals = Array.isArray(r) ? r : (r ? Object.values(r) : []);
+    localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  }, () => {});
+}
+// 오늘 체크 토글
+function toggleGoalToday(id) {
+  const g = goals.find(x => x.id === id); if (!g) return;
+  if (!g.done) g.done = {};
+  const tk = todayKey();
+  if (g.done[tk]) delete g.done[tk]; else g.done[tk] = true;
+  saveGoals(); renderGoals();
+}
+// 현재 연속 달성일 (오늘부터 거꾸로, target=7이면 매일 기준 / 그 외 주간목표는 이번주 횟수)
+function goalStreak(g) {
+  let streak = 0;
+  const d = today();
+  for (let i = 0; i < 400; i++) {
+    if (g.done && g.done[dateKey(d)]) streak++;
+    else if (i > 0) break;          // 오늘 안 했어도 어제까지 연속은 인정
+    else if (!(g.done && g.done[dateKey(d)])) { /* 오늘 미완료 → 어제부터 */ }
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+function goalWeekCount(g) {
+  const mon = getMonday(new Date());
+  let c = 0;
+  for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(d.getDate()+i); if (g.done && g.done[dateKey(d)]) c++; }
+  return c;
+}
+function openGoals() {
+  renderGoals();
+  document.getElementById('goalsModal').classList.remove('hidden');
+}
+function renderGoals() {
+  // 상단 요약
+  const box = document.getElementById('goalsStreakBox');
+  const best = goals.reduce((mx, g) => Math.max(mx, goalStreak(g)), 0);
+  box.innerHTML = goals.length
+    ? `<div style="text-align:center;padding:10px;background:var(--surface2);border-radius:10px">
+         <div style="font-size:26px">🔥 ${best}일</div>
+         <div style="font-size:11px;color:var(--text3)">최고 연속 달성</div></div>`
+    : '<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">목표를 추가하고 매일 체크해보세요</div>';
+  const list = document.getElementById('goalsList');
+  list.innerHTML = '';
+  const tk = todayKey();
+  goals.forEach(g => {
+    const row = el('div', 'goal-row');
+    const today_done = !!(g.done && g.done[tk]);
+    const cb = el('button', `goal-check${today_done ? ' on' : ''}`, {textContent: today_done ? '✓' : ''});
+    cb.title = '오늘 달성 체크';
+    cb.onclick = () => toggleGoalToday(g.id);
+    row.appendChild(cb);
+    const info = el('div', 'goal-info');
+    info.appendChild(el('div', 'goal-name', {textContent: g.text}));
+    const wc = goalWeekCount(g), tgt = +g.target || 7;
+    info.appendChild(el('div', 'goal-meta', {textContent: `🔥 ${goalStreak(g)}일 연속 · 이번 주 ${wc}/${tgt===7?7:tgt}회`}));
+    row.appendChild(info);
+    const del = el('button', 'task-act-btn del', {textContent: '✕', title: '목표 삭제'});
+    del.onclick = () => { goals = goals.filter(x => x.id !== g.id); saveGoals(); renderGoals(); };
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+document.getElementById('goalsBtn').onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); openGoals(); };
+document.getElementById('goalsClose').onclick = () => document.getElementById('goalsModal').classList.add('hidden');
+document.getElementById('goalsModal').onclick = e => { if (e.target === document.getElementById('goalsModal')) document.getElementById('goalsModal').classList.add('hidden'); };
+document.getElementById('goalAddBtn').onclick = () => {
+  const inp = document.getElementById('goalInput');
+  const t = inp.value.trim(); if (!t) { inp.focus(); return; }
+  goals.push({ id: uid(), text: t, target: +document.getElementById('goalTarget').value, done: {} });
+  inp.value = ''; saveGoals(); renderGoals();
+};
+document.getElementById('goalInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('goalAddBtn').click(); });
+
+// ═══════════════════════════════════════
+// 📋 주간 리뷰
+// ═══════════════════════════════════════
+function openReview() {
+  const mon = getMonday(new Date());
+  let done = 0, undone = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mon); d.setDate(d.getDate() + i);
+    const dk = dateKey(d);
+    (tasks[dk] || []).forEach(t => {
+      if (!t || (t.repeat && t.repeat !== 'none')) return;
+      if (t.checked) done++; else undone.push({dk, t, d});
+    });
+  }
+  const total = done + undone.length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const body = document.getElementById('reviewBody');
+  body.innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:30px;font-weight:800;color:var(--primary)">${pct}%</div>
+      <div style="font-size:12px;color:var(--text3)">이번 주 완료 ${done} / ${total}건</div>
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px">
+        <div style="height:100%;width:${pct}%;background:var(--green)"></div></div>
+    </div>`;
+  const ul = el('div', '', {style: 'max-height:38vh;overflow-y:auto'});
+  if (!undone.length) ul.appendChild(el('div', 'day-empty-text', {textContent: '🎉 미완료 항목이 없어요!', style: 'text-align:center;padding:14px;color:var(--green)'}));
+  undone.forEach(({t, d}) => {
+    const r = el('div', 'review-row');
+    r.appendChild(el('span', '', {textContent: `${d.getMonth()+1}/${d.getDate()}`, style: 'font-size:11px;color:var(--text3);min-width:38px'}));
+    r.appendChild(el('span', '', {textContent: t.text, style: 'flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+    ul.appendChild(r);
+  });
+  body.appendChild(ul);
+  document.getElementById('reviewModal').dataset.undoneCount = undone.length;
+  document.getElementById('reviewModal').classList.remove('hidden');
+}
+function carryReviewToNextWeek() {
+  const mon = getMonday(new Date());
+  let moved = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mon); d.setDate(d.getDate() + i);
+    const dk = dateKey(d);
+    const list = tasks[dk] || [];
+    for (let j = list.length - 1; j >= 0; j--) {
+      const t = list[j];
+      if (!t || t.checked || (t.repeat && t.repeat !== 'none')) continue;
+      const nd = new Date(d); nd.setDate(nd.getDate() + 7);
+      const ndk = dateKey(nd);
+      list.splice(j, 1);
+      if (!tasks[ndk]) tasks[ndk] = [];
+      tasks[ndk].push(t); moved++;
+    }
+    if (tasks[dk] && !tasks[dk].length) delete tasks[dk];
+  }
+  saveTasks(); render();
+  document.getElementById('reviewModal').classList.add('hidden');
+  showUndoToast(`📋 미완료 ${moved}개를 다음 주로 이월했어요`);
+}
+document.getElementById('reviewBtn').onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); openReview(); };
+document.getElementById('reviewClose').onclick = () => document.getElementById('reviewModal').classList.add('hidden');
+document.getElementById('reviewCarry').onclick = carryReviewToNextWeek;
+document.getElementById('reviewModal').onclick = e => { if (e.target === document.getElementById('reviewModal')) document.getElementById('reviewModal').classList.add('hidden'); };
+
+// ═══════════════════════════════════════
+// ⚡ 빠른 추가 (자연어)
+// ═══════════════════════════════════════
+function openQuickAdd() {
+  if (READ_ONLY) return;
+  document.getElementById('quickInput').value = '';
+  document.getElementById('quickPreview').textContent = '';
+  document.getElementById('quickModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('quickInput').focus(), 60);
+}
+function quickParse(raw) {
+  let v = raw.trim(), dk = todayKey(), time = null;
+  const pd = parseQuickDate(v); if (pd && pd.text) { v = pd.text; dk = dateKey(pd.date); }
+  const pt = parseQuickTime(v); if (pt && pt.text) { v = pt.text; time = pt.time; }
+  return { text: v, dk, time };
+}
+document.getElementById('quickInput').addEventListener('input', e => {
+  const raw = e.target.value.trim();
+  if (!raw) { document.getElementById('quickPreview').textContent = ''; return; }
+  const p = quickParse(raw);
+  const d = parseDk(p.dk);
+  document.getElementById('quickPreview').textContent =
+    `📅 ${d.getMonth()+1}/${d.getDate()}(${DAY_NAMES[dateToDayIdx(d)]})${p.time ? ' · 🕐 ' + p.time : ''} · ${p.text || '(내용 없음)'}`;
+});
+function quickSubmit() {
+  const raw = document.getElementById('quickInput').value.trim();
+  if (!raw) return;
+  const p = quickParse(raw);
+  if (!p.text) return;
+  addTask(p.dk, p.text, null, false, 'none', null, null, p.time);
+  document.getElementById('quickModal').classList.add('hidden');
+  const d = parseDk(p.dk);
+  showUndoToast(`⚡ ${d.getMonth()+1}/${d.getDate()}에 "${p.text}" 추가`);
+}
+document.getElementById('quickAdd').onclick = quickSubmit;
+document.getElementById('quickCancel').onclick = () => document.getElementById('quickModal').classList.add('hidden');
+document.getElementById('quickInput').addEventListener('keydown', e => { if (e.key === 'Enter') quickSubmit(); if (e.key === 'Escape') document.getElementById('quickModal').classList.add('hidden'); });
+document.getElementById('quickModal').onclick = e => { if (e.target === document.getElementById('quickModal')) document.getElementById('quickModal').classList.add('hidden'); };
+document.getElementById('fabAdd').onclick = openQuickAdd;
+
+// ═══════════════════════════════════════
+// 🖨 인쇄 / 이미지 저장
+// ═══════════════════════════════════════
+document.getElementById('printBtn').onclick = () => {
+  document.getElementById('moreMenu').classList.add('hidden');
+  window.print();
+};
+
+// ═══════════════════════════════════════
+// 📥 외부 캘린더 구독 (ICS) — 읽기 전용 오버레이
+// ═══════════════════════════════════════
+const ICS_KEY = USER_ID ? `calIcs_${USER_ID}` : 'calIcs';
+let icsSubs = (() => { try { return JSON.parse(localStorage.getItem(ICS_KEY) || '[]') || []; } catch { return []; } })();
+let icsEvents = {};   // dk → [{title, time, src}]
+function saveIcsSubs() { localStorage.setItem(ICS_KEY, JSON.stringify(icsSubs)); }
+function parseICS(text, srcName) {
+  // VEVENT의 DTSTART/SUMMARY 추출 (단순 파서: 종일/시간 모두)
+  const out = [];
+  const unfold = text.replace(/\r\n[ \t]/g, '').split(/\r?\n/);
+  let cur = null;
+  unfold.forEach(line => {
+    if (line === 'BEGIN:VEVENT') cur = {};
+    else if (line === 'END:VEVENT') { if (cur && cur.dk) out.push(cur); cur = null; }
+    else if (cur) {
+      let m;
+      if ((m = line.match(/^DTSTART[^:]*:(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/))) {
+        cur.dk = `${m[1]}-${m[2]}-${m[3]}`;
+        cur.time = m[4] ? `${m[4]}:${m[5]}` : null;
+      } else if ((m = line.match(/^SUMMARY[^:]*:(.+)/))) {
+        cur.title = m[1].replace(/\\,/g, ',').replace(/\\n/gi, ' ').trim();
+      }
+    }
+  });
+  return out.map(e => ({ dk: e.dk, time: e.time, title: e.title || '(제목 없음)', src: srcName }));
+}
+function rebuildIcsEvents() {
+  icsEvents = {};
+  icsSubs.forEach(sub => {
+    if (!sub.on || !Array.isArray(sub.events)) return;
+    sub.events.forEach(ev => {
+      if (!icsEvents[ev.dk]) icsEvents[ev.dk] = [];
+      icsEvents[ev.dk].push({ title: ev.title, time: ev.time, color: sub.color, src: sub.name });
+    });
+  });
+}
+function icsEventsFor(dk) { return icsEvents[dk] || []; }
+async function fetchIcsUrl(url) {
+  const tries = [
+    url,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  ];
+  for (const u of tries) {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) continue;
+      const txt = await r.text();
+      if (txt.includes('BEGIN:VCALENDAR')) return txt;
+    } catch {}
+  }
+  return null;
+}
+const ICS_COLORS = ['#00897b','#3949ab','#d81b60','#6d4c41','#546e7a'];
+function openIcsModal() { renderIcsList(); document.getElementById('icsModal').classList.remove('hidden'); }
+function renderIcsList() {
+  const box = document.getElementById('icsList');
+  box.innerHTML = '';
+  if (!icsSubs.length) { box.appendChild(el('div','day-empty-text',{textContent:'구독한 캘린더가 없어요',style:'text-align:center;padding:10px;color:var(--text3);font-size:12px'})); return; }
+  icsSubs.forEach((sub, i) => {
+    const row = el('div','share-row');
+    const dot = el('span','share-color-dot'); dot.style.background = sub.color; dot.style.cursor='default'; row.appendChild(dot);
+    const info = el('div',{},{}); info.style.flex='1'; info.style.minWidth='0';
+    info.appendChild(el('div','share-name',{textContent:sub.name}));
+    info.appendChild(el('div','goal-meta',{textContent:`${(sub.events||[]).length}개 일정`}));
+    row.appendChild(info);
+    const toggle = el('button',`share-toggle${sub.on?' on':''}`,{textContent:sub.on?'👁 보는 중':'🚫 숨김'});
+    toggle.onclick=()=>{ sub.on=!sub.on; saveIcsSubs(); rebuildIcsEvents(); renderIcsList(); render(); };
+    row.appendChild(toggle);
+    if (sub.url) {
+      const refresh = el('button','task-act-btn',{textContent:'🔄',title:'새로고침'});
+      refresh.onclick=async()=>{ refresh.textContent='⏳'; const txt=await fetchIcsUrl(sub.url); if(txt){sub.events=parseICS(txt,sub.name);saveIcsSubs();rebuildIcsEvents();render();showUndoToast('🔄 캘린더를 새로고침했어요');} else showUndoToast('⚠️ 불러오기 실패'); renderIcsList(); };
+      row.appendChild(refresh);
+    }
+    const del = el('button','task-act-btn del',{textContent:'✕',title:'구독 취소'});
+    del.onclick=()=>{ icsSubs.splice(i,1); saveIcsSubs(); rebuildIcsEvents(); renderIcsList(); render(); };
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+document.getElementById('icsImportBtn').onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); openIcsModal(); };
+document.getElementById('icsClose').onclick = () => document.getElementById('icsModal').classList.add('hidden');
+document.getElementById('icsModal').onclick = e => { if (e.target === document.getElementById('icsModal')) document.getElementById('icsModal').classList.add('hidden'); };
+document.getElementById('icsUrlAdd').onclick = async () => {
+  const inp = document.getElementById('icsUrlInput');
+  const url = inp.value.trim(); if (!url) { inp.focus(); return; }
+  const btn = document.getElementById('icsUrlAdd'); btn.textContent='⏳';
+  const txt = await fetchIcsUrl(url.replace(/^webcal:/i,'https:'));
+  btn.textContent='구독';
+  if (!txt) { showUndoToast('⚠️ 불러올 수 없어요 (URL·공개여부 확인)'); return; }
+  const name = (url.match(/([^\/]+)\.ics/)||[])[1] || ('캘린더 '+(icsSubs.length+1));
+  icsSubs.push({ name, url: url.replace(/^webcal:/i,'https:'), color: ICS_COLORS[icsSubs.length%ICS_COLORS.length], on:true, events: parseICS(txt,name) });
+  inp.value=''; saveIcsSubs(); rebuildIcsEvents(); renderIcsList(); render();
+  showUndoToast(`📥 ${name} 구독 완료`);
+};
+document.getElementById('icsFileBtn').onclick = () => document.getElementById('icsFileInput').click();
+document.getElementById('icsFileInput').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    const name = f.name.replace(/\.ics$/i,'');
+    icsSubs.push({ name, url:null, color: ICS_COLORS[icsSubs.length%ICS_COLORS.length], on:true, events: parseICS(rd.result, name) });
+    saveIcsSubs(); rebuildIcsEvents(); renderIcsList(); render();
+    showUndoToast(`📥 ${name} 추가 완료`);
+  };
+  rd.readAsText(f);
+  e.target.value='';
+});
+
+// ═══════════════════════════════════════
+// 🤝 팀 캘린더 — ?team=ID 공동 편집 (URL만 알면 함께 편집)
+// ═══════════════════════════════════════
+document.getElementById('teamBtn').onclick = () => {
+  document.getElementById('moreMenu').classList.add('hidden');
+  if (IS_TEAM) {
+    if (confirm('내 개인 캘린더로 돌아갈까요?')) {
+      const last = localStorage.getItem('lastUser');
+      window.location.href = window.location.pathname + (last ? `?u=${encodeURIComponent(last)}` : '');
+    }
+    return;
+  }
+  const choice = prompt('팀 캘린더 이름을 입력하세요.\n같은 이름을 입력한 사람끼리 일정을 함께 편집합니다.\n(예: 마케팅2팀)');
+  if (!choice) return;
+  const id = choice.replace(/[.#$\[\]\/]/g, '').trim().slice(0, 40);
+  if (!id) return;
+  window.location.href = window.location.pathname + `?team=${encodeURIComponent(id)}`;
+};
+
+// ═══════════════════════════════════════
+// 💬 일정 댓글 + ✅ 수락/거절(받은 일정)
+// ═══════════════════════════════════════
+let commentCtx = null;
+function openComments(dk, taskId, isRepeatInst, originDk) {
+  const tdk = isRepeatInst ? originDk : dk;
+  const t = (tasks[tdk]||[]).find(x => x.id === taskId);
+  if (!t) return;
+  commentCtx = { dk: tdk, taskId };
+  document.getElementById('commentTaskTitle').textContent = t.text;
+  renderComments();
+  document.getElementById('commentModal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('commentInput').focus(), 60);
+}
+function renderComments() {
+  if (!commentCtx) return;
+  const t = (tasks[commentCtx.dk]||[]).find(x => x.id === commentCtx.taskId);
+  const box = document.getElementById('commentList');
+  box.innerHTML = '';
+  const cs = (t && t.comments) || [];
+  if (!cs.length) box.appendChild(el('div','day-empty-text',{textContent:'아직 댓글이 없어요',style:'text-align:center;padding:12px;color:var(--text3);font-size:12px'}));
+  cs.forEach(c => {
+    const row = el('div','comment-row');
+    const head = el('div','comment-head');
+    head.appendChild(el('span','comment-author',{textContent:'👤 '+(c.by||'익명')}));
+    const d = new Date(c.ts);
+    head.appendChild(el('span','comment-time',{textContent:`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}));
+    row.appendChild(head);
+    row.appendChild(el('div','comment-text',{textContent:c.text}));
+    box.appendChild(row);
+  });
+}
+function addComment() {
+  if (!commentCtx || READ_ONLY) return;
+  const inp = document.getElementById('commentInput');
+  const text = inp.value.trim(); if (!text) return;
+  const t = (tasks[commentCtx.dk]||[]).find(x => x.id === commentCtx.taskId);
+  if (!t) return;
+  if (!Array.isArray(t.comments)) t.comments = [];
+  t.comments.push({ by: IS_TEAM ? (localStorage.getItem('lastUser')||'멤버') : (USER_ID||'나'), text, ts: Date.now() });
+  inp.value=''; saveTasks(commentCtx.dk); renderComments(); render();
+}
+document.getElementById('commentClose').onclick = () => document.getElementById('commentModal').classList.add('hidden');
+document.getElementById('commentModal').onclick = e => { if (e.target === document.getElementById('commentModal')) document.getElementById('commentModal').classList.add('hidden'); };
+document.getElementById('commentAdd').onclick = addComment;
+document.getElementById('commentInput').addEventListener('keydown', e => { if (e.key === 'Enter') addComment(); });
+
+// 받은 일정 수락/거절
+function acceptTask(dk, taskId) {
+  const t = (tasks[dk]||[]).find(x => x.id === taskId);
+  if (t) { delete t.pending; saveTasks(dk); render(); showUndoToast('✅ 일정을 수락했어요'); }
+}
+function rejectTask(dk, taskId) {
+  const list = tasks[dk]||[]; const idx = list.findIndex(x => x.id === taskId);
+  if (idx<0) return;
+  const [removed]=list.splice(idx,1);
+  if(!list.length) delete tasks[dk];
+  saveTasks(dk); render();
+  showUndoToast('🚫 일정을 거절했어요', ()=>{ if(!tasks[dk])tasks[dk]=[]; tasks[dk].push(removed); saveTasks(dk); render(); });
+}
 
 // ── Keyboard shortcuts ──
 document.addEventListener('keydown',e=>{
@@ -5074,7 +5797,10 @@ document.addEventListener('keydown',e=>{
     activeInput={dateKey:dateKey(new Date()),parentId:null};
     render();
   }
-  if(e.key==='Escape'){closeMemo();closeEdit();closeRepeatDel();closeNoteHist();closeCanvas();closeSlashMenu();closeLightbox();closeShareModal();document.getElementById('notesMenu').classList.add('hidden');activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
+  if((e.key==='n'||e.key==='N')&&!e.target.closest('input,textarea')){e.preventDefault();openQuickAdd();return;}
+  if(e.key==='Escape'){closeMemo();closeEdit();closeRepeatDel();closeNoteHist();closeCanvas();closeSlashMenu();closeLightbox();closeShareModal();
+    ['quickModal','goalsModal','reviewModal','icsModal','commentModal'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+    document.getElementById('notesMenu').classList.add('hidden');activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
 });
 
 // ── Init ──
@@ -5086,6 +5812,8 @@ renderNoteWins();
 initMemoSync();
 initOffSync();
 initShareSync();
+initGoalSync();
+rebuildIcsEvents();
 setInterval(()=>{ if(fbRef()) fbUpload(); }, 5*60*1000);
 window.addEventListener('online', ()=>{ if(pendingUpload && fbRef()){ pendingUpload=false; fbUpload(); } });
 window.addEventListener('offline', ()=>setSyncStatus('offline'));
