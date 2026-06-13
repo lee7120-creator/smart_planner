@@ -263,6 +263,8 @@ if (!USER_ID) {
       .catch(() => { btn.innerHTML = '❌ <span>실패</span>'; })
       .finally(() => setTimeout(() => { btn.innerHTML = '☁️ <span>저장</span>'; btn.disabled = false; }, 2000));
   };
+  document.getElementById('renameBtn').style.display = 'flex';
+  document.getElementById('renameBtn').onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); renameAccount(); };
   document.getElementById('switchUserBtn').style.display = 'flex';
   document.getElementById('switchUserBtn').onclick = () => {
     if (confirm('다른 사용자로 전환할까요? 현재 데이터는 유지됩니다.')) {
@@ -281,8 +283,11 @@ let yearNum = new Date().getFullYear();
 let tasks = loadTasks();
 let activeInput = null;
 let weatherByDate = {};
+let weatherStatus = 'loading';  // 'loading' | 'ok' | 'error'
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
 let searchQuery = '';
+let selectMode = false;            // 다중 선택 모드
+let bulkSelected = new Set();       // 선택된 태스크 키("dk|id")
 let editCtx = null;
 let _editColor = null, _editStarred = false, _editRepeat = 'none', _editPriority = null;
 
@@ -315,12 +320,14 @@ function loadTasks() {
 }
 
 let pendingUpload = false;
+let pendingTasksLocal = false;  // 로컬 편집이 Firebase로 반영되는 중 → 원격 스냅샷이 덮어쓰지 않도록 가드
 
 function saveTasks(dk) {
   if (READ_ONLY) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   const ref = fbRef();
   if (!ref) return;
+  pendingTasksLocal = true;
   if (!navigator.onLine) { pendingUpload = true; setSyncStatus('offline'); return; }
   setSyncStatus('syncing');
   clearTimeout(fbSaveTimer);
@@ -328,7 +335,7 @@ function saveTasks(dk) {
     const saveRef = dk ? ref.child(dk) : ref;
     const saveData = dk ? (tasks[dk] || null) : tasks;
     saveRef.set(saveData)
-      .then(() => setSyncStatus('synced'))
+      .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
       .catch(() => { pendingUpload = true; setSyncStatus('offline'); });
   }, 300);
 }
@@ -337,9 +344,10 @@ function fbUpload() {
   if (READ_ONLY) return Promise.reject('read-only');
   const ref = fbRef();
   if (!ref) return Promise.reject('no ref');
+  pendingTasksLocal = true;
   setSyncStatus('syncing');
   return ref.set(tasks)
-    .then(() => setSyncStatus('synced'))
+    .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
     .catch(e => { setSyncStatus('offline'); throw e; });
 }
 
@@ -364,13 +372,15 @@ function initFirebaseSync() {
     } else {
       setSyncStatus('synced');
     }
-    // 2) 이후 다른 기기 변경사항 실시간 반영
+    // 2) 이후 다른 기기 변경사항 실시간 반영 (단, 내 로컬 편집 업로드 중이면 건너뜀 → 덮어쓰기 방지)
     ref.on('value', snapshot => {
+      if (pendingTasksLocal) return;
       const remote = snapshot.val();
       if (remote && typeof remote === 'object') {
         tasks = normalizeTasks(remote);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
         render();
+        if (typeof checkPendingNotifications === 'function') checkPendingNotifications();
       }
     });
   }).catch(() => setSyncStatus('offline'));
@@ -388,8 +398,12 @@ function today() { const d=new Date(); d.setHours(0,0,0,0); return d; }
 function dateToDayIdx(d) { const dd=(typeof d==='string')?parseDk(d):d; const day=dd.getDay(); return day===0?6:day-1; }
 
 // ── Repeat helpers ──
+// 렌더 단위 캐시: 월/연/간트 뷰는 셀마다 호출하므로 dk별 1회 계산으로 재사용 (render 시작 시 비움)
+let _repeatCache = new Map();
 function getRepeatTasksForDate(date, dayIdx) {
   const dk = dateKey(date);
+  const _c = _repeatCache.get(dk);
+  if (_c) return _c;
   const out = [];
   Object.entries(tasks).forEach(([oDk, list]) => {
     if (oDk===dk || dk < oDk) return;  // 반복은 시작일 이후에만
@@ -441,6 +455,7 @@ function getRepeatTasksForDate(date, dayIdx) {
       }
     });
   });
+  _repeatCache.set(dk, out);
   return out;
 }
 function isRepeatChecked(task, instanceDk) {
@@ -899,6 +914,7 @@ function openEdit(dk,task,isRepeatInst,originDk) {
   document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
     b.classList.toggle('active',b.dataset.val===_editRepeat);
   });
+  document.getElementById('editRepeatCapHint').style.display = (_editRepeat!=='none'?'flex':'none');
   document.getElementById('editTimeInput').value=targetTask.time||'';
   document.getElementById('editDuration').value=targetTask.duration||'';
   document.getElementById('editInput').value=targetTask.text;
@@ -914,6 +930,7 @@ document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(b=>{
     _editRepeat=b.dataset.val;
     document.querySelectorAll('#editRepeatSel .repeat-opt').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
+    document.getElementById('editRepeatCapHint').style.display = (_editRepeat!=='none'?'flex':'none');
   };
 });
 document.querySelectorAll('#editPrioritySel .priority-opt').forEach(b=>{
@@ -1457,15 +1474,19 @@ memoPopupEl.addEventListener('drop', e=>{
 
 // ── Weather ──
 async function fetchWeather(lat,lon) {
+  weatherStatus='loading';
   try {
     const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto&forecast_days=16`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
     const d=await r.json();
+    if(!d.daily||!d.daily.time) throw new Error('형식 오류');
     (d.daily.time||[]).forEach((dt,i)=>{
       const code=d.daily.weathercode[i]??0;
       weatherByDate[dt]={emoji:WMO[code]||'🌡️',desc:WMO_D[code]||'',max:Math.round(d.daily.temperature_2m_max[i]),min:Math.round(d.daily.temperature_2m_min[i]),rain:d.daily.precipitation_probability_max[i]??0};
     });
+    weatherStatus='ok';
     render();
-  } catch(e){console.warn('날씨 로드 실패',e);}
+  } catch(e){ console.warn('날씨 로드 실패',e); weatherStatus='error'; render(); }
 }
 document.getElementById('locationBtn').onclick=()=>{
   if(!navigator.geolocation)return;
@@ -1477,13 +1498,29 @@ document.getElementById('locationBtn').onclick=()=>{
 
 // ── DOM helper ──
 function el(tag,cls,attrs){const e=document.createElement(tag);if(cls)e.className=cls;if(attrs)Object.assign(e,attrs);return e;}
+// Enter/Space로도 활성화되는 키보드 핸들러 부착 (div/span 기반 컨트롤 접근성)
+function addKbd(elem,handler){elem.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handler(e);}};}
 
 // ── Task item builder ──
 function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
   const prioCls = (!isSub && task.priority) ? ' prio-'+task.priority : '';
   const item=el('div',`task-item${isSub?' sub':''}${prioCls}`);
   const checked=isRepeatInst?isRepeatChecked(task,instanceDk):task.checked;
-  if(!isSub&&!READ_ONLY){
+  // 다중 선택 모드: 일반(비반복·비하위·비대기) 태스크만 선택 가능
+  const selectable = selectMode && !isSub && !task.pending && !isRepeatInst;
+  let toggleSel = null;
+  if(selectable){
+    const selKey = dk+'|'+task.id;
+    item.classList.add('selectable');
+    if(bulkSelected.has(selKey)) item.classList.add('selected');
+    toggleSel = (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
+      if(bulkSelected.has(selKey)){ bulkSelected.delete(selKey); item.classList.remove('selected'); }
+      else { bulkSelected.add(selKey); item.classList.add('selected'); }
+      updateBulkBar();
+    };
+    item.onclick = toggleSel;
+  }
+  if(!isSub&&!READ_ONLY&&!selectMode){
     item.draggable=true;
     item.ondragstart=e=>{
       e.dataTransfer.setData('application/json',JSON.stringify({dk:isRepeatInst?originDk:dk,id:task.id,isRepeat:!!isRepeatInst}));
@@ -1511,12 +1548,20 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   if(!isSub){
     const star=el('span',`task-star${task.starred?' on':''}`,{textContent:'★',title:'중요 표시'});
-    star.onclick=e=>{e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
+    const starToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
+    star.onclick=starToggle; addKbd(star,starToggle);
+    star.setAttribute('role','button'); star.tabIndex=0;
+    star.setAttribute('aria-pressed',task.starred?'true':'false');
+    star.setAttribute('aria-label','중요 표시 전환');
     item.appendChild(star);
   }
   if(task.color){const dot=el('div','color-dot');dot.style.background=task.color;item.appendChild(dot);}
   const cb=el('div',`task-cb${checked?' checked':''}`);
-  cb.onclick=e=>{e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
+  const cbToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
+  cb.onclick=cbToggle; addKbd(cb,cbToggle);
+  cb.setAttribute('role','checkbox'); cb.tabIndex=0;
+  cb.setAttribute('aria-checked',checked?'true':'false');
+  cb.setAttribute('aria-label',(task.text||'할 일')+' 완료');
   item.appendChild(cb);
   const body=el('div','task-body');
   // text + memo dot (clickable to open memo)
@@ -1536,7 +1581,10 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   textWrap.appendChild(txt);
   if(!isSub&&task.memo){ const dot=el('span','memo-dot',{title:'메모 있음'}); textWrap.appendChild(dot); }
   if(!isSub){
-    textWrap.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
+    const openMemoH=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
+    textWrap.onclick=openMemoH; addKbd(textWrap,openMemoH);
+    textWrap.setAttribute('role','button'); textWrap.tabIndex=0;
+    textWrap.setAttribute('aria-label',(task.text||'할 일')+' — 메모 보기/편집');
   }
   body.appendChild(textWrap);
   if(!isSub){
@@ -1740,7 +1788,13 @@ function buildInputForm(dk,parentId){
 function buildWeatherBar(dk){
   const bar=el('div','weather-bar');
   const w=weatherByDate[dk];
-  if(!w)bar.appendChild(el('span','weather-skeleton',{textContent:'날씨 로드 중...'}));
+  if(!w&&weatherStatus==='error'){
+    const retry=el('span','weather-skeleton weather-error',{textContent:'날씨 불러오기 실패 · 다시 시도',title:'클릭하여 다시 시도'});
+    retry.style.cursor='pointer';
+    retry.onclick=()=>fetchWeather(weatherLoc.lat,weatherLoc.lon);
+    bar.appendChild(retry);
+  }
+  else if(!w)bar.appendChild(el('span','weather-skeleton',{textContent:'날씨 로드 중...'}));
   else{
     bar.appendChild(el('span','weather-emoji',{textContent:w.emoji}));
     const info=el('div','weather-info');
@@ -2214,6 +2268,8 @@ function buildTimelineView(){
 
 // ── Search ──
 let tagFilter = null;
+let attrFilter = { incomplete:false, starred:false, prio:null, memo:false };
+function attrFilterActive(){ return attrFilter.incomplete||attrFilter.starred||attrFilter.memo||!!attrFilter.prio; }
 function allTaskTags(){
   const set = new Set();
   Object.values(tasks).forEach(list => Array.isArray(list) && list.forEach(t => {
@@ -2224,23 +2280,47 @@ function allTaskTags(){
 }
 function matchesQuery(t){
   if(tagFilter && !(t.text && t.text.includes(tagFilter))) return false;
+  if(attrFilter.starred && !t.starred) return false;
+  if(attrFilter.prio && t.priority!==attrFilter.prio) return false;
+  if(attrFilter.memo && !((t.memo&&t.memo.trim())||(Array.isArray(t.memoImages)&&t.memoImages.length))) return false;
+  if(attrFilter.incomplete && t.checked) return false;
   if(!searchQuery) return true;
   const q=searchQuery.toLowerCase();
   return (t.text&&t.text.toLowerCase().includes(q))||(t.memo&&t.memo.toLowerCase().includes(q))||(Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q)));
 }
 function buildTagFilterBar(){
   const tags = allTaskTags();
-  if (!tags.length) return null;
   const bar = el('div', 'tag-filter-bar');
-  bar.appendChild(el('span', '', {textContent: '🏷', style: 'font-size:12px'}));
-  const allChip = el('button', `tag-filter-chip${tagFilter ? '' : ' active'}`, {textContent: '전체'});
-  allChip.onclick = () => { tagFilter = null; render(); };
-  bar.appendChild(allChip);
-  tags.forEach(tag => {
-    const chip = el('button', `tag-filter-chip${tagFilter === tag ? ' active' : ''}`, {textContent: tag});
-    chip.onclick = () => { tagFilter = (tagFilter === tag ? null : tag); render(); };
+  // 상태/속성 필터 칩 (항상 표시)
+  const toggle=(key,label,val)=>{
+    const on = val!==undefined ? attrFilter[key]===val : attrFilter[key];
+    const chip = el('button', `tag-filter-chip attr-chip${on?' active':''}`, {textContent: label});
+    chip.setAttribute('aria-pressed', on?'true':'false');
+    chip.onclick = () => { if(val!==undefined) attrFilter[key]=(attrFilter[key]===val?null:val); else attrFilter[key]=!attrFilter[key]; render(); };
     bar.appendChild(chip);
-  });
+  };
+  bar.appendChild(el('span','',{textContent:'필터',style:'font-size:11px;color:var(--text3)'}));
+  toggle('incomplete','◻ 미완료');
+  toggle('starred','★ 중요');
+  toggle('memo','📝 메모');
+  toggle('prio','🔴 높음','high');
+  if(attrFilterActive()){
+    const clr=el('button','tag-filter-chip attr-clear',{textContent:'✕ 해제'});
+    clr.onclick=()=>{ attrFilter={incomplete:false,starred:false,prio:null,memo:false}; render(); };
+    bar.appendChild(clr);
+  }
+  // 태그 칩 (태그가 있을 때만)
+  if(tags.length){
+    bar.appendChild(el('span','',{textContent:'🏷',style:'font-size:12px;margin-left:6px'}));
+    const allChip = el('button', `tag-filter-chip${tagFilter ? '' : ' active'}`, {textContent: '전체'});
+    allChip.onclick = () => { tagFilter = null; render(); };
+    bar.appendChild(allChip);
+    tags.forEach(tag => {
+      const chip = el('button', `tag-filter-chip${tagFilter === tag ? ' active' : ''}`, {textContent: tag});
+      chip.onclick = () => { tagFilter = (tagFilter === tag ? null : tag); render(); };
+      bar.appendChild(chip);
+    });
+  }
   return bar;
 }
 
@@ -2400,7 +2480,7 @@ function spawnConfetti() {
   box.innerHTML = '';
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const colors = ['#1a73e8','#43a047','#e53935','#fb8c00','#f9a825','#8e24aa','#00acc1'];
-  const n = 90;
+  const n = 40;
   for (let i = 0; i < n; i++) {
     const p = el('div','confetti-piece');
     p.style.left = Math.random()*100 + '%';
@@ -2410,6 +2490,8 @@ function spawnConfetti() {
     if (Math.random() < 0.5) p.style.borderRadius = '50%';
     box.appendChild(p);
   }
+  // 애니메이션 종료 후 DOM에서 제거(불필요한 노드/페인트 정리)
+  setTimeout(() => { if (box) box.innerHTML = ''; }, 4500);
 }
 const _celebrateOverlayEl = document.getElementById('celebrateOverlay');
 if (_celebrateOverlayEl) _celebrateOverlayEl.onclick = hideCelebration;
@@ -2417,6 +2499,9 @@ if (_celebrateOverlayEl) _celebrateOverlayEl.onclick = hideCelebration;
 // ── Render ──
 let _renderedWeekKey=null, _weekScroll={key:null,left:0};
 function render(){
+  _repeatCache.clear();  // 반복 일정 캐시 무효화(상태 변경 후 매 렌더 시작)
+  if(typeof updatePendingBadge==='function') updatePendingBadge();
+  if(typeof updateBulkBar==='function') updateBulkBar();
   const view=document.getElementById('mainView');
   // 모바일 주간뷰: 다시 그리기 전에 현재 가로 스크롤 위치 저장 (체크/별표 시 화면 점프 방지)
   if(window.innerWidth<=768){
@@ -2524,9 +2609,11 @@ function setView(v){
 Object.entries(VIEW_BTNS).forEach(([view,id])=>{document.getElementById(id).onclick=()=>setView(view);});
 
 // ── Search ──
+let _searchTimer=null;
 document.getElementById('searchInput').addEventListener('input',e=>{
   searchQuery=e.target.value;
-  render();
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(render,160);  // 키 입력마다 전체 재렌더 방지(디바운스)
 });
 
 // ── Dark mode ──
@@ -2560,8 +2647,9 @@ document.addEventListener('click',e=>{
 });
 
 // ── Notifications: 9시 오늘할일 / 마감 1시간 전 / 17시 미완료 ──
-const NOTIFY_HOUR = 9;       // 아침 요약
-const NOTIFY_EVENING = 17;   // 저녁 미완료 리마인드
+let NOTIFY_HOUR = (()=>{ const v=parseInt(localStorage.getItem('notifyMorningHour'),10); return isNaN(v)?9:v; })();      // 아침 요약
+let NOTIFY_EVENING = (()=>{ const v=parseInt(localStorage.getItem('notifyEveningHour'),10); return isNaN(v)?17:v; })();  // 저녁 미완료 리마인드
+let NOTIFY_LEAD = (()=>{ const v=parseInt(localStorage.getItem('notifyLeadMin'),10); return isNaN(v)?60:v; })();         // 마감 N분 전
 function notifyAllowed() {
   return localStorage.getItem('notifyEnabled')==='true'
     && 'Notification' in window && Notification.permission==='granted';
@@ -2664,14 +2752,55 @@ function checkTimeNotifications(){
     if(state.ids.includes(c.id))return;
     const [h,m]=c.time.split(':').map(Number);
     const remainMin=(h*60+m)-nowMin; // 마감까지 남은 분
-    if(remainMin<=60&&remainMin>=0){
-      const msg=remainMin===0?'지금 마감 시간입니다':remainMin<=5?'곧 마감입니다':`마감 1시간 전입니다 (${c.time} 마감)`;
+    if(remainMin<=NOTIFY_LEAD&&remainMin>=0){
+      const msg=remainMin===0?'지금 마감 시간입니다':remainMin<=5?'곧 마감입니다':`마감 ${remainMin}분 전입니다 (${c.time} 마감)`;
       new Notification('⏰ '+c.text,{body:msg});
       state.ids.push(c.id);
     }
   });
   localStorage.setItem('timeNotified',JSON.stringify(state));
 }
+
+// 받은 일정(pending) 도착 알림 + 제목 배지
+function updatePendingBadge(){
+  let cnt=0;
+  Object.values(tasks).forEach(list=>{ if(Array.isArray(list)) list.forEach(t=>{ if(t&&t.pending) cnt++; }); });
+  document.title = (cnt>0 ? `(${cnt}) ` : '') + '마이플래너';
+}
+function checkPendingNotifications(){
+  if(READ_ONLY) return;
+  let seen=[]; try{ seen=JSON.parse(localStorage.getItem('pendingNotified')||'[]'); }catch{}
+  const seenSet=new Set(seen);
+  const current=[], fresh=[];
+  Object.entries(tasks).forEach(([dk,list])=>{
+    if(!Array.isArray(list)) return;
+    list.forEach(t=>{ if(t&&t.pending){ current.push(t.id); if(!seenSet.has(t.id)) fresh.push({text:t.text,from:t.from}); } });
+  });
+  if(fresh.length && notifyAllowed()){
+    try{ new Notification('👤 받은 일정 '+fresh.length+'건', {body: fresh.map(x=>`· ${x.from||'누군가'}: ${x.text}`).join('\n').slice(0,180)}); }catch(e){}
+  }
+  localStorage.setItem('pendingNotified', JSON.stringify(current));
+  updatePendingBadge();
+}
+
+// 알림 시간 설정
+const _notifySettingsBtn = document.getElementById('notifySettingsBtn');
+if (_notifySettingsBtn) _notifySettingsBtn.onclick = () => {
+  document.getElementById('moreMenu').classList.add('hidden');
+  const mh = prompt('아침 요약 알림 시각 (0~23시)', NOTIFY_HOUR);
+  if (mh === null) return;
+  const eh = prompt('저녁 미완료 리마인드 시각 (0~23시)', NOTIFY_EVENING);
+  if (eh === null) return;
+  const lead = prompt('마감 몇 분 전에 알릴까요? (분)', NOTIFY_LEAD);
+  if (lead === null) return;
+  const mhi = Math.max(0, Math.min(23, parseInt(mh, 10)));
+  const ehi = Math.max(0, Math.min(23, parseInt(eh, 10)));
+  const li = Math.max(1, Math.min(1440, parseInt(lead, 10)));
+  if (!isNaN(mhi)) { NOTIFY_HOUR = mhi; localStorage.setItem('notifyMorningHour', mhi); }
+  if (!isNaN(ehi)) { NOTIFY_EVENING = ehi; localStorage.setItem('notifyEveningHour', ehi); }
+  if (!isNaN(li)) { NOTIFY_LEAD = li; localStorage.setItem('notifyLeadMin', li); }
+  alert(`알림 시간을 저장했어요.\n· 아침 ${NOTIFY_HOUR}시 · 저녁 ${NOTIFY_EVENING}시 · 마감 ${NOTIFY_LEAD}분 전`);
+};
 
 setInterval(checkNotificationSchedule, 60*1000);
 checkNotificationSchedule();
@@ -2722,24 +2851,51 @@ function startPomodoroForTask(text){
 function escapeICS(text){ return String(text).replace(/[\\,;]/g,m=>'\\'+m).replace(/\n/g,'\\n'); }
 function buildICS(){
   const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//마이플래너//KO','CALSCALE:GREGORIAN'];
+  const dtstamp=new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
+  const RR={
+    daily:'FREQ=DAILY', weekdays:'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+    weekly:'FREQ=WEEKLY', biweekly:'FREQ=WEEKLY;INTERVAL=2', monthly:'FREQ=MONTHLY',
+    monthlyFirstBiz:'FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=1',
+    monthlyLastBiz:'FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1',
+  };
   Object.entries(tasks).forEach(([dk,list])=>{
     if(!Array.isArray(list)) return;
-    const dtstart=dk.replace(/-/g,'');
+    const ymd=dk.replace(/-/g,'');
     list.forEach(t=>{
-      if(!t) return;
+      if(!t||!t.text) return;
+      const timed=t.time&&/^\d{1,2}:\d{2}$/.test(t.time);
       lines.push('BEGIN:VEVENT');
       lines.push('UID:'+t.id+'@myplanner');
-      lines.push('DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z');
-      lines.push('DTSTART;VALUE=DATE:'+dtstart);
-      lines.push('SUMMARY:'+escapeICS((t.starred?'★ ':'')+t.text));
-      if(t.memo) lines.push('DESCRIPTION:'+escapeICS(t.memo));
-      if(t.repeat==='weekly') lines.push('RRULE:FREQ=WEEKLY');
-      else if(t.repeat==='biweekly') lines.push('RRULE:FREQ=WEEKLY;INTERVAL=2');
-      else if(t.repeat==='monthly') lines.push('RRULE:FREQ=MONTHLY');
-      else if(t.repeat==='monthlyNth'){
-        const od=new Date(dk);
-        lines.push(`RRULE:FREQ=MONTHLY;BYDAY=${Math.ceil(od.getDate()/7)}${['SU','MO','TU','WE','TH','FR','SA'][od.getDay()]}`);
+      lines.push('DTSTAMP:'+dtstamp);
+      if(timed){
+        const [hh,mm]=t.time.split(':').map(Number);
+        const dur=Math.max(15, parseInt(t.duration,10)||60);
+        const endMin=hh*60+mm+dur;
+        const startS=`${ymd}T${String(hh).padStart(2,'0')}${String(mm).padStart(2,'0')}00`;
+        const endS=endMin>=1440?`${ymd}T235900`:`${ymd}T${String(Math.floor(endMin/60)).padStart(2,'0')}${String(endMin%60).padStart(2,'0')}00`;
+        lines.push('DTSTART:'+startS);
+        lines.push('DTEND:'+endS);
+      } else {
+        lines.push('DTSTART;VALUE=DATE:'+ymd);
       }
+      lines.push('SUMMARY:'+escapeICS((t.starred?'★ ':'')+t.text));
+      // 반복 규칙
+      let rule=RR[t.repeat];
+      if(t.repeat==='monthlyNth'){
+        const od=parseDk(dk);
+        rule=`FREQ=MONTHLY;BYDAY=${Math.min(Math.ceil(od.getDate()/7),5)}${['SU','MO','TU','WE','TH','FR','SA'][od.getDay()]}`;
+      }
+      if(rule){
+        if(t.repeatEnd&&/^\d{4}-\d{2}-\d{2}$/.test(t.repeatEnd)) rule+=';UNTIL='+t.repeatEnd.replace(/-/g,'')+(timed?'T235959':'');
+        lines.push('RRULE:'+rule);
+        // 건너뛴 인스턴스 제외
+        if(t.skips) Object.keys(t.skips).forEach(sd=>{ if(/^\d{4}-\d{2}-\d{2}$/.test(sd)) lines.push((timed?'EXDATE:':'EXDATE;VALUE=DATE:')+sd.replace(/-/g,'')+(timed?'T'+t.time.replace(':','')+'00':'')); });
+      }
+      // 설명: 메모 + 하위 항목
+      const desc=[];
+      if(t.memo) desc.push(t.memo);
+      if(Array.isArray(t.subs)&&t.subs.length) desc.push('— 하위 —\n'+t.subs.map(s=>`• ${s.checked?'[완료]':'[ ]'} ${s.text}`).join('\n'));
+      if(desc.length) lines.push('DESCRIPTION:'+escapeICS(desc.join('\n\n')));
       lines.push('END:VEVENT');
     });
   });
@@ -4837,3 +4993,148 @@ function initDashboard(){
 
 initDashboard();
 checkMondaySync();
+
+// ── 이름 변경 / 데이터 이전 ──
+function renameAccount() {
+  if (READ_ONLY || IS_TEAM || !USER_ID) { alert('내 캘린더(?u=이름)에서만 사용할 수 있어요.'); return; }
+  const cur = USER_ID;
+  const next = prompt('새 이름을 입력하세요.\n현재 데이터가 새 이름으로 복사·이전되고, 새 URL로 이동합니다.\n(이전 이름의 데이터는 그대로 남아 있어요)', cur);
+  if (next == null) return;
+  const nn = next.trim();
+  if (!nn || nn === cur) return;
+  const oldSuffix = '_' + cur;
+  const newSuffix = '_' + nn;
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('cal') && k.endsWith(oldSuffix)) keys.push(k); }
+  keys.forEach(k => { const base = k.slice(0, k.length - oldSuffix.length); localStorage.setItem(base + newSuffix, localStorage.getItem(k)); });
+  localStorage.setItem('lastUser', nn);
+  alert(`'${nn}'(으)로 이전했습니다. 새 캘린더로 이동합니다.`);
+  window.location.href = window.location.pathname + `?u=${encodeURIComponent(nn)}`;
+}
+
+// ── 전체 백업 / 복원 ──
+function collectAllData() {
+  return {
+    _app: 'myplanner', _v: 1, _exported: new Date().toISOString(), user: USER_ID || null,
+    tasks: tasks,
+    offDays: (typeof offDays !== 'undefined' ? offDays : {}),
+    memos: (typeof memos !== 'undefined' ? memos : {}),
+    shares: (typeof shares !== 'undefined' ? shares : {}),
+    goals: (typeof goals !== 'undefined' ? goals : []),
+    icsSubs: (typeof icsSubs !== 'undefined' ? icsSubs : []),
+    templates: JSON.parse(localStorage.getItem(TPL_KEY) || '[]'),
+    trash: JSON.parse(localStorage.getItem(TRASH_KEY) || '[]'),
+  };
+}
+function exportAllData() {
+  try {
+    const blob = new Blob([JSON.stringify(collectAllData(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `myplanner-backup-${USER_ID || 'local'}-${todayKey()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { alert('백업 실패: ' + e.message); }
+}
+function importAllData(file) {
+  if (READ_ONLY) { alert('읽기 전용 모드에서는 복원할 수 없습니다.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); } catch { alert('올바른 백업 파일이 아닙니다 (JSON 파싱 실패).'); return; }
+    if (!data || data._app !== 'myplanner' || typeof data.tasks !== 'object') {
+      alert('이 앱의 백업 파일이 아닙니다.'); return;
+    }
+    const cnt = Object.values(data.tasks || {}).reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+    if (!confirm(`현재 데이터를 백업본으로 덮어씁니다.\n할 일 ${cnt}개 · 내보낸 시각 ${data._exported || '알 수 없음'}\n계속할까요?`)) return;
+    // Firebase 동기화 컬렉션: 메모리 갱신 + 각 저장함수로 localStorage·Firebase 반영
+    tasks = normalizeTasks(data.tasks);
+    if (typeof saveTasks === 'function') saveTasks();
+    if (data.offDays && typeof offDays !== 'undefined') { offDays = data.offDays; saveOffDays(); }
+    if (data.memos && typeof memos !== 'undefined') { memos = data.memos; saveMemos(); }
+    if (data.shares && typeof shares !== 'undefined') { shares = data.shares; saveShares(); }
+    if (data.goals && typeof goals !== 'undefined') { goals = data.goals; saveGoals(); }
+    // localStorage 전용 컬렉션
+    if (data.icsSubs && typeof icsSubs !== 'undefined') { icsSubs = data.icsSubs; saveIcsSubs(); }
+    if (data.templates) saveTpls(data.templates);
+    if (data.trash) saveTrash(data.trash);
+    render();
+    alert('복원이 완료되었습니다.');
+  };
+  reader.onerror = () => alert('파일을 읽지 못했습니다.');
+  reader.readAsText(file);
+}
+const _backupBtn = document.getElementById('backupBtn');
+if (_backupBtn) _backupBtn.onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); exportAllData(); };
+const _restoreBtn = document.getElementById('restoreBtn');
+const _restoreInput = document.getElementById('restoreFileInput');
+if (_restoreBtn && _restoreInput) {
+  _restoreBtn.onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); _restoreInput.click(); };
+  _restoreInput.onchange = () => { if (_restoreInput.files && _restoreInput.files[0]) importAllData(_restoreInput.files[0]); _restoreInput.value = ''; };
+}
+
+// ── 모달 접근성: 포커스 트랩 + 열기 시 포커스 이동 + 닫기 시 복원 ──
+let _lastFocusBeforeModal = null;
+function _modalFocusables(modal) {
+  return [...modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+    .filter(x => x.offsetParent !== null);
+}
+// 보이는 모달 안에서 Tab 순환
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const overlays = [...document.querySelectorAll('.modal-overlay:not(.hidden), .memo-overlay:not(.hidden)')];
+  const modal = overlays[overlays.length - 1];
+  if (!modal) return;
+  const f = _modalFocusables(modal);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+// 열림/닫힘 감지 → 첫 컨트롤 포커스 / 트리거로 복원
+const _modalObserver = new MutationObserver(muts => {
+  muts.forEach(m => {
+    const t = m.target; if (!t.classList) return;
+    const wasHidden = (m.oldValue || '').includes('hidden');
+    const nowHidden = t.classList.contains('hidden');
+    if (wasHidden && !nowHidden) {
+      _lastFocusBeforeModal = document.activeElement;
+      const f = _modalFocusables(t);
+      if (f.length) setTimeout(() => { try { f[0].focus(); } catch {} }, 40);
+    } else if (!wasHidden && nowHidden) {
+      const r = _lastFocusBeforeModal; _lastFocusBeforeModal = null;
+      if (r && r.focus && document.body.contains(r)) { try { r.focus(); } catch {} }
+    }
+  });
+});
+[...document.querySelectorAll('.modal-overlay, .memo-overlay')].forEach(ov =>
+  _modalObserver.observe(ov, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }));
+
+// ── 다중 선택 일괄 작업 ──
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar'); if (!bar) return;
+  if (selectMode) { bar.classList.remove('hidden'); const c = document.getElementById('bulkCount'); if (c) c.textContent = `${bulkSelected.size}개 선택`; }
+  else bar.classList.add('hidden');
+}
+function exitSelectMode() { selectMode = false; bulkSelected.clear(); updateBulkBar(); render(); }
+function bulkForEach(fn) {
+  bulkSelected.forEach(key => {
+    const i = key.indexOf('|'); const dk = key.slice(0, i), id = key.slice(i + 1);
+    const list = tasks[dk]; if (!Array.isArray(list)) return;
+    const idx = list.findIndex(t => t && t.id === id);
+    if (idx >= 0) fn(list, idx, dk);
+  });
+}
+(() => {
+  const sb = document.getElementById('selectModeBtn');
+  if (sb) sb.onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); selectMode = !selectMode; bulkSelected.clear(); updateBulkBar(); render(); };
+  const ex = document.getElementById('bulkExitBtn'); if (ex) ex.onclick = exitSelectMode;
+  const done = document.getElementById('bulkDoneBtn');
+  if (done) done.onclick = () => { if (!bulkSelected.size) return; bulkForEach((l, i) => { if (!l[i].checked) { l[i].checked = true; l[i].completedAt = Date.now(); } }); saveTasks(); exitSelectMode(); };
+  const undone = document.getElementById('bulkUndoneBtn');
+  if (undone) undone.onclick = () => { if (!bulkSelected.size) return; bulkForEach((l, i) => { if (l[i].checked) { l[i].checked = false; } }); saveTasks(); exitSelectMode(); };
+  const del = document.getElementById('bulkDeleteBtn');
+  if (del) del.onclick = () => { if (!bulkSelected.size) return; if (!confirm(`선택한 ${bulkSelected.size}개를 삭제할까요? (휴지통에 30일 보관)`)) return; bulkForEach((l, i, dk) => { const removed = l.splice(i, 1)[0]; addToTrash(dk, removed, null); }); saveTasks(); exitSelectMode(); };
+})();

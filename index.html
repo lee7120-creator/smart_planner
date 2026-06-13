@@ -3,7 +3,7 @@
 <html lang="ko" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>마이플래너</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -28,6 +28,7 @@
       <button class="landing-btn" id="landingStartBtn">시작 →</button>
     </div>
     <div class="landing-hint">📌 URL을 북마크하거나 저장해두면 다음에 바로 접근 가능해요</div>
+    <div class="landing-warn">⚠️ 입력한 <b>이름이 곧 로그인 키</b>입니다. 이름을 잊거나 다르게 입력하면 데이터를 다시 찾을 수 없어요 — 꼭 기억하거나 URL을 저장해 두세요.</div>
     <div class="landing-features">
       <span class="landing-feat">✅ 체크리스트</span>
       <span class="landing-feat">🔄 주간·월간 반복</span>
@@ -63,24 +64,27 @@
   </div>
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
-    <div class="sync-dot offline" id="syncDot" title="동기화 상태" style="display:none"></div>
-    <button class="icon-btn" id="guideBtn" title="사용 가이드">❓</button>
+    <div class="sync-dot offline" id="syncDot" title="동기화 상태" role="status" aria-live="polite" aria-label="동기화 상태" style="display:none"></div>
+    <button class="icon-btn" id="guideBtn" title="사용 가이드" aria-label="사용 가이드">❓</button>
     <button class="save-btn" id="forceSyncBtn" style="display:none" title="지금 바로 저장">☁️ <span>저장</span></button>
     <div class="more-menu-wrap">
-      <button class="icon-btn" id="notesBtn" title="메모장 (빈 곳 더블클릭으로도 생성)">📝</button>
+      <button class="icon-btn" id="notesBtn" title="메모장 (빈 곳 더블클릭으로도 생성)" aria-label="메모장 열기">📝</button>
       <div class="more-menu hidden" id="notesMenu"></div>
     </div>
-    <button class="icon-btn" id="darkBtn" title="다크 모드">🌙</button>
+    <button class="icon-btn" id="darkBtn" title="다크 모드" aria-label="다크 모드 전환">🌙</button>
     <div class="more-menu-wrap">
-      <button class="icon-btn" id="moreBtn" title="더보기">⋯</button>
+      <button class="icon-btn" id="moreBtn" title="더보기" aria-label="더보기 메뉴" aria-haspopup="true">⋯</button>
       <div class="more-menu hidden" id="moreMenu">
         <button class="more-menu-item" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
         <button class="more-menu-item" id="shareRoBtn" style="display:none">👁 <span>읽기전용 링크 복사</span></button>
         <button class="more-menu-item" id="templateBtn">📑 <span>템플릿</span></button>
+        <button class="more-menu-item" id="selectModeBtn">☑️ <span>선택 모드 (일괄 작업)</span></button>
         <button class="more-menu-item" id="switchUserBtn" style="display:none">↩ <span>다른 사용자로 전환</span></button>
+        <button class="more-menu-item" id="renameBtn" style="display:none">✏️ <span>이름 변경 / 데이터 이전</span></button>
         <div class="more-menu-divider"></div>
         <button class="more-menu-item" id="locationBtn">📍 <span>내 위치 날씨</span></button>
         <button class="more-menu-item" id="notifyBtn"><span id="notifyIcon">🔕</span> <span>마감 알림</span></button>
+        <button class="more-menu-item" id="notifySettingsBtn">⏰ <span>알림 시간 설정</span></button>
         <button class="more-menu-item" id="memoAllBtn">📝 <span>메모 모아보기</span></button>
         <button class="more-menu-item" id="shareCalBtn">👥 <span>일정 공유</span></button>
         <button class="more-menu-item" id="trashBtn">🗑 <span>휴지통</span></button>
@@ -90,8 +94,11 @@
         <button class="more-menu-item" id="icsImportBtn">📥 <span>외부 캘린더 구독</span></button>
         <button class="more-menu-item" id="teamBtn">🤝 <span>팀 캘린더</span></button>
         <button class="more-menu-item" id="icsExportBtn">📤 <span>캘린더 내보내기</span></button>
+        <button class="more-menu-item" id="backupBtn">💾 <span>전체 백업 (.json)</span></button>
+        <button class="more-menu-item" id="restoreBtn">📂 <span>백업 복원</span></button>
         <button class="more-menu-item" id="printBtn">🖨 <span>인쇄 / 이미지 저장</span></button>
       </div>
+      <input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none">
     </div>
     <div class="progress-pill" id="progressInfo"></div>
   </div>
@@ -185,7 +192,7 @@
 
 <!-- Memo Popup -->
 <div class="memo-overlay hidden" id="memoOverlay">
-  <div class="memo-popup" id="memoPopup">
+  <div class="memo-popup" id="memoPopup" role="dialog" aria-modal="true" aria-label="메모">
     <div class="memo-header" id="memoHeader" title="드래그해서 이동">
       <span class="memo-icon">📝</span>
       <span class="memo-task-title" id="memoTitle"></span>
@@ -210,7 +217,7 @@
 
 <!-- Edit Modal -->
 <div class="modal-overlay hidden" id="editModal">
-  <div class="modal-box">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="태스크 수정">
     <div class="modal-title">태스크 수정</div>
     <input class="modal-input" id="editInput" type="text" placeholder="할 일 내용">
     <div class="modal-row">
@@ -248,6 +255,9 @@
       <span class="modal-label">종료</span>
       <input class="time-input" id="editRepeatEnd" type="date" style="width:auto;flex:1">
       <button class="btn-secondary" id="editRepeatEndClear" type="button" style="padding:4px 8px;font-size:11px">없음</button>
+    </div>
+    <div class="modal-row" id="editRepeatCapHint" style="display:none">
+      <span class="modal-hint" style="font-size:11px;color:var(--text3)">ℹ️ 종료일을 비워두면 시작일로부터 1년 뒤 자동 종료돼요.</span>
     </div>
     <div class="modal-row">
       <span class="modal-label">마감시간</span>
@@ -399,7 +409,14 @@
 
 
 <!-- Undo Toast -->
-<div class="undo-toast hidden" id="undoToast">
+<div class="bulk-bar hidden" id="bulkBar" role="toolbar" aria-label="일괄 작업">
+  <span class="bulk-count" id="bulkCount">0개 선택</span>
+  <button class="bulk-act" id="bulkDoneBtn">✅ 완료</button>
+  <button class="bulk-act" id="bulkUndoneBtn">↩ 미완료</button>
+  <button class="bulk-act bulk-danger" id="bulkDeleteBtn">🗑 삭제</button>
+  <button class="bulk-act bulk-exit" id="bulkExitBtn">나가기</button>
+</div>
+<div class="undo-toast hidden" id="undoToast" role="status" aria-live="polite">
   <span id="undoMsg"></span>
   <button id="undoBtn">실행 취소</button>
 </div>
