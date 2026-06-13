@@ -380,7 +380,11 @@
       .view-toggle { order:2; }
       .nav-group { order:3; flex:1; justify-content:flex-end; gap:4px; }
       .search-wrap { order:5; max-width:100%; flex:1 1 100%; }
-      .header-actions { order:4; margin-left:0; gap:6px; }
+      .header-actions { order:4; margin-left:0; gap:4px; }
+      .header-actions .user-chip#userChip #userChipName { max-width:64px; }
+      .header-actions .user-chip, .header-actions .ro-chip { padding:4px 8px; gap:4px; }
+      .header-actions .copy-url-btn { padding:4px 7px; }
+      .header-actions .icon-btn { width:28px; height:28px; font-size:14px; }
       .progress-pill { display:none; }
       .week-label { font-size:12px; min-width:unset; }
       .nav-btn { padding:5px 10px; font-size:12px; }
@@ -774,7 +778,11 @@
     .user-chip {
       display:flex; align-items:center; gap:5px; background:var(--primary-l);
       border-radius:20px; padding:4px 10px; font-size:12px; font-weight:600;
-      color:var(--primary); white-space:nowrap;
+      color:var(--primary); white-space:nowrap; min-width:0;
+    }
+    .user-chip #userChipName {
+      display:inline-block; overflow:hidden; text-overflow:ellipsis;
+      white-space:nowrap; max-width:120px; vertical-align:bottom;
     }
     .ro-chip {
       display:flex; align-items:center; gap:5px; background:color-mix(in srgb, var(--orange) 15%, transparent);
