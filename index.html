@@ -606,8 +606,10 @@
       .view-toggle { order:2; flex-wrap:wrap; }
       .nav-group { order:3; flex:1; justify-content:flex-end; gap:4px; }
       .search-wrap { order:5; max-width:100%; flex:1 1 100%; }
-      .header-actions { order:4; margin-left:0; gap:6px; }
-      .user-chip { max-width:110px; }
+      .header-actions { order:4; margin-left:0; gap:4px; }
+      /* 기본 .user-chip(max-width:180px)가 소스 순서상 뒤에 와서 덮어쓰므로 명시도를 높여 모바일 캡 적용 */
+      .header-actions .user-chip { max-width:96px; padding:4px 8px; gap:4px; }
+      .header-actions .icon-btn { width:28px; height:28px; font-size:14px; }
       .progress-pill { display:none; }
       .week-label { font-size:12px; min-width:unset; }
       .nav-btn { padding:5px 10px; font-size:12px; }
@@ -1195,9 +1197,9 @@
     .user-chip {
       display:flex; align-items:center; gap:5px; background:var(--primary-l);
       border-radius:20px; padding:4px 10px; font-size:12px; font-weight:600;
-      color:var(--primary); white-space:nowrap; max-width:180px; overflow:hidden;
+      color:var(--primary); white-space:nowrap; max-width:180px; overflow:hidden; min-width:0;
     }
-    .user-chip span { overflow:hidden; text-overflow:ellipsis; }
+    .user-chip span { display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; min-width:0; }
     .more-menu-wrap { position:relative; }
     .more-menu {
       position:absolute; top:calc(100% + 6px); right:0; z-index:60;
