@@ -306,6 +306,81 @@ function collectDayEntries(date, dayIdx) {
   return out;
 }
 
+// ── 당일 완료 축하 ──
+const CELEBRATE_MSGS = [
+  ['오늘 할 일 끝!', '완벽한 하루를 보냈어요 🙌'],
+  ['전부 완료! 🎉', '오늘의 목표를 모두 달성했어요'],
+  ['수고했어요!', '깔끔하게 비운 오늘, 멋져요 ✨'],
+  ['올 클리어! 🏆', '이 기세 그대로 내일도 화이팅'],
+  ['굿잡! 👏', '미루지 않고 다 해낸 당신, 최고예요'],
+];
+const CELEBRATE_EMOJIS = ['🎉','🎊','🥳','🏆','✨','🙌','💪'];
+let _celebrateArmed = false;   // 최초 렌더(로드)에서는 축하 띄우지 않음
+let _celebratedDayKey = null;  // 오늘 축하했는지(다시 미완료되면 해제 → 재완료 시 재발동)
+let _celebrateTimer = null;
+
+function todayAllDone() {
+  const d = today();
+  const entries = collectDayEntries(d, dateToDayIdx(d));
+  return entries.length > 0 && entries.every(e => e.checked);
+}
+
+function maybeCelebrate() {
+  const tk = todayKey();
+  const allDone = todayAllDone();
+  if (!_celebrateArmed) {            // 페이지 로드 직후: 상태만 기록, 팝업 억제
+    _celebrateArmed = true;
+    if (allDone) _celebratedDayKey = tk;
+    return;
+  }
+  if (allDone) {
+    if (_celebratedDayKey !== tk) { _celebratedDayKey = tk; showCelebration(); }
+  } else if (_celebratedDayKey === tk) {
+    _celebratedDayKey = null;        // 다시 할 일이 생기거나 체크 해제 → 재발동 허용
+  }
+}
+
+function showCelebration() {
+  const overlay = document.getElementById('celebrateOverlay');
+  if (!overlay) return;
+  const [title, sub] = CELEBRATE_MSGS[Math.floor(Math.random()*CELEBRATE_MSGS.length)];
+  document.getElementById('celebrateEmoji').textContent = CELEBRATE_EMOJIS[Math.floor(Math.random()*CELEBRATE_EMOJIS.length)];
+  document.getElementById('celebrateTitle').textContent = title;
+  document.getElementById('celebrateSub').textContent = sub;
+  spawnConfetti();
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden','false');
+  clearTimeout(_celebrateTimer);
+  _celebrateTimer = setTimeout(hideCelebration, 3600);
+}
+
+function hideCelebration() {
+  const overlay = document.getElementById('celebrateOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden','true');
+  clearTimeout(_celebrateTimer);
+  setTimeout(() => { const c=document.getElementById('celebrateConfetti'); if(c) c.innerHTML=''; }, 300);
+}
+
+function spawnConfetti() {
+  const box = document.getElementById('celebrateConfetti');
+  if (!box) return;
+  box.innerHTML = '';
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#1a73e8','#43a047','#e53935','#fb8c00','#f9a825','#8e24aa','#00acc1'];
+  const n = 90;
+  for (let i = 0; i < n; i++) {
+    const p = el('div','confetti-piece');
+    p.style.left = Math.random()*100 + '%';
+    p.style.background = colors[i % colors.length];
+    p.style.animationDuration = (2 + Math.random()*1.6) + 's';
+    p.style.animationDelay = (Math.random()*0.5) + 's';
+    if (Math.random() < 0.5) p.style.borderRadius = '50%';
+    box.appendChild(p);
+  }
+}
+
 // ── Task mutations ──
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function addTask(dk,text,color,starred,repeat,parentId,time) {
@@ -722,6 +797,9 @@ function openLightbox(src) {
 }
 function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
 document.getElementById('lightbox').onclick = closeLightbox;
+
+// 축하 팝업: 클릭하면 바로 닫기
+document.getElementById('celebrateOverlay').onclick = hideCelebration;
 
 // ── Weather ──
 async function fetchWeather(lat,lon) {
@@ -1410,6 +1488,8 @@ function render(){
   if(activeInput){
     setTimeout(()=>{const inp=document.getElementById(`inp-${activeInput.dateKey}-${activeInput.parentId||'main'}`);if(inp)inp.focus();},30);
   }
+  // 당일 할 일 전부 완료 시 축하 (미완료→완료 전환 순간에만)
+  if(!READ_ONLY) maybeCelebrate();
 }
 
 // ── Nav ──
