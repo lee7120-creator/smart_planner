@@ -142,7 +142,7 @@
     .task-cb.checked { background:var(--green); border-color:var(--green); }
     .task-cb.checked::after { content:'✓'; color:#fff; font-size:9px; font-weight:700; }
 
-    .task-body { flex:1; min-width:0; }
+    .task-body { flex:1; min-width:48px; }
     .task-text { font-size:12px; line-height:1.45; word-break:break-word; color:var(--text); }
     .task-text.done { text-decoration:line-through; color:var(--text3); }
     .task-time-badge {
