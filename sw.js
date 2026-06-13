@@ -1,4 +1,4 @@
-const CACHE = 'myplanner-v5';
+const CACHE = 'myplanner-v6';
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './styles.css', './app.js', './icon.svg', './manifest.webmanifest'])));
