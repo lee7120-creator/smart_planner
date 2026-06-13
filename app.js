@@ -286,6 +286,8 @@ let weatherByDate = {};
 let weatherStatus = 'loading';  // 'loading' | 'ok' | 'error'
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
 let searchQuery = '';
+let selectMode = false;            // 다중 선택 모드
+let bulkSelected = new Set();       // 선택된 태스크 키("dk|id")
 let editCtx = null;
 let _editColor = null, _editStarred = false, _editRepeat = 'none', _editPriority = null;
 
@@ -1504,7 +1506,21 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   const prioCls = (!isSub && task.priority) ? ' prio-'+task.priority : '';
   const item=el('div',`task-item${isSub?' sub':''}${prioCls}`);
   const checked=isRepeatInst?isRepeatChecked(task,instanceDk):task.checked;
-  if(!isSub&&!READ_ONLY){
+  // 다중 선택 모드: 일반(비반복·비하위·비대기) 태스크만 선택 가능
+  const selectable = selectMode && !isSub && !task.pending && !isRepeatInst;
+  let toggleSel = null;
+  if(selectable){
+    const selKey = dk+'|'+task.id;
+    item.classList.add('selectable');
+    if(bulkSelected.has(selKey)) item.classList.add('selected');
+    toggleSel = (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
+      if(bulkSelected.has(selKey)){ bulkSelected.delete(selKey); item.classList.remove('selected'); }
+      else { bulkSelected.add(selKey); item.classList.add('selected'); }
+      updateBulkBar();
+    };
+    item.onclick = toggleSel;
+  }
+  if(!isSub&&!READ_ONLY&&!selectMode){
     item.draggable=true;
     item.ondragstart=e=>{
       e.dataTransfer.setData('application/json',JSON.stringify({dk:isRepeatInst?originDk:dk,id:task.id,isRepeat:!!isRepeatInst}));
@@ -1532,7 +1548,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   if(!isSub){
     const star=el('span',`task-star${task.starred?' on':''}`,{textContent:'★',title:'중요 표시'});
-    const starToggle=e=>{e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
+    const starToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
     star.onclick=starToggle; addKbd(star,starToggle);
     star.setAttribute('role','button'); star.tabIndex=0;
     star.setAttribute('aria-pressed',task.starred?'true':'false');
@@ -1541,7 +1557,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   if(task.color){const dot=el('div','color-dot');dot.style.background=task.color;item.appendChild(dot);}
   const cb=el('div',`task-cb${checked?' checked':''}`);
-  const cbToggle=e=>{e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
+  const cbToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
   cb.onclick=cbToggle; addKbd(cb,cbToggle);
   cb.setAttribute('role','checkbox'); cb.tabIndex=0;
   cb.setAttribute('aria-checked',checked?'true':'false');
@@ -1565,7 +1581,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   textWrap.appendChild(txt);
   if(!isSub&&task.memo){ const dot=el('span','memo-dot',{title:'메모 있음'}); textWrap.appendChild(dot); }
   if(!isSub){
-    const openMemoH=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
+    const openMemoH=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
     textWrap.onclick=openMemoH; addKbd(textWrap,openMemoH);
     textWrap.setAttribute('role','button'); textWrap.tabIndex=0;
     textWrap.setAttribute('aria-label',(task.text||'할 일')+' — 메모 보기/편집');
@@ -2485,6 +2501,7 @@ let _renderedWeekKey=null, _weekScroll={key:null,left:0};
 function render(){
   _repeatCache.clear();  // 반복 일정 캐시 무효화(상태 변경 후 매 렌더 시작)
   if(typeof updatePendingBadge==='function') updatePendingBadge();
+  if(typeof updateBulkBar==='function') updateBulkBar();
   const view=document.getElementById('mainView');
   // 모바일 주간뷰: 다시 그리기 전에 현재 가로 스크롤 위치 저장 (체크/별표 시 화면 점프 방지)
   if(window.innerWidth<=768){
@@ -5094,3 +5111,30 @@ const _modalObserver = new MutationObserver(muts => {
 });
 [...document.querySelectorAll('.modal-overlay, .memo-overlay')].forEach(ov =>
   _modalObserver.observe(ov, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }));
+
+// ── 다중 선택 일괄 작업 ──
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar'); if (!bar) return;
+  if (selectMode) { bar.classList.remove('hidden'); const c = document.getElementById('bulkCount'); if (c) c.textContent = `${bulkSelected.size}개 선택`; }
+  else bar.classList.add('hidden');
+}
+function exitSelectMode() { selectMode = false; bulkSelected.clear(); updateBulkBar(); render(); }
+function bulkForEach(fn) {
+  bulkSelected.forEach(key => {
+    const i = key.indexOf('|'); const dk = key.slice(0, i), id = key.slice(i + 1);
+    const list = tasks[dk]; if (!Array.isArray(list)) return;
+    const idx = list.findIndex(t => t && t.id === id);
+    if (idx >= 0) fn(list, idx, dk);
+  });
+}
+(() => {
+  const sb = document.getElementById('selectModeBtn');
+  if (sb) sb.onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); selectMode = !selectMode; bulkSelected.clear(); updateBulkBar(); render(); };
+  const ex = document.getElementById('bulkExitBtn'); if (ex) ex.onclick = exitSelectMode;
+  const done = document.getElementById('bulkDoneBtn');
+  if (done) done.onclick = () => { if (!bulkSelected.size) return; bulkForEach((l, i) => { if (!l[i].checked) { l[i].checked = true; l[i].completedAt = Date.now(); } }); saveTasks(); exitSelectMode(); };
+  const undone = document.getElementById('bulkUndoneBtn');
+  if (undone) undone.onclick = () => { if (!bulkSelected.size) return; bulkForEach((l, i) => { if (l[i].checked) { l[i].checked = false; } }); saveTasks(); exitSelectMode(); };
+  const del = document.getElementById('bulkDeleteBtn');
+  if (del) del.onclick = () => { if (!bulkSelected.size) return; if (!confirm(`선택한 ${bulkSelected.size}개를 삭제할까요? (휴지통에 30일 보관)`)) return; bulkForEach((l, i, dk) => { const removed = l.splice(i, 1)[0]; addToTrash(dk, removed, null); }); saveTasks(); exitSelectMode(); };
+})();

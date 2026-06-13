@@ -78,6 +78,7 @@
         <button class="more-menu-item" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
         <button class="more-menu-item" id="shareRoBtn" style="display:none">👁 <span>읽기전용 링크 복사</span></button>
         <button class="more-menu-item" id="templateBtn">📑 <span>템플릿</span></button>
+        <button class="more-menu-item" id="selectModeBtn">☑️ <span>선택 모드 (일괄 작업)</span></button>
         <button class="more-menu-item" id="switchUserBtn" style="display:none">↩ <span>다른 사용자로 전환</span></button>
         <button class="more-menu-item" id="renameBtn" style="display:none">✏️ <span>이름 변경 / 데이터 이전</span></button>
         <div class="more-menu-divider"></div>
@@ -408,6 +409,13 @@
 
 
 <!-- Undo Toast -->
+<div class="bulk-bar hidden" id="bulkBar" role="toolbar" aria-label="일괄 작업">
+  <span class="bulk-count" id="bulkCount">0개 선택</span>
+  <button class="bulk-act" id="bulkDoneBtn">✅ 완료</button>
+  <button class="bulk-act" id="bulkUndoneBtn">↩ 미완료</button>
+  <button class="bulk-act bulk-danger" id="bulkDeleteBtn">🗑 삭제</button>
+  <button class="bulk-act bulk-exit" id="bulkExitBtn">나가기</button>
+</div>
 <div class="undo-toast hidden" id="undoToast" role="status" aria-live="polite">
   <span id="undoMsg"></span>
   <button id="undoBtn">실행 취소</button>

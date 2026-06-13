@@ -439,6 +439,21 @@
     .readonly-mode .task-cb, .readonly-mode .task-star { cursor:default; }
 
     /* ─── Undo toast ─── */
+    .bulk-bar {
+      position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
+      background:var(--surface); border:1px solid var(--border); border-radius:14px;
+      padding:8px 10px; display:flex; align-items:center; gap:6px; z-index:1600;
+      box-shadow:var(--shadow-lg); max-width:calc(100vw - 24px); flex-wrap:wrap; justify-content:center;
+    }
+    .bulk-bar.hidden { display:none; }
+    .bulk-count { font-size:12px; font-weight:700; color:var(--text2); padding:0 6px; }
+    .bulk-act { border:1px solid var(--border); background:var(--surface2); color:var(--text); border-radius:9px;
+      padding:7px 11px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; min-height:36px; }
+    .bulk-act:hover { background:var(--primary-l); border-color:var(--primary); color:var(--primary); }
+    .bulk-act.bulk-danger:hover { background:#fde8e8; border-color:var(--red,#e5484d); color:var(--red,#e5484d); }
+    .bulk-act.bulk-exit { background:transparent; color:var(--text3); }
+    .task-item.selectable { cursor:pointer; }
+    .task-item.selected { background:var(--primary-l); outline:2px solid var(--primary); outline-offset:-2px; }
     .undo-toast {
       position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
       background:var(--text); color:var(--bg); border-radius:12px;
