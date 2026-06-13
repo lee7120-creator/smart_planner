@@ -440,7 +440,7 @@
 
     /* ─── Undo toast ─── */
     .undo-toast {
-      position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+      position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
       background:var(--text); color:var(--bg); border-radius:12px;
       padding:10px 16px; display:flex; align-items:center; gap:14px;
       font-size:13px; box-shadow:var(--shadow-lg); z-index:1500;
@@ -504,6 +504,7 @@
     .weather-desc { font-size:10px; color:var(--text3); }
     .weather-rain { font-size:10px; color:var(--primary); }
     .weather-skeleton { font-size:11px; color:var(--text3); }
+    .weather-error { color:var(--red, #e5484d); text-decoration:underline dotted; }
 
     /* ─── Month view ─── */
     .month-wrap { padding:16px; }
@@ -631,7 +632,7 @@
       .header-actions { order:4; margin-left:0; gap:4px; }
       /* 기본 .user-chip(max-width:180px)가 소스 순서상 뒤에 와서 덮어쓰므로 명시도를 높여 모바일 캡 적용 */
       .header-actions .user-chip { max-width:96px; padding:4px 8px; gap:4px; }
-      .header-actions .icon-btn { width:28px; height:28px; font-size:14px; }
+      .header-actions .icon-btn { width:36px; height:36px; font-size:15px; }
       .progress-pill { display:none; }
       .week-label { font-size:12px; min-width:unset; }
       .nav-btn { padding:5px 10px; font-size:12px; }
@@ -647,8 +648,8 @@
       }
 
       /* Task items: bigger touch targets */
-      .task-item { padding:8px 4px; min-height:36px; }
-      .task-cb { width:20px; height:20px; border-radius:5px; flex-shrink:0; }
+      .task-item { padding:8px 4px; min-height:40px; }
+      .task-cb { width:24px; height:24px; border-radius:6px; flex-shrink:0; }
       .task-cb.checked::after { font-size:11px; }
       .task-text { font-size:13px; }
       .task-star { font-size:16px; }
@@ -657,9 +658,9 @@
 
       /* Always show action buttons on mobile (no hover) */
       .task-actions { opacity:1; }
-      .task-act-btn { width:28px; height:28px; font-size:14px; }
+      .task-act-btn { width:36px; height:36px; font-size:15px; }
       /* 모바일: ⋯ 트레이 버튼 항상 노출 + 터치 영역 확대 */
-      .task-more-btn { opacity:1; width:28px; height:28px; font-size:18px; }
+      .task-more-btn { opacity:1; width:36px; height:36px; font-size:18px; }
       /* 하위 항목 들여쓰기 축소로 텍스트 폭 확보 */
       .task-item.sub { margin-left:12px; }
       .tray-item { padding:9px 12px; font-size:13px; }
@@ -802,7 +803,7 @@
     .month-shared { font-size:9px; color:#8e24aa; font-weight:700; }
     /* 빠른추가 FAB */
     .fab-add {
-      position:fixed; right:20px; bottom:20px; z-index:200; width:52px; height:52px;
+      position:fixed; right:20px; bottom:calc(20px + env(safe-area-inset-bottom)); z-index:200; width:52px; height:52px;
       border-radius:50%; border:none; background:var(--primary); color:#fff; font-size:28px;
       line-height:1; cursor:pointer; box-shadow:0 4px 16px rgba(26,115,232,.4); transition:transform .12s, background .15s;
     }
@@ -1041,6 +1042,7 @@
         left:0 !important; right:0 !important; width:100% !important;
         border-radius:18px 18px 0 0; transform:none !important;
         animation:memoUp .2s ease;
+        padding-bottom:env(safe-area-inset-bottom);
       }
       @keyframes memoUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
       .memo-textarea { min-height:180px; font-size:15px; }
@@ -1108,6 +1110,7 @@
         left:0 !important; right:0 !important; bottom:0 !important; top:auto !important;
         width:100% !important; height:58vh !important; resize:none;
         border-radius:18px 18px 0 0; min-width:unset;
+        padding-bottom:env(safe-area-inset-bottom);
       }
       .note-head { cursor:default; }
     }

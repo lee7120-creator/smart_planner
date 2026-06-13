@@ -283,6 +283,7 @@ let yearNum = new Date().getFullYear();
 let tasks = loadTasks();
 let activeInput = null;
 let weatherByDate = {};
+let weatherStatus = 'loading';  // 'loading' | 'ok' | 'error'
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
 let searchQuery = '';
 let editCtx = null;
@@ -394,8 +395,12 @@ function today() { const d=new Date(); d.setHours(0,0,0,0); return d; }
 function dateToDayIdx(d) { const dd=(typeof d==='string')?parseDk(d):d; const day=dd.getDay(); return day===0?6:day-1; }
 
 // ── Repeat helpers ──
+// 렌더 단위 캐시: 월/연/간트 뷰는 셀마다 호출하므로 dk별 1회 계산으로 재사용 (render 시작 시 비움)
+let _repeatCache = new Map();
 function getRepeatTasksForDate(date, dayIdx) {
   const dk = dateKey(date);
+  const _c = _repeatCache.get(dk);
+  if (_c) return _c;
   const out = [];
   Object.entries(tasks).forEach(([oDk, list]) => {
     if (oDk===dk || dk < oDk) return;  // 반복은 시작일 이후에만
@@ -447,6 +452,7 @@ function getRepeatTasksForDate(date, dayIdx) {
       }
     });
   });
+  _repeatCache.set(dk, out);
   return out;
 }
 function isRepeatChecked(task, instanceDk) {
@@ -1463,15 +1469,19 @@ memoPopupEl.addEventListener('drop', e=>{
 
 // ── Weather ──
 async function fetchWeather(lat,lon) {
+  weatherStatus='loading';
   try {
     const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto&forecast_days=16`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
     const d=await r.json();
+    if(!d.daily||!d.daily.time) throw new Error('형식 오류');
     (d.daily.time||[]).forEach((dt,i)=>{
       const code=d.daily.weathercode[i]??0;
       weatherByDate[dt]={emoji:WMO[code]||'🌡️',desc:WMO_D[code]||'',max:Math.round(d.daily.temperature_2m_max[i]),min:Math.round(d.daily.temperature_2m_min[i]),rain:d.daily.precipitation_probability_max[i]??0};
     });
+    weatherStatus='ok';
     render();
-  } catch(e){console.warn('날씨 로드 실패',e);}
+  } catch(e){ console.warn('날씨 로드 실패',e); weatherStatus='error'; render(); }
 }
 document.getElementById('locationBtn').onclick=()=>{
   if(!navigator.geolocation)return;
@@ -1759,7 +1769,13 @@ function buildInputForm(dk,parentId){
 function buildWeatherBar(dk){
   const bar=el('div','weather-bar');
   const w=weatherByDate[dk];
-  if(!w)bar.appendChild(el('span','weather-skeleton',{textContent:'날씨 로드 중...'}));
+  if(!w&&weatherStatus==='error'){
+    const retry=el('span','weather-skeleton weather-error',{textContent:'날씨 불러오기 실패 · 다시 시도',title:'클릭하여 다시 시도'});
+    retry.style.cursor='pointer';
+    retry.onclick=()=>fetchWeather(weatherLoc.lat,weatherLoc.lon);
+    bar.appendChild(retry);
+  }
+  else if(!w)bar.appendChild(el('span','weather-skeleton',{textContent:'날씨 로드 중...'}));
   else{
     bar.appendChild(el('span','weather-emoji',{textContent:w.emoji}));
     const info=el('div','weather-info');
@@ -2436,6 +2452,7 @@ if (_celebrateOverlayEl) _celebrateOverlayEl.onclick = hideCelebration;
 // ── Render ──
 let _renderedWeekKey=null, _weekScroll={key:null,left:0};
 function render(){
+  _repeatCache.clear();  // 반복 일정 캐시 무효화(상태 변경 후 매 렌더 시작)
   const view=document.getElementById('mainView');
   // 모바일 주간뷰: 다시 그리기 전에 현재 가로 스크롤 위치 저장 (체크/별표 시 화면 점프 방지)
   if(window.innerWidth<=768){
@@ -2543,9 +2560,11 @@ function setView(v){
 Object.entries(VIEW_BTNS).forEach(([view,id])=>{document.getElementById(id).onclick=()=>setView(view);});
 
 // ── Search ──
+let _searchTimer=null;
 document.getElementById('searchInput').addEventListener('input',e=>{
   searchQuery=e.target.value;
-  render();
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(render,160);  // 키 입력마다 전체 재렌더 방지(디바운스)
 });
 
 // ── Dark mode ──
