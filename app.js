@@ -353,8 +353,8 @@ function initFirebaseSync() {
   ref.once('value').then(snapshot => {
     const remote = snapshot.val();
     if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
-      // Firebase에 데이터 있음 → 로컬에 덮어쓰기
-      tasks = remote;
+      // Firebase에 데이터 있음 → 로컬에 덮어쓰기 (실시간 리스너와 동일하게 정규화)
+      tasks = normalizeTasks(remote);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
       render();
       setSyncStatus('synced');
@@ -385,7 +385,7 @@ function getMonday(d) {
 }
 function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function today() { const d=new Date(); d.setHours(0,0,0,0); return d; }
-function dateToDayIdx(d) { const day=new Date(d).getDay(); return day===0?6:day-1; }
+function dateToDayIdx(d) { const dd=(typeof d==='string')?parseDk(d):d; const day=dd.getDay(); return day===0?6:day-1; }
 
 // ── Repeat helpers ──
 function getRepeatTasksForDate(date, dayIdx) {
@@ -398,8 +398,8 @@ function getRepeatTasksForDate(date, dayIdx) {
       if (!t||!t.repeat||t.repeat==='none') return;
       if (t.repeatEnd && dk > t.repeatEnd) return;   // 반복 종료일
       if (t.skips && t.skips[dk]) return;            // "이 날짜만 삭제"
-      const originDate = new Date(oDk);
-      const limitDate = new Date(oDk);
+      const originDate = parseDk(oDk);
+      const limitDate = parseDk(oDk);
       limitDate.setFullYear(limitDate.getFullYear() + 1);
       if (date > limitDate) return; // 생성일로부터 1년 초과 시 반복 종료
       if (t.repeat==='daily') {
@@ -2066,7 +2066,7 @@ function buildDayTimeline(){
   const dayIdx=dateToDayIdx(dayDate);
   const box=el('div','timeblock-box');
   const items=[];
-  (tasks[dk]||[]).filter(matchesQuery).forEach(t=>items.push({task:t,isRepeat:false,originDk:null,instanceDk:null}));
+  (tasks[dk]||[]).filter(t=>matchesQuery(t)&&!(t&&t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])).forEach(t=>items.push({task:t,isRepeat:false,originDk:null,instanceDk:null}));
   try{
     getRepeatTasksForDate(dayDate,dayIdx).filter(({task})=>matchesQuery(task)).forEach(({task,originDk,instanceDk})=>
       items.push({task,isRepeat:true,originDk,instanceDk}));
@@ -2877,7 +2877,7 @@ function compressImage(file) {
       URL.revokeObjectURL(img.src);
       res(cv.toDataURL('image/jpeg', .82));
     };
-    img.onerror = () => res(null);
+    img.onerror = () => { URL.revokeObjectURL(img.src); res(null); };
     img.src = URL.createObjectURL(file);
   });
 }
@@ -4368,8 +4368,8 @@ document.addEventListener('keydown',e=>{
     weekStart=getMonday(new Date());
     activeInput={dateKey:dateKey(new Date()),parentId:null};
     render();
+    return;
   }
-  if((e.key==='n'||e.key==='N')&&!e.target.closest('input,textarea')){e.preventDefault();openQuickAdd();return;}
   if(e.key==='Escape'){closeMemo();closeEdit();closeRepeatDel();closeNoteHist();closeCanvas();closeSlashMenu();closeLightbox();closeShareModal();
     ['quickModal','goalsModal','reviewModal','icsModal','commentModal'].forEach(id=>document.getElementById(id).classList.add('hidden'));
     document.getElementById('notesMenu').classList.add('hidden');activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
@@ -4430,6 +4430,8 @@ function buildDashStats(){
     list.forEach(t=>{
       if(!t) return;
       totalAll++; if(t.checked) doneAll++;
+      // 반복 태스크는 아래 루프에서 인스턴스로 집계하므로 주간 버킷에서 제외(이중집계 방지)
+      if(t.repeat && t.repeat!=='none') return;
       const d = new Date(dk); d.setHours(0,0,0,0);
       const diff = Math.round((d-monday)/86400000);
       if(diff>=0 && diff<7){ weekTotal++; if(t.checked) weekDone++; dayTotals[diff]+=1; }
