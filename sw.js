@@ -1,6 +1,6 @@
 // 캘린더 태스크 서비스워커 — 오프라인 지원
-const CACHE_NAME = 'cal-tasks-v2';
-const PRECACHE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE_NAME = 'cal-tasks-v3';
+const PRECACHE = ['./', './index.html', './styles.css', './logic.js', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
