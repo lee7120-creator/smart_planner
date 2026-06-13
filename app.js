@@ -2249,6 +2249,8 @@ function buildTimelineView(){
 
 // ── Search ──
 let tagFilter = null;
+let attrFilter = { incomplete:false, starred:false, prio:null, memo:false };
+function attrFilterActive(){ return attrFilter.incomplete||attrFilter.starred||attrFilter.memo||!!attrFilter.prio; }
 function allTaskTags(){
   const set = new Set();
   Object.values(tasks).forEach(list => Array.isArray(list) && list.forEach(t => {
@@ -2259,23 +2261,47 @@ function allTaskTags(){
 }
 function matchesQuery(t){
   if(tagFilter && !(t.text && t.text.includes(tagFilter))) return false;
+  if(attrFilter.starred && !t.starred) return false;
+  if(attrFilter.prio && t.priority!==attrFilter.prio) return false;
+  if(attrFilter.memo && !((t.memo&&t.memo.trim())||(Array.isArray(t.memoImages)&&t.memoImages.length))) return false;
+  if(attrFilter.incomplete && t.checked) return false;
   if(!searchQuery) return true;
   const q=searchQuery.toLowerCase();
   return (t.text&&t.text.toLowerCase().includes(q))||(t.memo&&t.memo.toLowerCase().includes(q))||(Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q)));
 }
 function buildTagFilterBar(){
   const tags = allTaskTags();
-  if (!tags.length) return null;
   const bar = el('div', 'tag-filter-bar');
-  bar.appendChild(el('span', '', {textContent: '🏷', style: 'font-size:12px'}));
-  const allChip = el('button', `tag-filter-chip${tagFilter ? '' : ' active'}`, {textContent: '전체'});
-  allChip.onclick = () => { tagFilter = null; render(); };
-  bar.appendChild(allChip);
-  tags.forEach(tag => {
-    const chip = el('button', `tag-filter-chip${tagFilter === tag ? ' active' : ''}`, {textContent: tag});
-    chip.onclick = () => { tagFilter = (tagFilter === tag ? null : tag); render(); };
+  // 상태/속성 필터 칩 (항상 표시)
+  const toggle=(key,label,val)=>{
+    const on = val!==undefined ? attrFilter[key]===val : attrFilter[key];
+    const chip = el('button', `tag-filter-chip attr-chip${on?' active':''}`, {textContent: label});
+    chip.setAttribute('aria-pressed', on?'true':'false');
+    chip.onclick = () => { if(val!==undefined) attrFilter[key]=(attrFilter[key]===val?null:val); else attrFilter[key]=!attrFilter[key]; render(); };
     bar.appendChild(chip);
-  });
+  };
+  bar.appendChild(el('span','',{textContent:'필터',style:'font-size:11px;color:var(--text3)'}));
+  toggle('incomplete','◻ 미완료');
+  toggle('starred','★ 중요');
+  toggle('memo','📝 메모');
+  toggle('prio','🔴 높음','high');
+  if(attrFilterActive()){
+    const clr=el('button','tag-filter-chip attr-clear',{textContent:'✕ 해제'});
+    clr.onclick=()=>{ attrFilter={incomplete:false,starred:false,prio:null,memo:false}; render(); };
+    bar.appendChild(clr);
+  }
+  // 태그 칩 (태그가 있을 때만)
+  if(tags.length){
+    bar.appendChild(el('span','',{textContent:'🏷',style:'font-size:12px;margin-left:6px'}));
+    const allChip = el('button', `tag-filter-chip${tagFilter ? '' : ' active'}`, {textContent: '전체'});
+    allChip.onclick = () => { tagFilter = null; render(); };
+    bar.appendChild(allChip);
+    tags.forEach(tag => {
+      const chip = el('button', `tag-filter-chip${tagFilter === tag ? ' active' : ''}`, {textContent: tag});
+      chip.onclick = () => { tagFilter = (tagFilter === tag ? null : tag); render(); };
+      bar.appendChild(chip);
+    });
+  }
   return bar;
 }
 
@@ -2760,24 +2786,51 @@ function startPomodoroForTask(text){
 function escapeICS(text){ return String(text).replace(/[\\,;]/g,m=>'\\'+m).replace(/\n/g,'\\n'); }
 function buildICS(){
   const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//마이플래너//KO','CALSCALE:GREGORIAN'];
+  const dtstamp=new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
+  const RR={
+    daily:'FREQ=DAILY', weekdays:'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+    weekly:'FREQ=WEEKLY', biweekly:'FREQ=WEEKLY;INTERVAL=2', monthly:'FREQ=MONTHLY',
+    monthlyFirstBiz:'FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=1',
+    monthlyLastBiz:'FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1',
+  };
   Object.entries(tasks).forEach(([dk,list])=>{
     if(!Array.isArray(list)) return;
-    const dtstart=dk.replace(/-/g,'');
+    const ymd=dk.replace(/-/g,'');
     list.forEach(t=>{
-      if(!t) return;
+      if(!t||!t.text) return;
+      const timed=t.time&&/^\d{1,2}:\d{2}$/.test(t.time);
       lines.push('BEGIN:VEVENT');
       lines.push('UID:'+t.id+'@myplanner');
-      lines.push('DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z');
-      lines.push('DTSTART;VALUE=DATE:'+dtstart);
-      lines.push('SUMMARY:'+escapeICS((t.starred?'★ ':'')+t.text));
-      if(t.memo) lines.push('DESCRIPTION:'+escapeICS(t.memo));
-      if(t.repeat==='weekly') lines.push('RRULE:FREQ=WEEKLY');
-      else if(t.repeat==='biweekly') lines.push('RRULE:FREQ=WEEKLY;INTERVAL=2');
-      else if(t.repeat==='monthly') lines.push('RRULE:FREQ=MONTHLY');
-      else if(t.repeat==='monthlyNth'){
-        const od=new Date(dk);
-        lines.push(`RRULE:FREQ=MONTHLY;BYDAY=${Math.ceil(od.getDate()/7)}${['SU','MO','TU','WE','TH','FR','SA'][od.getDay()]}`);
+      lines.push('DTSTAMP:'+dtstamp);
+      if(timed){
+        const [hh,mm]=t.time.split(':').map(Number);
+        const dur=Math.max(15, parseInt(t.duration,10)||60);
+        const endMin=hh*60+mm+dur;
+        const startS=`${ymd}T${String(hh).padStart(2,'0')}${String(mm).padStart(2,'0')}00`;
+        const endS=endMin>=1440?`${ymd}T235900`:`${ymd}T${String(Math.floor(endMin/60)).padStart(2,'0')}${String(endMin%60).padStart(2,'0')}00`;
+        lines.push('DTSTART:'+startS);
+        lines.push('DTEND:'+endS);
+      } else {
+        lines.push('DTSTART;VALUE=DATE:'+ymd);
       }
+      lines.push('SUMMARY:'+escapeICS((t.starred?'★ ':'')+t.text));
+      // 반복 규칙
+      let rule=RR[t.repeat];
+      if(t.repeat==='monthlyNth'){
+        const od=parseDk(dk);
+        rule=`FREQ=MONTHLY;BYDAY=${Math.min(Math.ceil(od.getDate()/7),5)}${['SU','MO','TU','WE','TH','FR','SA'][od.getDay()]}`;
+      }
+      if(rule){
+        if(t.repeatEnd&&/^\d{4}-\d{2}-\d{2}$/.test(t.repeatEnd)) rule+=';UNTIL='+t.repeatEnd.replace(/-/g,'')+(timed?'T235959':'');
+        lines.push('RRULE:'+rule);
+        // 건너뛴 인스턴스 제외
+        if(t.skips) Object.keys(t.skips).forEach(sd=>{ if(/^\d{4}-\d{2}-\d{2}$/.test(sd)) lines.push((timed?'EXDATE:':'EXDATE;VALUE=DATE:')+sd.replace(/-/g,'')+(timed?'T'+t.time.replace(':','')+'00':'')); });
+      }
+      // 설명: 메모 + 하위 항목
+      const desc=[];
+      if(t.memo) desc.push(t.memo);
+      if(Array.isArray(t.subs)&&t.subs.length) desc.push('— 하위 —\n'+t.subs.map(s=>`• ${s.checked?'[완료]':'[ ]'} ${s.text}`).join('\n'));
+      if(desc.length) lines.push('DESCRIPTION:'+escapeICS(desc.join('\n\n')));
       lines.push('END:VEVENT');
     });
   });
