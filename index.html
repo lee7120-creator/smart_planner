@@ -290,6 +290,24 @@
   </div>
 </div>
 
+<!-- Send Task Modal (단위 태스크 보내기 — 검색·복수선택·수락) -->
+<div class="modal-overlay hidden" id="sendModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="태스크 보내기">
+    <div class="modal-title">👥 태스크 보내기</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">
+      "<b id="sendTaskName" style="color:var(--primary)"></b>" 일정을 보낼 사람을 검색해 선택하세요. 여러 명 지정할 수 있어요.<br>
+      <span style="color:var(--text3);font-size:11px">받는 사람이 <b>수락</b>해야 캘린더에 추가됩니다.</span>
+    </p>
+    <input class="modal-input" id="sendSearchInput" type="text" placeholder="이름 검색 또는 직접 입력..." style="margin-bottom:8px">
+    <div id="sendSelected" class="send-chips"></div>
+    <div id="sendResults" class="send-results"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="sendCancelBtn">취소</button>
+      <button class="btn-primary" id="sendConfirmBtn">보내기</button>
+    </div>
+  </div>
+</div>
+
 <!-- Guide Modal -->
 <div class="modal-overlay hidden" id="guideModal">
   <div class="modal-box" style="width:480px;max-height:84vh;display:flex;flex-direction:column">
