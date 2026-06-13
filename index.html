@@ -28,6 +28,7 @@
       <button class="landing-btn" id="landingStartBtn">시작 →</button>
     </div>
     <div class="landing-hint">📌 URL을 북마크하거나 저장해두면 다음에 바로 접근 가능해요</div>
+    <div class="landing-warn">⚠️ 입력한 <b>이름이 곧 로그인 키</b>입니다. 이름을 잊거나 다르게 입력하면 데이터를 다시 찾을 수 없어요 — 꼭 기억하거나 URL을 저장해 두세요.</div>
     <div class="landing-features">
       <span class="landing-feat">✅ 체크리스트</span>
       <span class="landing-feat">🔄 주간·월간 반복</span>
@@ -78,6 +79,7 @@
         <button class="more-menu-item" id="shareRoBtn" style="display:none">👁 <span>읽기전용 링크 복사</span></button>
         <button class="more-menu-item" id="templateBtn">📑 <span>템플릿</span></button>
         <button class="more-menu-item" id="switchUserBtn" style="display:none">↩ <span>다른 사용자로 전환</span></button>
+        <button class="more-menu-item" id="renameBtn" style="display:none">✏️ <span>이름 변경 / 데이터 이전</span></button>
         <div class="more-menu-divider"></div>
         <button class="more-menu-item" id="locationBtn">📍 <span>내 위치 날씨</span></button>
         <button class="more-menu-item" id="notifyBtn"><span id="notifyIcon">🔕</span> <span>마감 알림</span></button>
@@ -90,8 +92,11 @@
         <button class="more-menu-item" id="icsImportBtn">📥 <span>외부 캘린더 구독</span></button>
         <button class="more-menu-item" id="teamBtn">🤝 <span>팀 캘린더</span></button>
         <button class="more-menu-item" id="icsExportBtn">📤 <span>캘린더 내보내기</span></button>
+        <button class="more-menu-item" id="backupBtn">💾 <span>전체 백업 (.json)</span></button>
+        <button class="more-menu-item" id="restoreBtn">📂 <span>백업 복원</span></button>
         <button class="more-menu-item" id="printBtn">🖨 <span>인쇄 / 이미지 저장</span></button>
       </div>
+      <input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none">
     </div>
     <div class="progress-pill" id="progressInfo"></div>
   </div>

@@ -263,6 +263,8 @@ if (!USER_ID) {
       .catch(() => { btn.innerHTML = '❌ <span>실패</span>'; })
       .finally(() => setTimeout(() => { btn.innerHTML = '☁️ <span>저장</span>'; btn.disabled = false; }, 2000));
   };
+  document.getElementById('renameBtn').style.display = 'flex';
+  document.getElementById('renameBtn').onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); renameAccount(); };
   document.getElementById('switchUserBtn').style.display = 'flex';
   document.getElementById('switchUserBtn').onclick = () => {
     if (confirm('다른 사용자로 전환할까요? 현재 데이터는 유지됩니다.')) {
@@ -315,12 +317,14 @@ function loadTasks() {
 }
 
 let pendingUpload = false;
+let pendingTasksLocal = false;  // 로컬 편집이 Firebase로 반영되는 중 → 원격 스냅샷이 덮어쓰지 않도록 가드
 
 function saveTasks(dk) {
   if (READ_ONLY) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   const ref = fbRef();
   if (!ref) return;
+  pendingTasksLocal = true;
   if (!navigator.onLine) { pendingUpload = true; setSyncStatus('offline'); return; }
   setSyncStatus('syncing');
   clearTimeout(fbSaveTimer);
@@ -328,7 +332,7 @@ function saveTasks(dk) {
     const saveRef = dk ? ref.child(dk) : ref;
     const saveData = dk ? (tasks[dk] || null) : tasks;
     saveRef.set(saveData)
-      .then(() => setSyncStatus('synced'))
+      .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
       .catch(() => { pendingUpload = true; setSyncStatus('offline'); });
   }, 300);
 }
@@ -337,9 +341,10 @@ function fbUpload() {
   if (READ_ONLY) return Promise.reject('read-only');
   const ref = fbRef();
   if (!ref) return Promise.reject('no ref');
+  pendingTasksLocal = true;
   setSyncStatus('syncing');
   return ref.set(tasks)
-    .then(() => setSyncStatus('synced'))
+    .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
     .catch(e => { setSyncStatus('offline'); throw e; });
 }
 
@@ -364,8 +369,9 @@ function initFirebaseSync() {
     } else {
       setSyncStatus('synced');
     }
-    // 2) 이후 다른 기기 변경사항 실시간 반영
+    // 2) 이후 다른 기기 변경사항 실시간 반영 (단, 내 로컬 편집 업로드 중이면 건너뜀 → 덮어쓰기 방지)
     ref.on('value', snapshot => {
+      if (pendingTasksLocal) return;
       const remote = snapshot.val();
       if (remote && typeof remote === 'object') {
         tasks = normalizeTasks(remote);
@@ -4837,3 +4843,83 @@ function initDashboard(){
 
 initDashboard();
 checkMondaySync();
+
+// ── 이름 변경 / 데이터 이전 ──
+function renameAccount() {
+  if (READ_ONLY || IS_TEAM || !USER_ID) { alert('내 캘린더(?u=이름)에서만 사용할 수 있어요.'); return; }
+  const cur = USER_ID;
+  const next = prompt('새 이름을 입력하세요.\n현재 데이터가 새 이름으로 복사·이전되고, 새 URL로 이동합니다.\n(이전 이름의 데이터는 그대로 남아 있어요)', cur);
+  if (next == null) return;
+  const nn = next.trim();
+  if (!nn || nn === cur) return;
+  const oldSuffix = '_' + cur;
+  const newSuffix = '_' + nn;
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('cal') && k.endsWith(oldSuffix)) keys.push(k); }
+  keys.forEach(k => { const base = k.slice(0, k.length - oldSuffix.length); localStorage.setItem(base + newSuffix, localStorage.getItem(k)); });
+  localStorage.setItem('lastUser', nn);
+  alert(`'${nn}'(으)로 이전했습니다. 새 캘린더로 이동합니다.`);
+  window.location.href = window.location.pathname + `?u=${encodeURIComponent(nn)}`;
+}
+
+// ── 전체 백업 / 복원 ──
+function collectAllData() {
+  return {
+    _app: 'myplanner', _v: 1, _exported: new Date().toISOString(), user: USER_ID || null,
+    tasks: tasks,
+    offDays: (typeof offDays !== 'undefined' ? offDays : {}),
+    memos: (typeof memos !== 'undefined' ? memos : {}),
+    shares: (typeof shares !== 'undefined' ? shares : {}),
+    goals: (typeof goals !== 'undefined' ? goals : []),
+    icsSubs: (typeof icsSubs !== 'undefined' ? icsSubs : []),
+    templates: JSON.parse(localStorage.getItem(TPL_KEY) || '[]'),
+    trash: JSON.parse(localStorage.getItem(TRASH_KEY) || '[]'),
+  };
+}
+function exportAllData() {
+  try {
+    const blob = new Blob([JSON.stringify(collectAllData(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `myplanner-backup-${USER_ID || 'local'}-${todayKey()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { alert('백업 실패: ' + e.message); }
+}
+function importAllData(file) {
+  if (READ_ONLY) { alert('읽기 전용 모드에서는 복원할 수 없습니다.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); } catch { alert('올바른 백업 파일이 아닙니다 (JSON 파싱 실패).'); return; }
+    if (!data || data._app !== 'myplanner' || typeof data.tasks !== 'object') {
+      alert('이 앱의 백업 파일이 아닙니다.'); return;
+    }
+    const cnt = Object.values(data.tasks || {}).reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+    if (!confirm(`현재 데이터를 백업본으로 덮어씁니다.\n할 일 ${cnt}개 · 내보낸 시각 ${data._exported || '알 수 없음'}\n계속할까요?`)) return;
+    // Firebase 동기화 컬렉션: 메모리 갱신 + 각 저장함수로 localStorage·Firebase 반영
+    tasks = normalizeTasks(data.tasks);
+    if (typeof saveTasks === 'function') saveTasks();
+    if (data.offDays && typeof offDays !== 'undefined') { offDays = data.offDays; saveOffDays(); }
+    if (data.memos && typeof memos !== 'undefined') { memos = data.memos; saveMemos(); }
+    if (data.shares && typeof shares !== 'undefined') { shares = data.shares; saveShares(); }
+    if (data.goals && typeof goals !== 'undefined') { goals = data.goals; saveGoals(); }
+    // localStorage 전용 컬렉션
+    if (data.icsSubs && typeof icsSubs !== 'undefined') { icsSubs = data.icsSubs; saveIcsSubs(); }
+    if (data.templates) saveTpls(data.templates);
+    if (data.trash) saveTrash(data.trash);
+    render();
+    alert('복원이 완료되었습니다.');
+  };
+  reader.onerror = () => alert('파일을 읽지 못했습니다.');
+  reader.readAsText(file);
+}
+const _backupBtn = document.getElementById('backupBtn');
+if (_backupBtn) _backupBtn.onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); exportAllData(); };
+const _restoreBtn = document.getElementById('restoreBtn');
+const _restoreInput = document.getElementById('restoreFileInput');
+if (_restoreBtn && _restoreInput) {
+  _restoreBtn.onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); _restoreInput.click(); };
+  _restoreInput.onchange = () => { if (_restoreInput.files && _restoreInput.files[0]) importAllData(_restoreInput.files[0]); _restoreInput.value = ''; };
+}
