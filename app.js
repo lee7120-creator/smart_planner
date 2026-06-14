@@ -3132,7 +3132,49 @@ function mdInline(s) { // s는 이미 escape됨
   s = s.replace(/@(\d{4}-\d{2}-\d{2})/g, '<button class="nv-date" data-date="$1">@$1</button>');
   s = s.replace(/@(\d{1,2}\/\d{1,2})/g, '<button class="nv-date" data-md="$1">@$1</button>');
   s = s.replace(/(^|\s)#([\p{L}\d_]+)/gu, '$1<span class="nv-tag" data-tag="$2">#$2</span>');
+  s = richMarkers(s); // 서식 마커 {!...!}…{!/!} → 스타일 span
   return s;
+}
+// ── 노트 서식 마커 ({!c=ff0000 bg=fff59d sz=20 ft=jua b u i st!}…{!/!}) ──
+const NV_FONTS = {
+  pretendard:"'Pretendard Variable',sans-serif",
+  noto:"'Noto Sans KR',sans-serif",
+  notoserif:"'Noto Serif KR',serif",
+  nanum:"'Nanum Gothic',sans-serif",
+  nanummyeongjo:"'Nanum Myeongjo',serif",
+  gowun:"'Gowun Dodum',sans-serif",
+  jua:"'Jua',sans-serif",
+  dohyeon:"'Do Hyeon',sans-serif",
+  gaegu:"'Gaegu',cursive",
+  nanumpen:"'Nanum Pen Script',cursive"
+};
+function nvSpecToStyle(spec){
+  const css=[]; let deco=[];
+  (spec.trim().split(/\s+/)).forEach(p=>{
+    let mm;
+    if((mm=p.match(/^c=([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/))) css.push('color:#'+mm[1]);
+    else if((mm=p.match(/^bg=([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/))) css.push('background-color:#'+mm[1]);
+    else if((mm=p.match(/^sz=(\d{1,3})$/))){ const n=Math.max(8,Math.min(96,+mm[1])); css.push('font-size:'+n+'px'); }
+    else if((mm=p.match(/^ft=([a-z]+)$/))){ if(NV_FONTS[mm[1]]) css.push('font-family:'+NV_FONTS[mm[1]]); }
+    else if(p==='b') css.push('font-weight:700');
+    else if(p==='i') css.push('font-style:italic');
+    else if(p==='u') deco.push('underline');
+    else if(p==='st') deco.push('line-through');
+  });
+  if(deco.length) css.push('text-decoration:'+deco.join(' '));
+  return css.join(';');
+}
+function richMarkers(s){
+  let out='', last=0, m, depth=0;
+  const re=/\{!(\/?)([^!{}]*)!\}/g;
+  while((m=re.exec(s))){
+    out+=s.slice(last,m.index); last=re.lastIndex;
+    if(m[1]==='/'){ if(depth>0){ out+='</span>'; depth--; } }
+    else { out+=`<span class="nv-fmt" style="${nvSpecToStyle(m[2])}">`; depth++; }
+  }
+  out+=s.slice(last);
+  while(depth-->0) out+='</span>';
+  return out;
 }
 function renderMarkdown(text) {
   const lines = text.split('\n');
@@ -3579,6 +3621,48 @@ function buildNoteWin(m) {
   return win;
 }
 
+// 노트 서식: 선택 영역을 마커로 감싸기
+function nvWrapSel(ta, open, close, m) {
+  const s = ta.selectionStart, e = ta.selectionEnd, val = ta.value;
+  const sel = e > s ? val.slice(s, e) : '텍스트';
+  ta.value = val.slice(0, s) + open + sel + close + val.slice(e);
+  m.text = ta.value; if (!READ_ONLY) saveMemos();
+  ta.focus();
+  ta.selectionStart = s + open.length;
+  ta.selectionEnd = s + open.length + sel.length;
+}
+function buildNoteToolbar(ta, m) {
+  const tb = el('div', 'note-toolbar');
+  const fontSel = el('select', 'nt-select', { title: '글꼴' });
+  fontSel.innerHTML = '<option value="">글꼴</option>'
+    + '<option value="pretendard">프리텐다드</option><option value="noto">본고딕</option>'
+    + '<option value="notoserif">본명조</option><option value="nanum">나눔고딕</option>'
+    + '<option value="nanummyeongjo">나눔명조</option><option value="gowun">고운돋움</option>'
+    + '<option value="jua">주아</option><option value="dohyeon">도현</option>'
+    + '<option value="gaegu">개구</option><option value="nanumpen">나눔펜</option>';
+  fontSel.onchange = () => { if (fontSel.value) nvWrapSel(ta, `{!ft=${fontSel.value}!}`, '{!/!}', m); fontSel.selectedIndex = 0; };
+  const sizeSel = el('select', 'nt-select', { title: '글자 크기' });
+  sizeSel.innerHTML = '<option value="">크기</option>' + [12,14,16,18,20,24,28,32].map(n => `<option value="${n}">${n}</option>`).join('');
+  sizeSel.onchange = () => { if (sizeSel.value) nvWrapSel(ta, `{!sz=${sizeSel.value}!}`, '{!/!}', m); sizeSel.selectedIndex = 0; };
+  tb.appendChild(fontSel); tb.appendChild(sizeSel);
+  [['b','<b>B</b>','굵게'],['i','<i>I</i>','기울임'],['u','<u>U</u>','밑줄'],['st','<s>S</s>','취소선']].forEach(([code,label,title]) => {
+    const b = el('button', 'nt-btn', { title, type: 'button' }); b.innerHTML = label;
+    b.addEventListener('mousedown', e => e.preventDefault()); // 선택/포커스 유지
+    b.onclick = () => nvWrapSel(ta, `{!${code}!}`, '{!/!}', m);
+    tb.appendChild(b);
+  });
+  const foreLab = el('label', 'nt-color', { title: '글자색' });
+  foreLab.innerHTML = '<span style="color:#1a73e8;font-weight:800">A</span>';
+  const fore = el('input', null, { type: 'color', value: '#1a73e8' });
+  fore.onchange = () => nvWrapSel(ta, `{!c=${fore.value.slice(1)}!}`, '{!/!}', m);
+  foreLab.appendChild(fore); tb.appendChild(foreLab);
+  const bgLab = el('label', 'nt-color', { title: '배경색(형광펜)' });
+  bgLab.innerHTML = '<span style="background:#fff59d;border-radius:3px;padding:0 3px">H</span>';
+  const bg = el('input', null, { type: 'color', value: '#fff59d' });
+  bg.onchange = () => nvWrapSel(ta, `{!bg=${bg.value.slice(1)}!}`, '{!/!}', m);
+  bgLab.appendChild(bg); tb.appendChild(bgLab);
+  return tb;
+}
 function renderNoteBody(m, bodyWrap, win, focusEdit) {
   bodyWrap.innerHTML = '';
   const editing = !READ_ONLY && (noteEditState[m.id] || (!m.text.trim() && !memoChildren(m.id).length));
@@ -3616,6 +3700,7 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
       setTimeout(() => {
         if (slashCtx && slashCtx.ta === ta) return; // 슬래시 메뉴 조작 중
         if (document.activeElement === ta) return;
+        if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.note-toolbar')) return; // 서식 툴바 조작 중
         noteEditState[m.id] = false;
         snapshotMemo(m);
         if (!READ_ONLY) saveMemos();
@@ -3632,6 +3717,7 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
         renderNoteBody(m, bodyWrap, win, true);
       })();
     });
+    if (!READ_ONLY) bodyWrap.appendChild(buildNoteToolbar(ta, m));
     bodyWrap.appendChild(ta);
     if (focusEdit) setTimeout(() => ta.focus(), 30);
   } else {
