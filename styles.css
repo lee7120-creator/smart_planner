@@ -960,6 +960,34 @@
       font-family:inherit; line-height:1.65; background:transparent; color:var(--text);
     }
     .memo-textarea::placeholder { color:var(--text3); }
+    /* 서식 툴바 */
+    .memo-toolbar {
+      display:flex; flex-wrap:wrap; align-items:center; gap:3px;
+      padding:6px 8px; border-bottom:1px solid var(--border2); background:var(--surface2);
+    }
+    .mt-select { font-size:11px; padding:3px 4px; border:1px solid var(--border); border-radius:6px;
+      background:var(--surface); color:var(--text); font-family:inherit; max-width:84px; }
+    .mt-btn {
+      min-width:26px; height:26px; padding:0 6px; border:1px solid var(--border); border-radius:6px;
+      background:var(--surface); color:var(--text); cursor:pointer; font-size:13px; line-height:1;
+      display:inline-flex; align-items:center; justify-content:center; font-family:inherit;
+    }
+    .mt-btn:hover { background:var(--primary-l); border-color:var(--primary); color:var(--primary); }
+    .mt-color {
+      position:relative; min-width:26px; height:26px; border:1px solid var(--border); border-radius:6px;
+      background:var(--surface); cursor:pointer; font-size:12px; display:inline-flex; align-items:center; justify-content:center; overflow:hidden;
+    }
+    .mt-color input[type=color] { position:absolute; inset:0; opacity:0; cursor:pointer; border:none; padding:0; }
+    /* WYSIWYG 편집 영역 */
+    .memo-editable {
+      width:100%; min-height:150px; max-height:340px; overflow-y:auto;
+      outline:none; padding:13px 14px; font-size:13px;
+      font-family:inherit; line-height:1.65; background:transparent; color:var(--text); word-break:break-word;
+    }
+    .memo-editable:empty::before { content:attr(data-ph); color:var(--text3); pointer-events:none; }
+    .memo-editable a { color:var(--primary); word-break:break-all; }
+    .memo-editable img { max-width:100%; border-radius:8px; margin:4px 0; }
+    .memo-editable .md-h { font-weight:700; font-size:15px; margin:4px 0 2px; }
     .memo-footer {
       display:flex; align-items:center; justify-content:space-between;
       padding:7px 14px 10px; font-size:11px; color:var(--text3);

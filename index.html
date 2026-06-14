@@ -10,6 +10,10 @@
   <meta name="theme-color" content="#6366f1">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <!-- 메모 서식용 무료 오픈소스 폰트 (Google Fonts / SIL OFL) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Noto+Serif+KR:wght@400;700&family=Nanum+Gothic&family=Nanum+Myeongjo&family=Nanum+Pen+Script&family=Gowun+Dodum&family=Jua&family=Gaegu&family=Do+Hyeon&display=swap">
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <link rel="stylesheet" href="styles.css">
@@ -196,15 +200,46 @@
     <div class="memo-header" id="memoHeader" title="드래그해서 이동">
       <span class="memo-icon">📝</span>
       <span class="memo-task-title" id="memoTitle"></span>
-      <button class="memo-attach" id="memoViewBtn" title="보기/편집 전환">👁</button>
       <button class="memo-attach" id="memoHistBtn" title="버전 히스토리">🕐</button>
       <button class="memo-attach" id="memoAttachBtn" title="이미지 첨부 (붙여넣기도 가능)">📷</button>
       <button class="memo-close" id="memoClose">✕</button>
     </div>
     <input type="file" id="memoFileInput" accept="image/*" multiple style="display:none">
-    <div class="memo-md hidden" id="memoMD"></div>
+    <div class="memo-toolbar" id="memoToolbar">
+      <select class="mt-select" id="mtFont" title="글꼴">
+        <option value="">글꼴</option>
+        <option value="'Pretendard Variable',sans-serif">프리텐다드</option>
+        <option value="'Noto Sans KR',sans-serif">본고딕</option>
+        <option value="'Noto Serif KR',serif">본명조</option>
+        <option value="'Nanum Gothic',sans-serif">나눔고딕</option>
+        <option value="'Nanum Myeongjo',serif">나눔명조</option>
+        <option value="'Gowun Dodum',sans-serif">고운돋움</option>
+        <option value="'Jua',sans-serif">주아</option>
+        <option value="'Do Hyeon',sans-serif">도현</option>
+        <option value="'Gaegu',cursive">개구(손글씨)</option>
+        <option value="'Nanum Pen Script',cursive">나눔펜(손글씨)</option>
+      </select>
+      <select class="mt-select" id="mtSize" title="글자 크기">
+        <option value="">크기</option>
+        <option value="12px">12</option>
+        <option value="14px">14</option>
+        <option value="16px">16</option>
+        <option value="18px">18</option>
+        <option value="20px">20</option>
+        <option value="24px">24</option>
+        <option value="28px">28</option>
+        <option value="32px">32</option>
+      </select>
+      <button class="mt-btn" data-cmd="bold" title="굵게" type="button"><b>B</b></button>
+      <button class="mt-btn" data-cmd="italic" title="기울임" type="button"><i>I</i></button>
+      <button class="mt-btn" data-cmd="underline" title="밑줄" type="button"><u>U</u></button>
+      <button class="mt-btn" data-cmd="strikeThrough" title="취소선" type="button"><s>S</s></button>
+      <label class="mt-color" title="글자색"><span style="color:#1a73e8;font-weight:800">A</span><input type="color" id="mtFore" value="#1a73e8"></label>
+      <label class="mt-color" title="배경색(형광펜)"><span style="background:#fff59d;border-radius:3px;padding:0 3px">H</span><input type="color" id="mtBack" value="#fff59d"></label>
+      <button class="mt-btn" data-cmd="removeFormat" title="서식 지우기" type="button">⌫</button>
+    </div>
     <div class="memo-history hidden" id="memoHistory"></div>
-    <textarea class="memo-textarea" id="memoTextarea" placeholder="메모를 입력하세요...&#10;&#10;태스크와 관련된 설명, 링크, 참고사항 등을 자유롭게 기록할 수 있어요.&#10;(자동으로 저장됩니다)"></textarea>
+    <div class="memo-editable" id="memoEditable" contenteditable="true" data-ph="메모를 입력하세요...  (텍스트를 선택하고 위 도구로 서식을 적용하세요)"></div>
     <div class="memo-images" id="memoImages"></div>
     <div class="memo-links" id="memoLinks"></div>
     <div class="memo-footer">
