@@ -88,27 +88,12 @@ function isRestDay(date) {
 }
 // 공휴일/수동휴무만(주말 제외) — 주간/격주는 지정 요일이 의도된 선택이라 주말엔 안 밀고 '휴일'에만 민다
 function isHolidayShift(date) { const dk = dateKey(date); return isHoliday(dk) || !!offDays[dk]; }
-// 휴일이면 직전 평일로 이동
-function prevWorkday(date) {
-  let d = new Date(date);
-  d.setDate(d.getDate() - 1);
-  let guard = 0;
-  while (isRestDay(d) && guard++ < 14) d.setDate(d.getDate() - 1);
-  return d;
-}
 // 휴일이면 다음 평일로 이동 (date 포함 — date가 휴일이면 다음 영업일 반환)
 function nextWorkday(date) {
   let d = new Date(date);
   let guard = 0;
-  while (isRestDay(d) && guard++ < 31) d.setDate(d.getDate() + 1);
+  while (isRestDay(d) && guard++ < 366) d.setDate(d.getDate() + 1);
   return d;
-}
-// 해당 월의 origin day 기준 조정된 영업일 반환 (휴일이면 '다음 영업일'로)
-function adjustedMonthlyDate(year, month, originDay) {
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  let d = new Date(year, month, Math.min(originDay, daysInMonth));
-  if (isRestDay(d)) d = nextWorkday(d);
-  return d; // 조정 결과가 다음 달로 넘어가도 그 날짜에 그대로 표기 (예: 5/31 토·일 → 6/1 월)
 }
 // 날짜지정형 반복(주/매월/N째주)의 원본일이 휴일이면 '다음 영업일'로 밀려 표시되므로,
 // 원본 날짜(저장 위치)에는 표시하지 않음(중복 방지). 격주·첫/말영업일은 원본일이 발생일이 아니라 제외.
@@ -3541,21 +3526,6 @@ const SLASH_ITEMS = [
 ];
 let slashCtx = null, slashSel = 0;
 const slashMenu = document.getElementById('slashMenu');
-function openSlashMenu(m, ta) {
-  slashCtx = {m, ta, pos: ta.selectionStart};
-  slashSel = 0;
-  renderSlashMenu();
-  // 캐럿 근처에 표시 (줄 수 기반 근사)
-  const rect = ta.getBoundingClientRect();
-  const lines = ta.value.slice(0, ta.selectionStart).split('\n').length;
-  const lh = 21;
-  let top = rect.top + Math.min(lines*lh - ta.scrollTop, rect.height - 10) + 6;
-  let left = rect.left + 16;
-  if (top + 240 > window.innerHeight) top = window.innerHeight - 250;
-  slashMenu.style.top = top+'px';
-  slashMenu.style.left = left+'px';
-  slashMenu.classList.remove('hidden');
-}
 function renderSlashMenu() {
   slashMenu.innerHTML = '';
   SLASH_ITEMS.forEach((it, i) => {

@@ -1,4 +1,5 @@
-const CACHE = 'myplanner-v19';
+// 고정 캐시명 — 갱신은 network-first(아래)로 자동 처리되므로 버전 수동 bump 불필요
+const CACHE = 'myplanner';
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './styles.css', './app.js', './icon.svg', './manifest.webmanifest'])));
