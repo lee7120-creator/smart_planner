@@ -107,6 +107,19 @@ function isDisplacedRecurringOrigin(t, dk) {
 function visibleStored(dk) {
   return (tasks[dk] || []).filter(t => !isDisplacedRecurringOrigin(t, dk));
 }
+// 해당 날짜에 표시할 태스크 항목 통합(저장 + 반복 인스턴스) — 저장→반복 순.
+// visibleStored와 getRepeatTasksForDate를 항상 짝지어 호출(누락으로 인한 중복/누락 버그 방지).
+function tasksForDate(date, dayIdx) {
+  const dk = dateKey(date);
+  const out = [];
+  visibleStored(dk).forEach(t => {
+    if (t && !(t.repeat && t.repeat !== 'none' && t.skips && t.skips[dk]))
+      out.push({ task: t, isRepeat: false, originDk: null, instanceDk: null, adjusted: false });
+  });
+  getRepeatTasksForDate(date, dayIdx).forEach(e =>
+    out.push({ task: e.task, isRepeat: true, originDk: e.originDk, instanceDk: e.instanceDk, adjusted: !!e.adjusted }));
+  return out;
+}
 // 해당 월의 첫/마지막 영업일
 function firstBizDay(year, month) {
   let d = new Date(year, month, 1), g = 0;
@@ -2101,8 +2114,7 @@ function buildTimeblockView(){
   const dayIdx=dateToDayIdx(dayDate);
   // 그 날의 모든 항목 수집 (직접+반복)
   const items=[];
-  visibleStored(dk).forEach(t=>{ if(t&&!(t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])&&matchesQuery(t)) items.push({t,isRepeat:false}); });
-  getRepeatTasksForDate(dayDate,dayIdx).forEach(({task,originDk,instanceDk})=>{ if(matchesQuery(task)) items.push({t:task,isRepeat:true,originDk,instanceDk}); });
+  tasksForDate(dayDate,dayIdx).forEach(e=>{ if(matchesQuery(e.task)) items.push({t:e.task,isRepeat:e.isRepeat,originDk:e.originDk,instanceDk:e.instanceDk}); });
   const timed=items.filter(x=>x.t.time).sort((a,b)=>a.t.time<b.t.time?-1:1);
   const untimed=items.filter(x=>!x.t.time);
 
@@ -2298,11 +2310,7 @@ function buildDayTimeline(){
   const dayIdx=dateToDayIdx(dayDate);
   const box=el('div','timeblock-box');
   const items=[];
-  visibleStored(dk).filter(t=>matchesQuery(t)&&!(t&&t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])).forEach(t=>items.push({task:t,isRepeat:false,originDk:null,instanceDk:null}));
-  try{
-    getRepeatTasksForDate(dayDate,dayIdx).filter(({task})=>matchesQuery(task)).forEach(({task,originDk,instanceDk})=>
-      items.push({task,isRepeat:true,originDk,instanceDk}));
-  }catch(e){}
+  try{ tasksForDate(dayDate,dayIdx).forEach(e=>{ if(matchesQuery(e.task)) items.push({task:e.task,isRepeat:e.isRepeat,originDk:e.originDk,instanceDk:e.instanceDk}); }); }catch(e){}
   const untimed=items.filter(x=>!x.task.time);
   if(untimed.length){
     const sec=el('div','timeblock-untimed');
