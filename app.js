@@ -569,7 +569,7 @@ function nextWorkdayAfter(dk) {
   const d = parseDk(dk);
   d.setDate(d.getDate() + 1);
   let guard = 0;
-  while (isRestDay(d) && guard++ < 14) d.setDate(d.getDate() + 1);
+  while (isRestDay(d) && guard++ < 366) d.setDate(d.getDate() + 1);
   return dateKey(d);
 }
 function postponeTask(dk, id) {
@@ -3409,12 +3409,12 @@ function inlineNodeToMd(node) {
   if (node.nodeType !== 1) return '';
   const el = node, tag = el.tagName.toLowerCase();
   if (tag === 'img' && el.dataset.img != null) return `![${el.getAttribute('alt') || ''}](local:${el.dataset.img})`;
-  if (tag === 'br') return '';
+  if (tag === 'br') return '\n';                                   // 소프트 줄바꿈 보존
   const inner = [...el.childNodes].map(inlineNodeToMd).join('');
   if (tag === 'b' || tag === 'strong') return `**${inner}**`;
   if (tag === 'i' || tag === 'em') return `*${inner}*`;
   if (tag === 'code') return '`' + inner + '`';
-  if (tag === 'a') return el.getAttribute('href') || inner;
+  if (tag === 'a') return inner || el.getAttribute('href') || '';
   if (el.classList && (el.classList.contains('nv-tag') || el.classList.contains('nv-date'))) return inner; // #태그·@날짜는 원문 텍스트로(자동 재인식)
   if (tag === 'u') return `<u>${inner}</u>`;
   if (tag === 's' || tag === 'strike') return `<s>${inner}</s>`;
@@ -3422,6 +3422,8 @@ function inlineNodeToMd(node) {
     const style = nvCleanStyle(el.getAttribute('style') || '');
     return style ? `<span style="${style}">${inner}</span>` : inner;
   }
+  // 브라우저가 블록 안에 만든 중첩 블록(div/p/h/li) → 줄바꿈으로 분리(줄 손실 방지)
+  if (tag === 'div' || tag === 'p' || tag === 'li' || /^h[1-6]$/.test(tag)) return inner ? '\n' + inner : '';
   return inner;
 }
 function childrenToMd(el) { return [...el.childNodes].map(inlineNodeToMd).join(''); }
@@ -3592,18 +3594,22 @@ function applySlash(i) {
   const it = SLASH_ITEMS[i];
   closeSlashMenu();
   if (!editor) return;
-  // 현재 편집기 내용을 모델로 반영하고 '/'만 있는 줄을 찾음
+  // 현재 편집기 내용을 모델로 반영하고 '/'로 시작하는 줄을 찾음 (정확히 '/' 또는 '/'+텍스트)
   m.text = serializeNoteEditor(editor);
   const lines = m.text.split('\n');
   let idx = lines.findIndex(l => l.trim() === '/');
+  if (idx < 0) idx = lines.findIndex(l => /^\s*\//.test(l));
   if (it.action === 'image') {
-    if (idx >= 0) { lines[idx] = ''; m.text = lines.join('\n'); }
+    if (idx >= 0) lines[idx] = lines[idx].replace(/^(\s*)\/\s?/, '$1');
+    m.text = lines.join('\n');
+    if (!READ_ONLY) saveMemos();
     pendingImgTarget = { m, editor };
     document.getElementById('noteImgInput').click();
     return;
   }
   const snip = (typeof it.snippet === 'function' ? it.snippet() : it.snippet).replace(/\n$/, '');
-  if (idx < 0) { lines.push(snip); } else { lines[idx] = snip; }
+  if (idx < 0) { lines.push(snip); }
+  else { const mm = lines[idx].match(/^(\s*)\/(.*)$/); lines[idx] = snip + (mm ? mm[2] : ''); }
   m.text = lines.join('\n');
   if (!READ_ONLY) saveMemos();
   renderNoteBody(m, bodyWrap, win, true);
@@ -3976,6 +3982,7 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
   if (editing) {
     const editor = el('div', 'note-editor');
     editor.contentEditable = 'true';
+    try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch (e) {} // Enter → 평평한 div(중첩 방지)
     editor.setAttribute('data-ph', '메모를 입력하세요...  ( / 입력 → 블록, 이미지 붙여넣기 )');
     editor.innerHTML = m.text.trim() ? renderMarkdown(m.text) : '<div class="nv-p"><br></div>';
     hydrateNoteMedia(editor, true);
@@ -4895,7 +4902,8 @@ document.getElementById('teamBtn').onclick = () => {
 
 // ═══ 팀 등록부 · 구독 · 빠른 전환 (Phase 1) ═══
 function myPersonalId(){ return IS_TEAM ? (localStorage.getItem('lastUser')||'') : (USER_ID||''); }
-const TEAM_SUBS_KEY = `calTeamSubs_${myPersonalId()||'anon'}`;
+function deviceId(){ let d=localStorage.getItem('calDeviceId'); if(!d){ d='dev-'+Math.random().toString(36).slice(2,10); localStorage.setItem('calDeviceId',d); } return d; }
+const TEAM_SUBS_KEY = `calTeamSubs_${myPersonalId()||deviceId()}`;
 let teamSubs = (()=>{ try{ return JSON.parse(localStorage.getItem(TEAM_SUBS_KEY)||'{}')||{}; }catch{ return {}; } })();
 function saveTeamSubs(){
   localStorage.setItem(TEAM_SUBS_KEY, JSON.stringify(teamSubs));
