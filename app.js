@@ -5049,8 +5049,9 @@ function registerTaskToTeam(dk, task, isRepeatInst, originDk){
   pickTeamForRegister(teamId=>{
     const tid=sanitizeId(teamId); if(!tid) return;
     const by=myPersonalId() || (localStorage.getItem('lastUser')||'나');
+    const copyId=uid();
     const copy={
-      id: uid(), text: t.text, color: t.color||null, starred: !!t.starred,
+      id: copyId, text: t.text, color: t.color||null, starred: !!t.starred,
       repeat: t.repeat||'none', repeatEnd: t.repeatEnd||null, priority: t.priority||null,
       time: t.time||null, duration: t.duration||null, checked:false,
       completions:{}, skips:{},
@@ -5063,7 +5064,14 @@ function registerTaskToTeam(dk, task, isRepeatInst, originDk){
       const v=snap.val(); const arr=Array.isArray(v)?v:(v?Object.values(v):[]);
       arr.push(copy);
       ref.set(arr)
-        .then(()=>showUndoToast(`🤝 '${teamId}' 팀에 등록했어요${(t.repeat&&t.repeat!=='none')?' (반복 포함)':''}`))
+        .then(()=>{
+          // 내가 올린 건 다시 내 캘린더로 복사하지 않도록 표시(원본과 중복 방지)
+          teamCopied[`${tid}|${srcDk}|${copyId}`]=Date.now(); saveTeamCopied();
+          // 자동 구독 → 이 팀 일정이 내 캘린더로 흘러오게(이미 구독이면 유지)
+          let added=false;
+          if(!teamSubs[tid]){ teamSubs[tid]={name:teamId, ts:Date.now()}; saveTeamSubs(); attachTeamListener(tid); added=true; }
+          showUndoToast(`🤝 '${teamId}' 팀에 등록했어요${(t.repeat&&t.repeat!=='none')?' (반복 포함)':''}${added?' · 이 팀 구독함':''}`);
+        })
         .catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
     }).catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
   });
