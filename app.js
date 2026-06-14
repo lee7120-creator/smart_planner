@@ -2826,7 +2826,7 @@ document.addEventListener('click',e=>{
 // ── Notifications: 9시 오늘할일 / 마감 1시간 전 / 17시 미완료 ──
 let NOTIFY_HOUR = (()=>{ const v=parseInt(localStorage.getItem('notifyMorningHour'),10); return isNaN(v)?9:v; })();      // 아침 요약
 let NOTIFY_EVENING = (()=>{ const v=parseInt(localStorage.getItem('notifyEveningHour'),10); return isNaN(v)?17:v; })();  // 저녁 미완료 리마인드
-let NOTIFY_LEAD = (()=>{ const v=parseInt(localStorage.getItem('notifyLeadMin'),10); return isNaN(v)?60:v; })();         // 마감 N분 전
+let NOTIFY_LEAD = (()=>{ const v=parseInt(localStorage.getItem('notifyLeadMin'),10); return isNaN(v)?30:v; })();         // 시간지정 태스크 N분 전(기본 30)
 function notifyAllowed() {
   return localStorage.getItem('notifyEnabled')==='true'
     && 'Notification' in window && Notification.permission==='granted';
@@ -2888,7 +2888,7 @@ function updateNotifyBtn() {
   const enabled = localStorage.getItem('notifyEnabled')==='true' && 'Notification' in window && Notification.permission==='granted';
   const btn = document.getElementById('notifyBtn');
   document.getElementById('notifyIcon').textContent = enabled?'🔔':'🔕';
-  btn.title = enabled?`알림 켜짐 (${NOTIFY_HOUR}시 오늘할일 · 마감 ${NOTIFY_LEAD}분 전 · ${NOTIFY_EVENING}시 미완료)`:'알림 꺼짐 (클릭하여 켜기)';
+  btn.title = enabled?`알림 켜짐 (${NOTIFY_HOUR}시 오늘할일·🔴중요 · 시간 ${NOTIFY_LEAD}분 전 · ${NOTIFY_EVENING}시 미완료)`:'알림 꺼짐 (클릭하여 켜기)';
 }
 document.getElementById('notifyBtn').onclick=()=>{
   if(!('Notification' in window)){ alert('이 브라우저는 알림을 지원하지 않습니다.'); return; }
@@ -2901,7 +2901,7 @@ document.getElementById('notifyBtn').onclick=()=>{
   Notification.requestPermission().then(perm=>{
     if(perm==='granted'){
       localStorage.setItem('notifyEnabled','true');
-      new Notification('🗓 마이플래너', {body:`알림 설정 완료!\n· 매일 ${NOTIFY_HOUR}시 오늘 할 일\n· 마감 ${NOTIFY_LEAD}분 전\n· 매일 ${NOTIFY_EVENING}시 미완료 리마인드\n(더보기 → 알림 시간 설정에서 변경)`});
+      new Notification('🗓 마이플래너', {body:`알림 설정 완료!\n· 매일 ${NOTIFY_HOUR}시 오늘 할 일 · 🔴중요(높음) 태스크\n· 시간지정 태스크 ${NOTIFY_LEAD}분 전\n· 매일 ${NOTIFY_EVENING}시 미완료 리마인드\n(더보기 → 알림 시간 설정에서 변경)`});
     } else {
       alert('알림 권한이 거부되었습니다. 브라우저 설정에서 알림을 허용해주세요.');
     }
@@ -2936,6 +2936,20 @@ function checkTimeNotifications(){
     }
   });
   localStorage.setItem('timeNotified',JSON.stringify(state));
+}
+
+// 2-b) 빨강(높음) 중요 태스크 일일 알림 — 오전 NOTIFY_HOUR 이후 1회
+function checkHighPriorityAlert(){
+  if(!notifyAllowed())return;
+  const now=new Date();
+  if(now.getHours()<NOTIFY_HOUR)return;
+  const todayDk=dateKey(now);
+  if(localStorage.getItem('lastNotifyHigh')===todayDk)return;
+  localStorage.setItem('lastNotifyHigh',todayDk);
+  const reds=getTodayIncomplete().filter(t=>t.priority==='high');
+  if(!reds.length)return;
+  const names=reds.slice(0,3).map(t=>(t.time?t.time+' ':'')+t.text).join(', ');
+  new Notification(`🔴 중요(높음) 태스크 ${reds.length}건`,{body:names+(reds.length>3?` 외 ${reds.length-3}건`:'')});
 }
 
 // 받은 일정(pending) 도착 알림 + 제목 배지
@@ -2985,6 +2999,8 @@ setInterval(checkEveningReminder, 60*1000);
 checkEveningReminder();
 setInterval(checkTimeNotifications, 60*1000);
 checkTimeNotifications();
+setInterval(checkHighPriorityAlert, 60*1000);
+checkHighPriorityAlert();
 
 // ── Pomodoro timer ──
 let pomodoroInterval=null, pomodoroSeconds=25*60, pomodoroRunning=false;
