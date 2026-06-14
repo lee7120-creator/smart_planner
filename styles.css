@@ -1076,6 +1076,12 @@
       display:inline-block; width:6px; height:6px; border-radius:50%;
       background:#f9a825; margin-left:4px; vertical-align:middle; flex-shrink:0; margin-top:4px;
     }
+    .memo-icon-btn {
+      flex-shrink:0; margin-left:3px; font-size:12px; line-height:1; cursor:pointer;
+      opacity:.32; filter:grayscale(1); transition:opacity .12s, filter .12s; border-radius:5px; padding:1px 2px;
+    }
+    .memo-icon-btn.has { opacity:1; filter:none; }
+    .memo-icon-btn:hover { opacity:1; filter:none; background:var(--primary-l); }
     .task-text-wrap { cursor:pointer; display:flex; align-items:flex-start; gap:4px; flex:1; min-width:0; }
     .task-text-wrap:hover .task-text { text-decoration:underline; text-decoration-style:dotted; text-decoration-color:var(--primary); }
 

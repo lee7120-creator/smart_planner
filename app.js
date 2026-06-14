@@ -95,12 +95,30 @@ function prevWorkday(date) {
   while (isRestDay(d) && guard++ < 14) d.setDate(d.getDate() - 1);
   return d;
 }
-// 해당 월의 origin day 기준 조정된 영업일 반환
+// 휴일이면 다음 평일로 이동 (date 포함 — date가 휴일이면 다음 영업일 반환)
+function nextWorkday(date) {
+  let d = new Date(date);
+  let guard = 0;
+  while (isRestDay(d) && guard++ < 31) d.setDate(d.getDate() + 1);
+  return d;
+}
+// 해당 월의 origin day 기준 조정된 영업일 반환 (휴일이면 '다음 영업일'로)
 function adjustedMonthlyDate(year, month, originDay) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   let d = new Date(year, month, Math.min(originDay, daysInMonth));
-  if (isRestDay(d)) d = prevWorkday(d);
-  return d; // 조정 결과가 전월로 넘어가도 그 날짜에 그대로 표기 (예: 8/1 토 → 7/31 금)
+  if (isRestDay(d)) d = nextWorkday(d);
+  return d; // 조정 결과가 다음 달로 넘어가도 그 날짜에 그대로 표기 (예: 5/31 토·일 → 6/1 월)
+}
+// 매월 반복 태스크의 원본일이 휴일이라 '다음 영업일'로 밀린 경우 → 원본 날짜에는 표시하지 않음(중복 방지)
+function isMonthlyDisplaced(t, dk) {
+  if (!t || t.repeat !== 'monthly') return false;
+  const d = parseDk(dk);
+  if (!isRestDay(d)) return false;
+  return dateKey(adjustedMonthlyDate(d.getFullYear(), d.getMonth(), d.getDate())) !== dk;
+}
+// 해당 날짜에 '저장된' 태스크 중 화면에 보일 것 (휴일로 밀린 매월 원본 제외)
+function visibleStored(dk) {
+  return (tasks[dk] || []).filter(t => !isMonthlyDisplaced(t, dk));
 }
 // 해당 월의 첫/마지막 영업일
 function firstBizDay(year, month) {
@@ -431,8 +449,8 @@ function getRepeatTasksForDate(date, dayIdx) {
       }
       if (t.repeat==='monthly') {
         const originDay = originDate.getDate();
-        // 이번 달 발생 + "다음 달 발생이 영업일 조정으로 이번 달 말로 당겨진 경우"까지 검사
-        for (const off of [0, 1]) {
+        // 이번 달 발생 + "전달 발생이 영업일 조정으로 이번 달 초로 밀려온 경우"까지 검사
+        for (const off of [0, -1]) {
           const base = new Date(date.getFullYear(), date.getMonth() + off, 1);
           const adj = adjustedMonthlyDate(base.getFullYear(), base.getMonth(), originDay);
           if (adj && dateKey(adj) === dk) {
@@ -1646,12 +1664,18 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   const txt=el('div',`task-text${checked?' done':''}`,{textContent:task.text});
   textWrap.appendChild(txt);
-  if(!isSub&&task.memo){ const dot=el('span','memo-dot',{title:'메모 있음'}); textWrap.appendChild(dot); }
   if(!isSub){
-    const openMemoH=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,textWrap);};
-    textWrap.onclick=openMemoH; addKbd(textWrap,openMemoH);
+    const hasMemo=!!(task.memo&&task.memo.trim());
+    const memoBtn=el('span',`memo-icon-btn${hasMemo?' has':''}`,{textContent:'📝',title:hasMemo?'메모 보기/편집':'메모 추가'});
+    memoBtn.setAttribute('role','button'); memoBtn.tabIndex=0;
+    const openMemoH=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,memoBtn);};
+    memoBtn.onclick=openMemoH; addKbd(memoBtn,openMemoH);
+    textWrap.appendChild(memoBtn);
+    // 본문 탭 → 수정 모달
+    const openEditH=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();openEdit(dk,task,isRepeatInst,originDk);};
+    textWrap.onclick=openEditH; addKbd(textWrap,openEditH);
     textWrap.setAttribute('role','button'); textWrap.tabIndex=0;
-    textWrap.setAttribute('aria-label',(task.text||'할 일')+' — 메모 보기/편집');
+    textWrap.setAttribute('aria-label',(task.text||'할 일')+' — 수정');
   }
   body.appendChild(textWrap);
   if(!isSub){
@@ -1909,7 +1933,7 @@ function buildDayCol(date,dayIdx){
     hdr.appendChild(offBtn);
   }
   // task count + mini progress (반복 인스턴스는 해당 날짜의 체크 상태 기준)
-  const dayTasks=(tasks[dk]||[]).filter(t=>!(t&&t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk]));
+  const dayTasks=visibleStored(dk).filter(t=>!(t&&t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk]));
   const countTasks=dayTasks.filter(t=>!(t&&t.pending));
   const repeatEntries=getRepeatTasksForDate(date,dayIdx);
   const total=countTasks.length+repeatEntries.length;
@@ -1990,7 +2014,7 @@ function buildTimeblockView(){
   const dayIdx=dateToDayIdx(dayDate);
   // 그 날의 모든 항목 수집 (직접+반복)
   const items=[];
-  (tasks[dk]||[]).forEach(t=>{ if(t&&!(t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])&&matchesQuery(t)) items.push({t,isRepeat:false}); });
+  visibleStored(dk).forEach(t=>{ if(t&&!(t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])&&matchesQuery(t)) items.push({t,isRepeat:false}); });
   getRepeatTasksForDate(dayDate,dayIdx).forEach(({task,originDk,instanceDk})=>{ if(matchesQuery(task)) items.push({t:task,isRepeat:true,originDk,instanceDk}); });
   const timed=items.filter(x=>x.t.time).sort((a,b)=>a.t.time<b.t.time?-1:1);
   const untimed=items.filter(x=>!x.t.time);
@@ -2078,7 +2102,7 @@ function buildFocusView(){
   const sec1=el('div','focus-section');
   sec1.appendChild(el('div','focus-section-title',{textContent:`📌 오늘 · ${now.getMonth()+1}월 ${now.getDate()}일 (${DAY_NAMES[dayIdx]})`}));
   const list1=el('div','tasks-list focus-list');
-  const directToday=(tasks[dk]||[]).filter(matchesQuery);
+  const directToday=visibleStored(dk).filter(matchesQuery);
   const repeatsToday=getRepeatTasksForDate(now,dayIdx).filter(({task})=>matchesQuery(task));
   const sortedDirect=[...directToday].sort(taskSort);
   sortedDirect.forEach(t=>list1.appendChild(buildTaskItem(dk,t,false,null,false,null,null)));
@@ -2187,7 +2211,7 @@ function buildDayTimeline(){
   const dayIdx=dateToDayIdx(dayDate);
   const box=el('div','timeblock-box');
   const items=[];
-  (tasks[dk]||[]).filter(t=>matchesQuery(t)&&!(t&&t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])).forEach(t=>items.push({task:t,isRepeat:false,originDk:null,instanceDk:null}));
+  visibleStored(dk).filter(t=>matchesQuery(t)&&!(t&&t.repeat&&t.repeat!=='none'&&t.skips&&t.skips[dk])).forEach(t=>items.push({task:t,isRepeat:false,originDk:null,instanceDk:null}));
   try{
     getRepeatTasksForDate(dayDate,dayIdx).filter(({task})=>matchesQuery(task)).forEach(({task,originDk,instanceDk})=>
       items.push({task,isRepeat:true,originDk,instanceDk}));
@@ -2267,7 +2291,7 @@ function buildTimelineView(){
   for(let d=1;d<=daysInMonth;d++){
     const date=new Date(year,month,d);
     const dk=dateKey(date);
-    (tasks[dk]||[]).forEach(t=>{
+    visibleStored(dk).forEach(t=>{
       if(!t||!matchesQuery(t))return;
       if(t.repeat&&t.repeat!=='none'){
         if(!repRows[t.id])repRows[t.id]={task:t,cells:[]};
@@ -2459,7 +2483,7 @@ function calcProgress(){
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(d.getDate()+i);
     const dk=dateKey(d);
-    (tasks[dk]||[]).forEach(t=>{if(!t||t.pending)return;total++;if(t.checked)done++;(t.subs||[]).forEach(s=>{total++;if(s.checked)done++;});});
+    visibleStored(dk).forEach(t=>{if(!t||t.pending)return;total++;if(t.checked)done++;(t.subs||[]).forEach(s=>{total++;if(s.checked)done++;});});
     // 반복 인스턴스 포함 (해당 날짜의 체크 상태 기준)
     try{
       getRepeatTasksForDate(d,i).forEach(({task,instanceDk})=>{
@@ -2489,7 +2513,7 @@ function todayProgress() {
   const i = dateToDayIdx(d);
   const dk = dateKey(d);
   let total = 0, done = 0;
-  (tasks[dk]||[]).forEach(t => {
+  visibleStored(dk).forEach(t => {
     if (!t || t.pending) return;
     total++; if (t.checked) done++;
     (t.subs||[]).forEach(s => { total++; if (s.checked) done++; });
@@ -2742,7 +2766,7 @@ function summarizeTasks(list){
 function getTodayIncomplete(){
   const now=today(); const dk=dateKey(now);
   const out=[];
-  (tasks[dk]||[]).forEach(t=>{ if(t&&!t.checked) out.push(t); });
+  visibleStored(dk).forEach(t=>{ if(t&&!t.checked) out.push(t); });
   try{
     getRepeatTasksForDate(now,dateToDayIdx(now)).forEach(({task,instanceDk})=>{
       if(!isRepeatChecked(task,instanceDk)) out.push(task);
@@ -2809,7 +2833,7 @@ function checkTimeNotifications(){
   try{state=JSON.parse(localStorage.getItem('timeNotified')||'{}');}catch{}
   if(state.dk!==dk)state={dk,ids:[]};
   const candidates=[];
-  (tasks[dk]||[]).forEach(t=>{ if(t&&t.time&&!t.checked)candidates.push({id:t.id,time:t.time,text:t.text}); });
+  visibleStored(dk).forEach(t=>{ if(t&&t.time&&!t.checked)candidates.push({id:t.id,time:t.time,text:t.text}); });
   try{
     getRepeatTasksForDate(now,dateToDayIdx(now)).forEach(({task,instanceDk})=>{
       if(task.time&&!isRepeatChecked(task,instanceDk))candidates.push({id:task.id,time:task.time,text:task.text});
@@ -3068,7 +3092,33 @@ function memoChildren(id) {
 function memoRoots() {
   return Object.values(memos).filter(m => !m.parentId).sort((a,b) => a.created - b.created);
 }
-function memoLabel(m) { return m.title.trim() || (m.text.trim() ? m.text.trim().slice(0,18) : '제목 없음'); }
+function memoLabel(m) { return m.title.trim() || memoFirstLine(m.text).slice(0,18) || '제목 없음'; }
+// 본문에서 의미 있는 첫 줄을 평문으로 (페이지링크/이미지 단독줄·서식마커·마크다운 기호 제거)
+function memoFirstLine(text) {
+  if (!text) return '';
+  for (const ln of text.split('\n')) {
+    const t = ln.replace(/\{!\/?[^!{}]*!\}/g, '')
+                .replace(/^#{1,3}\s+/, '').replace(/^\s*-\s+/, '').replace(/^\s*\[( |x)\]\s?/, '')
+                .replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
+    if (!t) continue;
+    if (/^\[\[[a-z0-9]+\]\]$/.test(t)) continue;                 // 페이지 링크 단독줄은 건너뜀
+    if (/^!\[[^\]]*\]\(local:[a-z0-9_]+\)$/.test(t)) continue;   // 이미지 단독줄도 건너뜀
+    return t.replace(/!\[[^\]]*\]\(local:[a-z0-9_]+\)/g, '🖼');
+  }
+  return '';
+}
+// 본문 전체를 미리보기용 평문으로 (페이지링크는 대상 메모 제목으로 치환)
+function memoPreviewText(text) {
+  if (!text) return '';
+  return text.split('\n').map(ln => {
+    let t = ln.replace(/\{!\/?[^!{}]*!\}/g, ''), mm;
+    if ((mm = t.match(/^\s*\[\[([a-z0-9]+)\]\]\s*$/))) return memos[mm[1]] ? ('📄 ' + memoLabel(memos[mm[1]])) : '📄 삭제된 메모';
+    if (/^\s*!\[[^\]]*\]\(local:[a-z0-9_]+\)\s*$/.test(t)) return '🖼';
+    return t.replace(/^#{1,3}\s+/, '').replace(/^\s*-\s+/, '• ').replace(/^\s*\[( |x)\]\s?/, '')
+            .replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1')
+            .replace(/!\[[^\]]*\]\(local:[a-z0-9_]+\)/g, '🖼');
+  }).join(' ').replace(/\s+/g, ' ').trim();
+}
 
 // ── 태그: #태그 추출 ──
 function extractTags(m) {
@@ -3265,7 +3315,7 @@ function openNoteHist(m) {
     const d = new Date(h.t);
     const info = el('div','hist-info');
     info.appendChild(el('div','hist-time',{textContent:`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}));
-    info.appendChild(el('div','hist-preview',{textContent:(h.title?h.title+' — ':'')+h.text.slice(0,48).replace(/\n/g,' ')}));
+    info.appendChild(el('div','hist-preview',{textContent:(h.title?h.title+' — ':'')+memoPreviewText(h.text).slice(0,48)}));
     row.appendChild(info);
     if (!READ_ONLY) {
       const btn = el('button','btn-secondary',{textContent:'복원',style:'padding:4px 10px;font-size:11px'});
@@ -3904,7 +3954,7 @@ function renderCanvas() {
     card.style.top = (m.cy + canvasPan.y) + 'px';
     if (m.color) card.style.borderLeft = `4px solid ${m.color}`;
     card.appendChild(el('div', 'canvas-card-title', {textContent: (m.pinned?'📌 ':'') + memoLabel(m)}));
-    const preview = m.text.trim().replace(/\n/g,' ').slice(0, 36);
+    const preview = memoPreviewText(m.text).slice(0, 36);
     if (preview) card.appendChild(el('div', 'canvas-card-preview', {textContent: preview}));
     const tags = extractTags(m);
     if (tags.length) card.appendChild(el('div', 'canvas-card-tags', {textContent: tags.map(t=>'#'+t).join(' ')}));
@@ -4858,7 +4908,7 @@ function buildDashCalendar(){
     let total=0,done=0;
     for(let i=0;i<7;i++){
       const d=new Date(ws); d.setDate(d.getDate()+i);
-      (tasks[dateKey(d)]||[]).forEach(t=>{ if(t){total++; if(t.checked)done++;} });
+      visibleStored(dateKey(d)).forEach(t=>{ if(t){total++; if(t.checked)done++;} });
       try{
         getRepeatTasksForDate(d,i).forEach(({task,instanceDk})=>{
           total++; if(isRepeatChecked(task,instanceDk))done++;
