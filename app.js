@@ -4918,6 +4918,11 @@ function myPersonalId(){ return IS_TEAM ? (localStorage.getItem('lastUser')||'')
 function deviceId(){ let d=localStorage.getItem('calDeviceId'); if(!d){ d='dev-'+Math.random().toString(36).slice(2,10); localStorage.setItem('calDeviceId',d); } return d; }
 const TEAM_SUBS_KEY = `calTeamSubs_${myPersonalId()||deviceId()}`;
 let teamSubs = (()=>{ try{ return JSON.parse(localStorage.getItem(TEAM_SUBS_KEY)||'{}')||{}; }catch{ return {}; } })();
+// 내가 들어가거나 만든 팀을 로컬에도 기억 → 피커에 항상 표시(원격 teamDirectory 규칙과 무관)
+const MY_TEAMS_KEY = `calMyTeams_${myPersonalId()||deviceId()}`;
+let myTeams = (()=>{ try{ return JSON.parse(localStorage.getItem(MY_TEAMS_KEY)||'{}')||{}; }catch{ return {}; } })();
+function rememberTeam(id, name){ const s=sanitizeId(id); if(!s) return; myTeams[s]={name:name||s, ts:Date.now()}; try{ localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(myTeams)); }catch(e){} }
+function forgetTeam(id){ const s=sanitizeId(id); if(myTeams[s]){ delete myTeams[s]; try{ localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(myTeams)); }catch(e){} } }
 const TEAM_COPIED_KEY = `calTeamCopied_${myPersonalId()||deviceId()}`;
 let teamCopied = (()=>{ try{ return JSON.parse(localStorage.getItem(TEAM_COPIED_KEY)||'{}')||{}; }catch{ return {}; } })();
 function saveTeamCopied(){ localStorage.setItem(TEAM_COPIED_KEY, JSON.stringify(teamCopied)); }
@@ -5008,7 +5013,7 @@ function fetchTeamDirectory(cb){
     cb(Object.keys(v).map(id=>({id, name:(v[id]&&v[id].name)||id})).sort((a,b)=>String(a.name).localeCompare(String(b.name))));
   }).catch(()=>cb([]));
 }
-function enterTeam(id){ const s=sanitizeId(id); if(!s) return; window.location.href = window.location.pathname + `?team=${encodeURIComponent(s)}`; }
+function enterTeam(id, name){ const s=sanitizeId(id); if(!s) return; rememberTeam(s, name||id); window.location.href = window.location.pathname + `?team=${encodeURIComponent(s)}`; }
 function gotoPersonal(){ const last=localStorage.getItem('lastUser'); window.location.href = window.location.pathname + (last?`?u=${encodeURIComponent(last)}`:''); }
 function toggleTeamSub(id, name){
   const nowOn = !teamSubs[id];
@@ -5052,7 +5057,7 @@ function registerTaskToTeam(dk, task, isRepeatInst, originDk){
       subs:(Array.isArray(t.subs)?t.subs:[]).map(s=>({id:uid(),text:s.text,checked:false,starred:false,color:null,subs:[]})),
       by, memo:'', memoImages:[], memoHistory:[], comments:[]
     };
-    registerTeamDirectory(tid, teamId);
+    registerTeamDirectory(tid, teamId); rememberTeam(tid, teamId);
     const ref=fbDb.ref(`users/team-${tid}/tasks/${srcDk}`);
     ref.once('value').then(snap=>{
       const v=snap.val(); const arr=Array.isArray(v)?v:(v?Object.values(v):[]);
@@ -5075,24 +5080,35 @@ function openTeamPicker(){
   const inRow=el('div','modal-row'); inRow.style.gap='6px';
   const inp=el('input','modal-input',{type:'text',placeholder:'새 팀 이름'}); inp.style.cssText='flex:1;margin-bottom:0';
   const goBtn=el('button','btn-primary',{type:'button',textContent:'들어가기'});
-  goBtn.onclick=()=>{ if(inp.value.trim()) enterTeam(inp.value.trim()); };
-  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&inp.value.trim()) enterTeam(inp.value.trim()); });
+  goBtn.onclick=()=>{ if(inp.value.trim()) enterTeam(inp.value.trim(), inp.value.trim()); };
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&inp.value.trim()) enterTeam(inp.value.trim(), inp.value.trim()); });
   inRow.appendChild(inp); inRow.appendChild(goBtn); box.appendChild(inRow);
   const closeBtn=el('button','btn-secondary',{type:'button',textContent:'닫기',style:'margin-top:8px;width:100%'});
   closeBtn.onclick=()=>ov.remove(); box.appendChild(closeBtn);
   ov.appendChild(box); document.body.appendChild(ov);
   ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
-  fetchTeamDirectory(list=>{
-    loading.remove();
+  // 로컬(내가 들어간/만든 팀) + 구독 팀 + 원격 등록부를 합쳐 표시
+  const renderList=(remote)=>{
+    const map={};
+    Object.keys(myTeams).forEach(id=>{ map[id]={id, name:myTeams[id].name||id}; });
+    Object.keys(teamSubs).forEach(id=>{ if(!map[id]) map[id]={id, name:teamSubs[id].name||id}; });
+    (remote||[]).forEach(t=>{ if(!map[t.id]) map[t.id]={id:t.id, name:t.name}; });
+    const list=Object.values(map).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+    listWrap.innerHTML='';
     if(!list.length){ listWrap.appendChild(el('div','',{textContent:'아직 등록된 팀이 없어요. 아래에서 새로 만들어 보세요.',style:'font-size:12px;color:var(--text3)'})); return; }
     list.forEach(t=>{
       const row=el('div','team-pick-row');
-      const nm=el('button','team-pick-name',{type:'button',textContent:'🤝 '+t.name}); nm.onclick=()=>enterTeam(t.id);
+      const nm=el('button','team-pick-name',{type:'button',textContent:'🤝 '+t.name}); nm.onclick=()=>enterTeam(t.id, t.name);
       const subBtn=el('button',`team-pick-sub${teamSubs[t.id]?' on':''}`,{type:'button',textContent:teamSubs[t.id]?'구독중 ✓':'구독'});
       subBtn.onclick=()=>{ const on=toggleTeamSub(t.id,t.name); subBtn.textContent=on?'구독중 ✓':'구독'; subBtn.classList.toggle('on',on); };
-      row.appendChild(nm); row.appendChild(subBtn); listWrap.appendChild(row);
+      const delBtn=el('button','team-pick-del',{type:'button',textContent:'✕',title:'목록에서 제거'});
+      delBtn.onclick=()=>{ forgetTeam(t.id); renderList(remote); };
+      row.appendChild(nm); row.appendChild(subBtn); row.appendChild(delBtn); listWrap.appendChild(row);
     });
-  });
+  };
+  loading.remove();
+  renderList([]);                          // 로컬 즉시 표시
+  fetchTeamDirectory(remote=>renderList(remote)); // 원격 도착 시 병합
 }
 // 상단 캘린더 이름 클릭 → 빠른 전환 드롭다운
 (function initCalSwitch(){
@@ -5107,7 +5123,9 @@ function openTeamPicker(){
       const last=localStorage.getItem('lastUser');
       if(last) items.push({label:'👤 '+last+' (내 캘린더)', fn:gotoPersonal});
     } else {
-      Object.keys(teamSubs).forEach(id=>items.push({label:'🤝 '+(teamSubs[id].name||id), fn:()=>enterTeam(id)}));
+      const seen={};
+      Object.keys(myTeams).forEach(id=>{ seen[id]=1; items.push({label:'🤝 '+(myTeams[id].name||id), fn:()=>enterTeam(id, myTeams[id].name)}); });
+      Object.keys(teamSubs).forEach(id=>{ if(!seen[id]) items.push({label:'🤝 '+(teamSubs[id].name||id), fn:()=>enterTeam(id, teamSubs[id].name)}); });
     }
     items.push({label:'＋ 팀 캘린더 관리', fn:openTeamPicker});
     if(!items.length) return;
@@ -5122,6 +5140,7 @@ function openTeamPicker(){
 if (IS_TEAM) {
   const _tid = sanitizeId(_rawTeam);
   registerTeamDirectory(_tid, _rawTeam);
+  rememberTeam(_tid, _rawTeam);
   const tb=document.getElementById('teamBtn');
   if (tb && tb.parentNode) {
     const subItem=document.createElement('button'); subItem.className='more-menu-item'; subItem.id='teamSubBtn';
