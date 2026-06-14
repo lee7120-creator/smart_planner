@@ -1141,6 +1141,15 @@
       line-height:1.6; font-family:inherit; background:none; color:var(--text); min-height:50px;
     }
     .note-textarea::placeholder { color:var(--text3); }
+    /* WYSIWYG 노트 편집기 (contentEditable) */
+    .note-editor {
+      flex:1; outline:none; padding:10px 12px; font-size:13px; line-height:1.6;
+      font-family:inherit; background:none; color:var(--text); min-height:50px; overflow-y:auto;
+      cursor:text; word-break:break-word;
+    }
+    .note-editor:empty::before, .note-editor:has(.nv-placeholder)::before { content:attr(data-ph); color:var(--text3); pointer-events:none; }
+    .note-editor .nv-page, .note-editor .nv-imgblock { user-select:none; }
+    .note-editor .nv-check { cursor:pointer; }
     /* 노트 서식 툴바 */
     .note-toolbar {
       display:flex; flex-wrap:wrap; align-items:center; gap:3px;
