@@ -1010,6 +1010,13 @@
     .memo-editable a { color:var(--primary); word-break:break-all; }
     .memo-editable img { max-width:100%; border-radius:8px; margin:4px 0; }
     .memo-editable .md-h { font-weight:700; font-size:15px; margin:4px 0 2px; }
+    .memo-submemo {
+      display:inline-flex; align-items:center; gap:2px; padding:1px 7px; margin:0 1px;
+      border-radius:6px; background:var(--primary-l); color:var(--primary); font-size:12px;
+      font-weight:600; cursor:pointer; user-select:none; vertical-align:baseline; white-space:nowrap;
+    }
+    .memo-submemo:hover { background:var(--primary); color:#fff; }
+    .memo-submemo.missing { background:var(--surface3); color:var(--text3); text-decoration:line-through; }
     .memo-footer {
       display:flex; align-items:center; justify-content:space-between;
       padding:7px 14px 10px; font-size:11px; color:var(--text3);
