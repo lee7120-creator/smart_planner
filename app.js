@@ -4910,6 +4910,51 @@ function myPersonalId(){ return IS_TEAM ? (localStorage.getItem('lastUser')||'')
 function deviceId(){ let d=localStorage.getItem('calDeviceId'); if(!d){ d='dev-'+Math.random().toString(36).slice(2,10); localStorage.setItem('calDeviceId',d); } return d; }
 const TEAM_SUBS_KEY = `calTeamSubs_${myPersonalId()||deviceId()}`;
 let teamSubs = (()=>{ try{ return JSON.parse(localStorage.getItem(TEAM_SUBS_KEY)||'{}')||{}; }catch{ return {}; } })();
+const TEAM_COPIED_KEY = `calTeamCopied_${myPersonalId()||deviceId()}`;
+let teamCopied = (()=>{ try{ return JSON.parse(localStorage.getItem(TEAM_COPIED_KEY)||'{}')||{}; }catch{ return {}; } })();
+function saveTeamCopied(){ localStorage.setItem(TEAM_COPIED_KEY, JSON.stringify(teamCopied)); }
+// 구독한 팀들의 일정을 내 캘린더로 복사(독립) — 이미 복사한 건 dedup, 삭제해도 재복사 안 함
+function syncSubscribedTeams(){
+  if(IS_TEAM || READ_ONLY || !fbDb) return;
+  const ids=Object.keys(teamSubs); if(!ids.length) return;
+  let pending=ids.length, changed=false;
+  const done=()=>{ if(--pending<=0 && changed){ saveTeamCopied(); saveTasks(); render(); } };
+  ids.forEach(id=>{
+    fbDb.ref(`users/team-${sanitizeId(id)}/tasks`).once('value').then(snap=>{
+      const data=snap.val()||{};
+      Object.entries(data).forEach(([oDk,list])=>{
+        const arr=Array.isArray(list)?list:Object.values(list||{});
+        arr.forEach(t=>{
+          if(!t||!t.id) return;
+          const ref=`${id}|${oDk}|${t.id}`;
+          if(teamCopied[ref]) return;
+          teamCopied[ref]=Date.now();
+          const copy=Object.assign({}, t, {
+            id:uid(), fromTeam:id, teamRef:ref, by:t.by||id,
+            subs:(Array.isArray(t.subs)?t.subs:Object.values(t.subs||{})).filter(Boolean),
+            completions:t.completions||{}, skips:t.skips||{},
+            memo:'', memoImages:[], memoHistory:[], comments:[]
+          });
+          (tasks[oDk]=tasks[oDk]||[]).push(copy);
+          changed=true;
+        });
+      });
+      done();
+    }).catch(done);
+  });
+}
+// 구독 취소 시 그 팀에서 복사된 일정 정리
+function removeCopiedTeamTasks(id){
+  let changed=false;
+  Object.keys(tasks).forEach(dk=>{
+    const list=tasks[dk]; if(!Array.isArray(list))return;
+    const next=list.filter(t=>!(t&&t.fromTeam===id));
+    if(next.length!==list.length){ if(next.length) tasks[dk]=next; else delete tasks[dk]; changed=true; }
+  });
+  Object.keys(teamCopied).forEach(ref=>{ if(ref.indexOf(id+'|')===0) delete teamCopied[ref]; });
+  saveTeamCopied();
+  if(changed){ saveTasks(); render(); }
+}
 function saveTeamSubs(){
   localStorage.setItem(TEAM_SUBS_KEY, JSON.stringify(teamSubs));
   const me = sanitizeId(myPersonalId());
@@ -4926,8 +4971,11 @@ function fetchTeamDirectory(cb){
 function enterTeam(id){ const s=sanitizeId(id); if(!s) return; window.location.href = window.location.pathname + `?team=${encodeURIComponent(s)}`; }
 function gotoPersonal(){ const last=localStorage.getItem('lastUser'); window.location.href = window.location.pathname + (last?`?u=${encodeURIComponent(last)}`:''); }
 function toggleTeamSub(id, name){
+  const nowOn = !teamSubs[id];
   if (teamSubs[id]) delete teamSubs[id]; else teamSubs[id]={name:name||id, ts:Date.now()};
   saveTeamSubs();
+  if (nowOn) { if(!IS_TEAM) syncSubscribedTeams(); }      // 구독 → 즉시 일정 복사
+  else { if(!IS_TEAM) removeCopiedTeamTasks(id); }        // 구독취소 → 복사본 정리
   return !!teamSubs[id];
 }
 // 팀 선택(등록용) — 구독 팀 목록 + 직접 입력
@@ -5149,6 +5197,8 @@ initFirebaseSync();
 renderNoteWins();
 initMemoSync();
 initOffSync();
+// 구독한 팀 일정을 내 캘린더로 자동 복사 (초기 동기화 후)
+setTimeout(() => { try { syncSubscribedTeams(); } catch(e){} }, 2800);
 initShareSync();
 registerUserDirectory();
 initGoalSync();
