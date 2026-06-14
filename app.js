@@ -2716,7 +2716,11 @@ function render(){
       view.appendChild(hint);
     }
     const grid=el('div','calendar-grid');
-    for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);grid.appendChild(buildDayCol(d,i));}
+    // 월~금은 각각 한 칸, 토·일은 한 칸에 위아래로 합본 (주말은 보통 비어서 평일을 넓게)
+    for(let i=0;i<5;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);grid.appendChild(buildDayCol(d,i));}
+    const wkndCol=el('div','weekend-col');
+    [5,6].forEach(i=>{const d=new Date(weekStart);d.setDate(d.getDate()+i);wkndCol.appendChild(buildDayCol(d,i));});
+    grid.appendChild(wkndCol);
     wrap.appendChild(grid); view.appendChild(wrap);
     const wk=dateKey(weekStart);
     if(window.innerWidth<=768){
