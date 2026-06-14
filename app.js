@@ -3639,6 +3639,22 @@ function createMemo(parentId, x, y) {
   if (elw) setTimeout(() => { const t = elw.querySelector('.note-title-input'); if (t) t.focus(); }, 50);
   return id;
 }
+// 노션식: 선택한 텍스트를 끌어다 놓으면 하위 메모로 생성 (본문엔 페이지 링크 추가)
+function createSubNoteFromText(parentM, text) {
+  text = (text||'').trim();
+  if (!text || READ_ONLY || !parentM) return;
+  const id = uid();
+  const lines = text.split('\n');
+  memos[id] = {
+    id, title: lines[0].slice(0,80), text: lines.slice(1).join('\n'),
+    parentId: parentM.id, open: false,
+    x: 90, y: 130, w: 300, h: 280, z: 0, created: Date.now(),
+    color: null, pinned: false, cx: null, cy: null, hist: [],
+  };
+  parentM.text = (parentM.text.trim() ? parentM.text.replace(/\s+$/, '') + '\n' : '') + `[[${id}]]\n`;
+  saveMemos(); renderNoteWins();
+  showToast('📄 하위 메모로 만들었어요');
+}
 
 function deleteMemoTree(id) {
   if (READ_ONLY) return;
@@ -3797,6 +3813,22 @@ function buildNoteWin(m) {
   const kids = memoChildren(m.id).filter(c => !linkedIds.has(c.id));
   if (kids.length || !READ_ONLY) {
     const box = el('div', 'note-children');
+    if (!READ_ONLY) {
+      // 본문에서 선택한 텍스트를 여기로 끌어다 놓으면 하위 메모로 생성
+      box.addEventListener('dragover', e => {
+        const types = [...(e.dataTransfer?.types||[])];
+        if (types.includes('text/note-block')) return;
+        if (types.includes('text/plain') || types.includes('text/html')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; box.classList.add('drop-target'); }
+      });
+      box.addEventListener('dragleave', e => { if (!box.contains(e.relatedTarget)) box.classList.remove('drop-target'); });
+      box.addEventListener('drop', e => {
+        const types = [...(e.dataTransfer?.types||[])];
+        box.classList.remove('drop-target');
+        if (types.includes('text/note-block')) return;
+        const txt = e.dataTransfer.getData('text/plain');
+        if (txt && txt.trim()) { e.preventDefault(); createSubNoteFromText(m, txt); }
+      });
+    }
     kids.forEach(c => {
       const row = el('div', 'note-child');
       row.appendChild(el('span', '', {textContent: '📄'}));
@@ -3810,7 +3842,7 @@ function buildNoteWin(m) {
       box.appendChild(row);
     });
     if (!READ_ONLY) {
-      const add = el('button', 'note-add-child', {textContent: '+ 하위 메모'});
+      const add = el('button', 'note-add-child', {textContent: '+ 하위 메모', title: '선택한 텍스트를 이 영역으로 끌어다 놓아도 하위 메모가 만들어져요'});
       add.onclick = () => {
         const cid = createMemo(m.id);
         if (!cid) return;
