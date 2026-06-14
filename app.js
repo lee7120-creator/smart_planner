@@ -1744,6 +1744,8 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   const txt=el('div',`task-text${checked?' done':''}`,{textContent:task.text});
   textWrap.appendChild(txt);
+  if(!isSub && task.by){ textWrap.appendChild(el('span','task-by',{textContent:'👤'+task.by,title:'등록: '+task.by})); }
+  if(!isSub && task.fromTeam){ textWrap.appendChild(el('span','task-fromteam',{textContent:'🤝'+((teamSubs&&teamSubs[task.fromTeam]&&teamSubs[task.fromTeam].name)||task.fromTeam),title:'팀 일정(복사본)'})); }
   if(!isSub){
     const hasMemo=!!(task.memo&&task.memo.trim());
     const memoBtn=el('span',`memo-icon-btn${hasMemo?' has':''}`,{textContent:'📝',title:hasMemo?'메모 보기/편집':'메모 추가'});
@@ -1861,6 +1863,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   });
   if(!isRepeatInst) trayItem('⏭','다음 영업일로 미루기',null,()=>postponeTask(dk,task.id));
   trayItem('💬','댓글',null,()=>openComments(dk,task.id,isRepeatInst,originDk));
+  if(!IS_TEAM && fbDb) trayItem('🤝','팀에 등록',null,()=>registerTaskToTeam(dk,task,isRepeatInst,originDk));
   trayItem('✕','삭제','del',()=>{
     if(isRepeatInst||(task.repeat&&task.repeat!=='none')){
       openRepeatDel(isRepeatInst?originDk:dk, task.id, dk);
@@ -4926,6 +4929,51 @@ function toggleTeamSub(id, name){
   if (teamSubs[id]) delete teamSubs[id]; else teamSubs[id]={name:name||id, ts:Date.now()};
   saveTeamSubs();
   return !!teamSubs[id];
+}
+// 팀 선택(등록용) — 구독 팀 목록 + 직접 입력
+function pickTeamForRegister(cb){
+  const subs=Object.keys(teamSubs).map(id=>({id, name:(teamSubs[id].name||id)}));
+  const ov=el('div','modal-overlay'); const box=el('div','modal-box'); box.style.maxWidth='320px';
+  box.appendChild(el('div','modal-title',{textContent:'🤝 어느 팀에 등록할까요?'}));
+  const list=el('div',null); list.style.cssText='display:flex;flex-direction:column;gap:6px;margin:8px 0;max-height:40vh;overflow-y:auto';
+  if(!subs.length) list.appendChild(el('div','',{textContent:'구독한 팀이 없어요. 아래에 팀 이름을 입력하세요.',style:'font-size:12px;color:var(--text3)'}));
+  subs.forEach(t=>{ const b=el('button','team-pick-name',{type:'button',textContent:'🤝 '+t.name}); b.onclick=()=>{ ov.remove(); cb(t.id); }; list.appendChild(b); });
+  box.appendChild(list);
+  const inRow=el('div','modal-row'); inRow.style.gap='6px';
+  const inp=el('input','modal-input',{type:'text',placeholder:'팀 이름 직접 입력'}); inp.style.cssText='flex:1;margin-bottom:0';
+  const go=el('button','btn-primary',{type:'button',textContent:'등록'}); go.onclick=()=>{ if(inp.value.trim()){ ov.remove(); cb(inp.value.trim()); } };
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&inp.value.trim()){ ov.remove(); cb(inp.value.trim()); } });
+  inRow.appendChild(inp); inRow.appendChild(go); box.appendChild(inRow);
+  const c=el('button','btn-secondary',{type:'button',textContent:'취소'}); c.style.cssText='margin-top:8px;width:100%'; c.onclick=()=>ov.remove(); box.appendChild(c);
+  ov.appendChild(box); document.body.appendChild(ov); ov.onclick=e=>{ if(e.target===ov)ov.remove(); };
+}
+// 내 태스크를 팀 캘린더에 등록(복사) — 반복 유지, 작성자 이름 태그
+function registerTaskToTeam(dk, task, isRepeatInst, originDk){
+  if(IS_TEAM){ showUndoToast('개인 캘린더에서 사용하세요'); return; }
+  if(!fbDb){ showUndoToast('⚠️ 오프라인 상태예요'); return; }
+  const srcDk=isRepeatInst?originDk:dk;
+  const t=(tasks[srcDk]||[]).find(x=>x.id===task.id) || task;
+  pickTeamForRegister(teamId=>{
+    const tid=sanitizeId(teamId); if(!tid) return;
+    const by=myPersonalId() || (localStorage.getItem('lastUser')||'나');
+    const copy={
+      id: uid(), text: t.text, color: t.color||null, starred: !!t.starred,
+      repeat: t.repeat||'none', repeatEnd: t.repeatEnd||null, priority: t.priority||null,
+      time: t.time||null, duration: t.duration||null, checked:false,
+      completions:{}, skips:{},
+      subs:(Array.isArray(t.subs)?t.subs:[]).map(s=>({id:uid(),text:s.text,checked:false,starred:false,color:null,subs:[]})),
+      by, memo:'', memoImages:[], memoHistory:[], comments:[]
+    };
+    registerTeamDirectory(tid, teamId);
+    const ref=fbDb.ref(`users/team-${tid}/tasks/${srcDk}`);
+    ref.once('value').then(snap=>{
+      const v=snap.val(); const arr=Array.isArray(v)?v:(v?Object.values(v):[]);
+      arr.push(copy);
+      ref.set(arr)
+        .then(()=>showUndoToast(`🤝 '${teamId}' 팀에 등록했어요${(t.repeat&&t.repeat!=='none')?' (반복 포함)':''}`))
+        .catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
+    }).catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
+  });
 }
 function openTeamPicker(){
   const old=document.getElementById('teamPickerOv'); if(old) old.remove();
