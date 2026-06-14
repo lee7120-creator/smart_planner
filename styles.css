@@ -895,6 +895,15 @@
     .comment-time { font-size:10px; color:var(--text3); align-self:center; }
     .comment-del { border:none; background:none; color:var(--text3); cursor:pointer; font-size:12px; line-height:1; padding:0 2px; margin-left:2px; }
     .comment-del:hover { color:#e53935; }
+    /* 팀 캘린더 피커 · 빠른 전환 */
+    .team-pick-row { display:flex; align-items:center; gap:6px; }
+    .team-pick-name { flex:1; text-align:left; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); cursor:pointer; font-family:inherit; font-size:13px; font-weight:600; }
+    .team-pick-name:hover { border-color:var(--primary); background:var(--primary-l); }
+    .team-pick-sub { flex-shrink:0; padding:7px 11px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text2); cursor:pointer; font-family:inherit; font-size:12px; white-space:nowrap; }
+    .team-pick-sub.on { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .cal-switch-dd { position:fixed; z-index:460; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow-lg); padding:5px; display:flex; flex-direction:column; gap:2px; min-width:180px; max-width:80vw; }
+    .cal-switch-item { text-align:left; padding:8px 12px; border:none; background:none; color:var(--text); cursor:pointer; font-family:inherit; font-size:13px; border-radius:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cal-switch-item:hover { background:var(--primary-l); color:var(--primary); }
     .comment-text { font-size:13px; color:var(--text); word-break:break-word; }
     .from-badge {
       display:inline-flex; align-items:center; gap:2px; font-size:9px;
