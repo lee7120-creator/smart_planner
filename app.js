@@ -1038,10 +1038,41 @@ function openMemo(dk, taskId, anchorEl) {
     elS.className = 'memo-status ok';
     elS.textContent = `수정 ${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   } else setMemoStatus('saved');
+  hydrateMemoSubmemos(ed);
   positionMemo(anchorEl);
   document.getElementById('memoOverlay').classList.remove('hidden');
   if (!READ_ONLY) setTimeout(()=>ed.focus(), 40);
 }
+// 태스크 메모 속 하위메모 칩: 제목 채우고 클릭 시 노트 창 열기
+function hydrateMemoSubmemos(ed){
+  if(!ed) return;
+  ed.querySelectorAll('.memo-submemo[data-note]').forEach(chip=>{
+    const id=chip.dataset.note, mm=memos[id];
+    chip.textContent='📄 '+(mm?(memoLabel(mm)||'하위 메모'):'삭제된 메모');
+    chip.classList.toggle('missing', !mm);
+    chip.onclick=e=>{ e.stopPropagation(); if(!memos[id])return; memos[id].open=true; bringNoteToFront(id); saveMemos(); renderNoteWins(); };
+  });
+}
+// 하위 메모 추가: 새 노트를 만들고 칩을 본문에 삽입 + 노트 창 열기
+function insertMemoSubmemo(){
+  if(READ_ONLY || !memoCtx) return;
+  const ed=document.getElementById('memoEditable'); if(!ed) return;
+  const id=uid();
+  memos[id]={ id, title:'', text:'', parentId:null, open:true,
+    x:120, y:150, w:300, h:300, z:0, created:Date.now(),
+    color:null, pinned:false, cx:null, cy:null, hist:[] };
+  noteEditState[id]=true;
+  saveMemos();
+  ed.focus();
+  document.execCommand('insertHTML', false, `<span class="memo-submemo" data-note="${id}" contenteditable="false">📄 새 하위 메모</span>&nbsp;`);
+  saveMemoNow();
+  hydrateMemoSubmemos(ed);
+  bringNoteToFront(id); renderNoteWins();
+  const elw=noteWinEls[id];
+  if(elw) setTimeout(()=>{ const t=elw.querySelector('.note-title-input'); if(t)t.focus(); }, 60);
+}
+const _memoSubBtn=document.getElementById('memoSubBtn');
+if(_memoSubBtn) _memoSubBtn.onclick=insertMemoSubmemo;
 
 function positionMemo(anchor) {
   const pop = document.getElementById('memoPopup');
@@ -1193,6 +1224,7 @@ function renderMemoHistory(){
     restoreBtn.onclick=()=>{
       if(!confirm('이 버전으로 복원할까요? 현재 내용은 히스토리에 저장됩니다.'))return;
       document.getElementById('memoEditable').innerHTML=memoToHtml(h.text);
+      hydrateMemoSubmemos(document.getElementById('memoEditable'));
       saveMemoNow();
       updateMemoCount(); updateMemoLinks();
       document.getElementById('memoHistory').classList.add('hidden');
