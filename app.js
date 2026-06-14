@@ -1168,7 +1168,7 @@ const GUIDE_SECTIONS=[
   { title:'📈 하단 대시보드', items:[
     ['📊','이번 주 현황','완료 수, 전체 달성률, 연속 완료 일수와 요일별 분포를 보여줘요.'],
     ['⭐','다가오는 중요 일정','별표/높은 우선순위 할 일의 D-day를 보여줘요.'],
-    ['📈','완료 통계','최근 8주 완료율 추이와 최근 완료한 일 목록이에요.'],
+    ['📈','완료 통계','최근 8주 완료율 추이와 앞으로 해야 할 일 목록이에요.'],
   ]},
 ];
 function renderGuide(){
@@ -4701,9 +4701,9 @@ function buildDashCalendar(){
   const panel = document.getElementById('dashCalendar');
   panel.innerHTML = '';
 
-  // ── 완료 통계 & 히스토리 ──
+  // ── 완료 통계 & 예정 ──
   const title = document.createElement('div'); title.className='dash-panel-title';
-  title.textContent = '📈 완료 통계 & 히스토리';
+  title.textContent = '📈 완료 통계 & 예정';
   panel.appendChild(title);
 
   // 최근 8주 완료율 추이
@@ -4739,37 +4739,43 @@ function buildDashCalendar(){
   panel.appendChild(trendTitle);
   panel.appendChild(trendWrap);
 
-  // 최근 완료 히스토리
-  const completed=[];
+  // 앞으로 해야 할 일 (미완료·예정, 가까운 날짜순)
+  const todayDk0=todayKey();
+  const upcomingTodo=[];
   Object.entries(tasks).forEach(([dk,list])=>{
     if(!Array.isArray(list))return;
-    list.forEach(t=>{ if(t&&t.checked) completed.push({dk,task:t,ts:t.completedAt||new Date(dk).getTime()}); });
+    if(dk<todayDk0)return; // 지난 날짜 제외(오늘 포함)
+    list.forEach(t=>{ if(t&&!t.checked&&!t.pending&&(!t.repeat||t.repeat==='none')) upcomingTodo.push({dk,task:t}); });
   });
-  completed.sort((a,b)=>b.ts-a.ts);
+  upcomingTodo.sort((a,b)=>a.dk<b.dk?-1:a.dk>b.dk?1:0);
   const histTitle=document.createElement('div'); histTitle.className='dash-panel-title'; histTitle.style.marginBottom='6px';
-  histTitle.textContent='✅ 최근 완료한 일';
+  histTitle.textContent='📋 앞으로 해야 할 일';
   panel.appendChild(histTitle);
-  if(completed.length){
+  if(upcomingTodo.length){
     const list=document.createElement('div'); list.className='upcoming-list';
-    completed.slice(0,8).forEach(({dk,task,ts})=>{
+    upcomingTodo.slice(0,8).forEach(({dk,task})=>{
       const item=document.createElement('div'); item.className='upcoming-item';
       item.style.cursor='pointer';
-      const when=document.createElement('div'); when.className='upcoming-dday far';
-      const td=task.completedAt?new Date(ts):new Date(dk);
-      when.textContent=`${td.getMonth()+1}/${td.getDate()}`;
+      const dday=Math.round((parseDk(dk)-today())/86400000);
+      const when=document.createElement('div');
+      when.className='upcoming-dday '+(dday===0?'today':dday<=7?'soon':'far');
+      when.textContent=dday===0?'D-DAY':'D-'+dday;
       const info=document.createElement('div'); info.className='upcoming-info';
       const name=document.createElement('div'); name.className='upcoming-name';
-      name.textContent=(task.starred?'★ ':'')+task.text;
-      info.appendChild(name);
+      name.textContent=(task.starred?'★ ':'')+(task.priority==='high'?'🔴 ':'')+task.text;
+      const dateEl=document.createElement('div'); dateEl.className='upcoming-date';
+      const pd=parseDk(dk);
+      dateEl.textContent=`${pd.getMonth()+1}월 ${pd.getDate()}일 (${['일','월','화','수','목','금','토'][pd.getDay()]})`+(task.time?` · ⏰${task.time}`:'');
+      info.appendChild(name); info.appendChild(dateEl);
       item.appendChild(when); item.appendChild(info);
-      item.onclick=()=>{weekStart=getMonday(new Date(dk));setView('week');window.scrollTo({top:0,behavior:'smooth'});};
+      item.onclick=()=>{weekStart=getMonday(parseDk(dk));setView('week');window.scrollTo({top:0,behavior:'smooth'});};
       list.appendChild(item);
     });
     panel.appendChild(list);
   } else {
     const empty=document.createElement('div');
     empty.style.cssText='font-size:12px;color:var(--text3);text-align:center;padding:14px';
-    empty.textContent='아직 완료한 일이 없습니다';
+    empty.textContent='예정된 할 일이 없습니다 🎉';
     panel.appendChild(empty);
   }
 
