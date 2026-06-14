@@ -157,7 +157,8 @@
       background:var(--surface); transition:all .15s;
     }
     .task-cb:hover { border-color:var(--green); background:color-mix(in srgb,var(--green) 8%,var(--surface)); transform:scale(1.08); }
-    .task-cb.checked { background:var(--green); border-color:var(--green); box-shadow:0 1px 3px rgba(16,185,129,.3); animation:cbPop .25s ease; }
+    .task-cb.checked { background:var(--green); border-color:var(--green); box-shadow:0 1px 3px rgba(16,185,129,.3); }
+    .task-cb.cb-pop { animation:cbPop .25s ease; }
     .task-cb.checked::after { content:'✓'; color:#fff; font-size:9px; font-weight:700; }
     @keyframes cbPop { 0%{transform:scale(.6)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
 
@@ -271,15 +272,17 @@
     .cp-dot { width:18px; height:18px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:transform .1s; }
     .cp-dot:hover { transform:scale(1.15); }
     .cp-dot.selected { border-color:var(--text); }
-    .repeat-selector { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:5px; }
+    .repeat-selector { display:grid; grid-template-columns:repeat(5,1fr); gap:4px; margin-bottom:5px; }
     .repeat-opt {
-      flex:1 0 auto; padding:5px 8px; font-size:11px; border:1px solid var(--border);
+      padding:5px 4px; font-size:10.5px; border:1px solid var(--border);
       border-radius:6px; cursor:pointer; text-align:center; color:var(--text2);
       background:var(--surface); transition:all .15s; font-family:inherit; font-weight:500;
       white-space:nowrap;
     }
     .repeat-opt.active { background:var(--primary); color:#fff; border-color:var(--primary); }
-    .priority-selector { display:flex; gap:3px; margin-bottom:5px; }
+    .priority-selector { display:flex; gap:3px; margin-bottom:5px; flex:1; }
+    .add-field-row { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+    .add-field-label { font-size:11px; color:var(--text3); font-weight:600; flex-shrink:0; min-width:38px; }
     .priority-opt {
       flex:1; padding:4px 0; font-size:14px; border:1px solid var(--border);
       border-radius:6px; cursor:pointer; text-align:center;
@@ -687,7 +690,7 @@
       .task-input { font-size:14px; padding:8px 12px; }
       .btn-add { padding:8px 16px; font-size:13px; }
       .btn-cancel { padding:8px 12px; font-size:13px; }
-      .repeat-opt { padding:7px 10px; font-size:12px; }
+      .repeat-opt { padding:7px 3px; font-size:11px; }
       .cp-dot { width:22px; height:22px; }
 
       /* Day header */
@@ -880,8 +883,10 @@
     .comment-badge:hover { color:var(--primary); border-color:var(--primary); }
     .comment-row { background:var(--surface2); border-radius:8px; padding:7px 10px; }
     .comment-head { display:flex; justify-content:space-between; gap:8px; margin-bottom:2px; }
-    .comment-author { font-size:11px; font-weight:700; color:var(--primary); }
-    .comment-time { font-size:10px; color:var(--text3); }
+    .comment-author { font-size:11px; font-weight:700; color:var(--primary); margin-right:auto; }
+    .comment-time { font-size:10px; color:var(--text3); align-self:center; }
+    .comment-del { border:none; background:none; color:var(--text3); cursor:pointer; font-size:12px; line-height:1; padding:0 2px; margin-left:2px; }
+    .comment-del:hover { color:#e53935; }
     .comment-text { font-size:13px; color:var(--text); word-break:break-word; }
     .from-badge {
       display:inline-flex; align-items:center; gap:2px; font-size:9px;
