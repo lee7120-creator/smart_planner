@@ -961,8 +961,10 @@ function openMemo(dk, taskId, anchorEl) {
   if (!task) return;
   memoCtx = {dk, taskId};
   document.getElementById('memoTitle').textContent = task.text;
-  const ta = document.getElementById('memoTextarea');
-  ta.value = task.memo || '';
+  const ed = document.getElementById('memoEditable');
+  ed.innerHTML = memoToHtml(task.memo || '');
+  ed.contentEditable = READ_ONLY ? 'false' : 'true';
+  document.getElementById('memoToolbar').style.display = READ_ONLY ? 'none' : 'flex';
   updateMemoCount();
   updateMemoLinks();
   renderMemoImages(task);
@@ -974,9 +976,7 @@ function openMemo(dk, taskId, anchorEl) {
   } else setMemoStatus('saved');
   positionMemo(anchorEl);
   document.getElementById('memoOverlay').classList.remove('hidden');
-  ta.readOnly=READ_ONLY;
-  // 메모가 있으면 보기 모드, 없으면 바로 편집 모드로 (읽기 전용이면 항상 보기)
-  setMemoMode(READ_ONLY||(task.memo&&task.memo.trim())?'view':'edit');
+  if (!READ_ONLY) setTimeout(()=>ed.focus(), 40);
 }
 
 function positionMemo(anchor) {
@@ -1005,7 +1005,8 @@ function saveMemoNow() {
   if (!memoCtx || READ_ONLY) return;
   const task = (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId);
   if (task) {
-    const v = document.getElementById('memoTextarea').value;
+    const ed = document.getElementById('memoEditable');
+    const v = ed.textContent.trim() === '' && !ed.querySelector('img') ? '' : sanitizeMemoHtml(ed.innerHTML);
     if (v !== (task.memo||'')) {
       // 버전 히스토리: 직전 내용 보관 (5분 간격, 최대 5개)
       const old = task.memo||'';
@@ -1025,8 +1026,7 @@ function saveMemoNow() {
   }
 }
 
-// ── 메모 마크다운 라이트 보기 ──
-let memoViewMode='edit';
+// ── 메모 마크다운 → HTML 변환 (옛 메모 호환용) ──
 function renderMemoMD(text){
   const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return esc(text)
@@ -1041,21 +1041,74 @@ function renderMemoMD(text){
       return '<div class="md-line">'+(l||'&nbsp;')+'</div>';
     }).join('');
 }
-function setMemoMode(mode){
-  memoViewMode=mode;
-  const ta=document.getElementById('memoTextarea'), md=document.getElementById('memoMD');
-  document.getElementById('memoHistory').classList.add('hidden');
-  if(mode==='view'){
-    md.innerHTML=renderMemoMD(ta.value);
-    md.classList.remove('hidden'); ta.style.display='none';
-  } else {
-    md.classList.add('hidden'); ta.style.display='';
-    setTimeout(()=>ta.focus(),30);
-  }
-  document.getElementById('memoViewBtn').textContent=mode==='view'?'✏️':'👁';
+// ── 메모 HTML 변환·정화 (WYSIWYG) ──
+function memoIsHtml(s){ return /<\/?(b|i|u|s|strike|em|strong|span|div|font|br|a|code|p|ul|ol|li|h[1-6]|img)\b/i.test(s); }
+function sanitizeMemoHtml(html){
+  const tpl=document.createElement('template'); tpl.innerHTML=html||'';
+  tpl.content.querySelectorAll('script,style,iframe,object,embed,link,meta,form,input,textarea,button').forEach(n=>n.remove());
+  tpl.content.querySelectorAll('*').forEach(elx=>{
+    [...elx.attributes].forEach(a=>{ const n=a.name.toLowerCase();
+      if(n.startsWith('on')) elx.removeAttribute(a.name);
+      else if((n==='href'||n==='src')&&/^\s*javascript:/i.test(a.value)) elx.removeAttribute(a.name);
+    });
+  });
+  return tpl.innerHTML;
 }
-document.getElementById('memoViewBtn').onclick=()=>setMemoMode(memoViewMode==='view'?'edit':'view');
-document.getElementById('memoMD').addEventListener('dblclick',()=>setMemoMode('edit'));
+// 저장된 메모 → 편집용 HTML (옛 마크다운 메모는 자동 변환)
+function memoToHtml(memo){
+  if(!memo) return '';
+  return memoIsHtml(memo) ? sanitizeMemoHtml(memo) : renderMemoMD(memo);
+}
+// 메모(HTML 또는 마크다운) → 미리보기용 평문
+function memoPlainText(memo){
+  if(!memo) return '';
+  if(!memoIsHtml(memo)) return memo;
+  let s = memo.replace(/<\s*(br|\/div|\/p|\/h[1-6]|\/li)\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'');
+  const ta=document.createElement('textarea'); ta.innerHTML=s;
+  return (ta.value||'').replace(/\n{2,}/g,'\n').trim();
+}
+// 서식 명령 실행 (execCommand 기반)
+function memoExec(cmd, val){
+  const ed=document.getElementById('memoEditable'); if(!ed) return;
+  ed.focus();
+  try{ document.execCommand('styleWithCSS', false, true); }catch(e){}
+  try{ document.execCommand(cmd, false, val); }catch(e){}
+  scheduleMemoSave();
+}
+// 선택 영역을 인라인 스타일 span으로 감싸기 (글자크기·글꼴)
+function memoWrapStyle(prop, value){
+  const ed=document.getElementById('memoEditable'); if(!ed) return;
+  ed.focus();
+  const sel=window.getSelection(); if(!sel || !sel.rangeCount) return;
+  const range=sel.getRangeAt(0); if(range.collapsed) return;
+  const span=document.createElement('span'); span.style[prop]=value;
+  try{
+    span.appendChild(range.extractContents()); range.insertNode(span);
+    sel.removeAllRanges(); const r=document.createRange(); r.selectNodeContents(span); sel.addRange(r);
+  }catch(e){}
+  scheduleMemoSave();
+}
+function scheduleMemoSave(){
+  updateMemoCount(); updateMemoLinks(); setMemoStatus('saving');
+  clearTimeout(memoTimer);
+  memoTimer=setTimeout(()=>{ saveMemoNow(); setMemoStatus('saved'); }, 700);
+}
+// 툴바 배선
+(function initMemoToolbar(){
+  const tb=document.getElementById('memoToolbar'); if(!tb) return;
+  tb.querySelectorAll('.mt-btn').forEach(b=>{
+    b.onmousedown=e=>e.preventDefault(); // 선택 유지
+    b.onclick=()=>memoExec(b.dataset.cmd);
+  });
+  const font=document.getElementById('mtFont');
+  if(font) font.onchange=()=>{ if(font.value) memoWrapStyle('fontFamily', font.value); font.selectedIndex=0; };
+  const size=document.getElementById('mtSize');
+  if(size) size.onchange=()=>{ if(size.value) memoWrapStyle('fontSize', size.value); size.selectedIndex=0; };
+  const fore=document.getElementById('mtFore');
+  if(fore){ fore.onmousedown=e=>e.stopPropagation(); fore.onchange=()=>memoExec('foreColor', fore.value); }
+  const back=document.getElementById('mtBack');
+  if(back){ back.onmousedown=e=>e.stopPropagation(); back.onchange=()=>{ try{document.execCommand('styleWithCSS',false,true);}catch(e){} if(!document.execCommand('hiliteColor',false,back.value)) document.execCommand('backColor',false,back.value); scheduleMemoSave(); }; }
+})();
 
 // ── 메모 버전 히스토리 (최근 5개) ──
 function renderMemoHistory(){
@@ -1071,15 +1124,14 @@ function renderMemoHistory(){
     const row=el('div','memo-hist-row');
     const d=new Date(h.ts);
     const meta=el('div','memo-hist-meta',{textContent:`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`});
-    const excerpt=el('div','memo-hist-excerpt',{textContent:h.text.split('\n')[0].slice(0,40)||'(빈 메모)'});
+    const excerpt=el('div','memo-hist-excerpt',{textContent:memoPlainText(h.text).split('\n')[0].slice(0,40)||'(빈 메모)'});
     const restoreBtn=el('button','trash-act-btn',{textContent:'복원'});
     restoreBtn.onclick=()=>{
       if(!confirm('이 버전으로 복원할까요? 현재 내용은 히스토리에 저장됩니다.'))return;
-      document.getElementById('memoTextarea').value=h.text;
+      document.getElementById('memoEditable').innerHTML=memoToHtml(h.text);
       saveMemoNow();
       updateMemoCount(); updateMemoLinks();
       document.getElementById('memoHistory').classList.add('hidden');
-      if(memoViewMode==='view')setMemoMode('view');
     };
     row.appendChild(meta); row.appendChild(excerpt); row.appendChild(restoreBtn);
     wrap.appendChild(row);
@@ -1297,7 +1349,7 @@ function renderMemoAllModal(){
     head.appendChild(el('span','memo-all-date',{textContent:`${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[dateToDayIdx(d)]})`}));
     row.appendChild(head);
     const imgCnt=Array.isArray(task.memoImages)?task.memoImages.length:0;
-    const excerpt=(task.memo||'').trim().split('\n').slice(0,2).join(' / ').slice(0,80);
+    const excerpt=memoPlainText(task.memo).split('\n').slice(0,2).join(' / ').slice(0,80);
     row.appendChild(el('div','memo-all-excerpt',{textContent:(imgCnt?`📷${imgCnt} `:'')+excerpt}));
     row.onclick=()=>{
       document.getElementById('memoAllModal').classList.add('hidden');
@@ -1403,9 +1455,14 @@ document.getElementById('memoFileInput').onchange=e=>{
   [...e.target.files].forEach(attachMemoImage);
   e.target.value='';
 };
-document.getElementById('memoTextarea').addEventListener('paste',e=>{
-  const files=[...(e.clipboardData&&e.clipboardData.files||[])].filter(f=>f.type.startsWith('image/'));
-  if(files.length){e.preventDefault();files.forEach(attachMemoImage);}
+document.getElementById('memoEditable').addEventListener('paste',e=>{
+  const cd=e.clipboardData||window.clipboardData; if(!cd) return;
+  const files=[...(cd.files||[])].filter(f=>f.type.startsWith('image/'));
+  if(files.length){ e.preventDefault(); files.forEach(attachMemoImage); return; }
+  // 서식 없는 텍스트로 붙여넣기(오염 방지) — 줄바꿈 유지
+  e.preventDefault();
+  const text=cd.getData('text/plain');
+  if(text) document.execCommand('insertText', false, text);
 });
 document.getElementById('imgLightbox').onclick=()=>{
   document.getElementById('imgLightbox').classList.add('hidden');
@@ -1416,7 +1473,7 @@ document.getElementById('imgLightbox').onclick=()=>{
 function updateMemoLinks() {
   const wrap = document.getElementById('memoLinks');
   wrap.innerHTML = '';
-  const urls = (document.getElementById('memoTextarea').value.match(/https?:\/\/[^\s<>"']+/g)||[]).slice(0,6);
+  const urls = ((document.getElementById('memoEditable').innerText||'').match(/https?:\/\/[^\s<>"']+/g)||[]).slice(0,6);
   urls.forEach(u=>{
     const a = el('a','memo-link-chip',{href:u,target:'_blank',rel:'noopener',textContent:'🔗 '+u.replace(/^https?:\/\//,'').slice(0,40)});
     wrap.appendChild(a);
@@ -1431,10 +1488,10 @@ function setMemoStatus(state) {
 }
 
 function updateMemoCount() {
-  document.getElementById('memoCharCount').textContent = document.getElementById('memoTextarea').value.length + '자';
+  document.getElementById('memoCharCount').textContent = (document.getElementById('memoEditable').textContent||'').length + '자';
 }
 
-document.getElementById('memoTextarea').addEventListener('input', ()=>{
+document.getElementById('memoEditable').addEventListener('input', ()=>{
   updateMemoCount();
   updateMemoLinks();
   setMemoStatus('saving');
@@ -1610,7 +1667,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     }
   }
   if(!isSub&&((task.memo&&task.memo.trim())||(Array.isArray(task.memoImages)&&task.memoImages.length))){
-    const firstLine=(task.memo||'').trim().split('\n')[0];
+    const firstLine=memoPlainText(task.memo).split('\n')[0];
     const imgCnt=Array.isArray(task.memoImages)?task.memoImages.length:0;
     const prev=el('div','memo-preview',{textContent:'📝 '+(imgCnt?`📷${imgCnt} `:'')+firstLine,title:'메모 열기'});
     prev.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,prev);};
@@ -3075,7 +3132,49 @@ function mdInline(s) { // s는 이미 escape됨
   s = s.replace(/@(\d{4}-\d{2}-\d{2})/g, '<button class="nv-date" data-date="$1">@$1</button>');
   s = s.replace(/@(\d{1,2}\/\d{1,2})/g, '<button class="nv-date" data-md="$1">@$1</button>');
   s = s.replace(/(^|\s)#([\p{L}\d_]+)/gu, '$1<span class="nv-tag" data-tag="$2">#$2</span>');
+  s = richMarkers(s); // 서식 마커 {!...!}…{!/!} → 스타일 span
   return s;
+}
+// ── 노트 서식 마커 ({!c=ff0000 bg=fff59d sz=20 ft=jua b u i st!}…{!/!}) ──
+const NV_FONTS = {
+  pretendard:"'Pretendard Variable',sans-serif",
+  noto:"'Noto Sans KR',sans-serif",
+  notoserif:"'Noto Serif KR',serif",
+  nanum:"'Nanum Gothic',sans-serif",
+  nanummyeongjo:"'Nanum Myeongjo',serif",
+  gowun:"'Gowun Dodum',sans-serif",
+  jua:"'Jua',sans-serif",
+  dohyeon:"'Do Hyeon',sans-serif",
+  gaegu:"'Gaegu',cursive",
+  nanumpen:"'Nanum Pen Script',cursive"
+};
+function nvSpecToStyle(spec){
+  const css=[]; let deco=[];
+  (spec.trim().split(/\s+/)).forEach(p=>{
+    let mm;
+    if((mm=p.match(/^c=([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/))) css.push('color:#'+mm[1]);
+    else if((mm=p.match(/^bg=([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/))) css.push('background-color:#'+mm[1]);
+    else if((mm=p.match(/^sz=(\d{1,3})$/))){ const n=Math.max(8,Math.min(96,+mm[1])); css.push('font-size:'+n+'px'); }
+    else if((mm=p.match(/^ft=([a-z]+)$/))){ if(NV_FONTS[mm[1]]) css.push('font-family:'+NV_FONTS[mm[1]]); }
+    else if(p==='b') css.push('font-weight:700');
+    else if(p==='i') css.push('font-style:italic');
+    else if(p==='u') deco.push('underline');
+    else if(p==='st') deco.push('line-through');
+  });
+  if(deco.length) css.push('text-decoration:'+deco.join(' '));
+  return css.join(';');
+}
+function richMarkers(s){
+  let out='', last=0, m, depth=0;
+  const re=/\{!(\/?)([^!{}]*)!\}/g;
+  while((m=re.exec(s))){
+    out+=s.slice(last,m.index); last=re.lastIndex;
+    if(m[1]==='/'){ if(depth>0){ out+='</span>'; depth--; } }
+    else { out+=`<span class="nv-fmt" style="${nvSpecToStyle(m[2])}">`; depth++; }
+  }
+  out+=s.slice(last);
+  while(depth-->0) out+='</span>';
+  return out;
 }
 function renderMarkdown(text) {
   const lines = text.split('\n');
@@ -3522,6 +3621,48 @@ function buildNoteWin(m) {
   return win;
 }
 
+// 노트 서식: 선택 영역을 마커로 감싸기
+function nvWrapSel(ta, open, close, m) {
+  const s = ta.selectionStart, e = ta.selectionEnd, val = ta.value;
+  const sel = e > s ? val.slice(s, e) : '텍스트';
+  ta.value = val.slice(0, s) + open + sel + close + val.slice(e);
+  m.text = ta.value; if (!READ_ONLY) saveMemos();
+  ta.focus();
+  ta.selectionStart = s + open.length;
+  ta.selectionEnd = s + open.length + sel.length;
+}
+function buildNoteToolbar(ta, m) {
+  const tb = el('div', 'note-toolbar');
+  const fontSel = el('select', 'nt-select', { title: '글꼴' });
+  fontSel.innerHTML = '<option value="">글꼴</option>'
+    + '<option value="pretendard">프리텐다드</option><option value="noto">본고딕</option>'
+    + '<option value="notoserif">본명조</option><option value="nanum">나눔고딕</option>'
+    + '<option value="nanummyeongjo">나눔명조</option><option value="gowun">고운돋움</option>'
+    + '<option value="jua">주아</option><option value="dohyeon">도현</option>'
+    + '<option value="gaegu">개구</option><option value="nanumpen">나눔펜</option>';
+  fontSel.onchange = () => { if (fontSel.value) nvWrapSel(ta, `{!ft=${fontSel.value}!}`, '{!/!}', m); fontSel.selectedIndex = 0; };
+  const sizeSel = el('select', 'nt-select', { title: '글자 크기' });
+  sizeSel.innerHTML = '<option value="">크기</option>' + [12,14,16,18,20,24,28,32].map(n => `<option value="${n}">${n}</option>`).join('');
+  sizeSel.onchange = () => { if (sizeSel.value) nvWrapSel(ta, `{!sz=${sizeSel.value}!}`, '{!/!}', m); sizeSel.selectedIndex = 0; };
+  tb.appendChild(fontSel); tb.appendChild(sizeSel);
+  [['b','<b>B</b>','굵게'],['i','<i>I</i>','기울임'],['u','<u>U</u>','밑줄'],['st','<s>S</s>','취소선']].forEach(([code,label,title]) => {
+    const b = el('button', 'nt-btn', { title, type: 'button' }); b.innerHTML = label;
+    b.addEventListener('mousedown', e => e.preventDefault()); // 선택/포커스 유지
+    b.onclick = () => nvWrapSel(ta, `{!${code}!}`, '{!/!}', m);
+    tb.appendChild(b);
+  });
+  const foreLab = el('label', 'nt-color', { title: '글자색' });
+  foreLab.innerHTML = '<span style="color:#1a73e8;font-weight:800">A</span>';
+  const fore = el('input', null, { type: 'color', value: '#1a73e8' });
+  fore.onchange = () => nvWrapSel(ta, `{!c=${fore.value.slice(1)}!}`, '{!/!}', m);
+  foreLab.appendChild(fore); tb.appendChild(foreLab);
+  const bgLab = el('label', 'nt-color', { title: '배경색(형광펜)' });
+  bgLab.innerHTML = '<span style="background:#fff59d;border-radius:3px;padding:0 3px">H</span>';
+  const bg = el('input', null, { type: 'color', value: '#fff59d' });
+  bg.onchange = () => nvWrapSel(ta, `{!bg=${bg.value.slice(1)}!}`, '{!/!}', m);
+  bgLab.appendChild(bg); tb.appendChild(bgLab);
+  return tb;
+}
 function renderNoteBody(m, bodyWrap, win, focusEdit) {
   bodyWrap.innerHTML = '';
   const editing = !READ_ONLY && (noteEditState[m.id] || (!m.text.trim() && !memoChildren(m.id).length));
@@ -3559,6 +3700,7 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
       setTimeout(() => {
         if (slashCtx && slashCtx.ta === ta) return; // 슬래시 메뉴 조작 중
         if (document.activeElement === ta) return;
+        if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.note-toolbar')) return; // 서식 툴바 조작 중
         noteEditState[m.id] = false;
         snapshotMemo(m);
         if (!READ_ONLY) saveMemos();
@@ -3575,6 +3717,7 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
         renderNoteBody(m, bodyWrap, win, true);
       })();
     });
+    if (!READ_ONLY) bodyWrap.appendChild(buildNoteToolbar(ta, m));
     bodyWrap.appendChild(ta);
     if (focusEdit) setTimeout(() => ta.focus(), 30);
   } else {
