@@ -3144,7 +3144,7 @@ function memoLabel(m) { return m.title.trim() || memoFirstLine(m.text).slice(0,1
 function memoFirstLine(text) {
   if (!text) return '';
   for (const ln of text.split('\n')) {
-    const t = ln.replace(/\{!\/?[^!{}]*!\}/g, '')
+    const t = ln.replace(/\{!\/?[^!{}]*!\}/g, '').replace(/<[^>]+>/g, '')
                 .replace(/^#{1,3}\s+/, '').replace(/^\s*-\s+/, '').replace(/^\s*\[( |x)\]\s?/, '')
                 .replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
     if (!t) continue;
@@ -3158,7 +3158,7 @@ function memoFirstLine(text) {
 function memoPreviewText(text) {
   if (!text) return '';
   return text.split('\n').map(ln => {
-    let t = ln.replace(/\{!\/?[^!{}]*!\}/g, ''), mm;
+    let t = ln.replace(/\{!\/?[^!{}]*!\}/g, '').replace(/<[^>]+>/g, ''), mm;
     if ((mm = t.match(/^\s*\[\[([a-z0-9]+)\]\]\s*$/))) return memos[mm[1]] ? ('📄 ' + memoLabel(memos[mm[1]])) : '📄 삭제된 메모';
     if (/^\s*!\[[^\]]*\]\(local:[a-z0-9_]+\)\s*$/.test(t)) return '🖼';
     return t.replace(/^#{1,3}\s+/, '').replace(/^\s*-\s+/, '• ').replace(/^\s*\[( |x)\]\s?/, '')
@@ -3219,6 +3219,35 @@ async function insertImageFile(m, ta, file) {
 // ── 마크다운 렌더러 (HTML 이스케이프 후 안전한 토큰만 치환) ──
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// WYSIWYG: 저장된 안전한 인라인 서식 태그(b/i/u/s/code/span style)를 보존하며 나머지는 escape
+const NV_SAFE_INLINE = /<\/?(?:b|strong|i|em|u|s|code|span|br)(?:\s+[a-zA-Z-]+="[^"<>]*")*\s*\/?>/g;
+function nvCleanStyle(style) {
+  const allow = ['color','background-color','background','font-size','font-family','font-weight','font-style','text-decoration'];
+  return style.split(';').map(s => s.trim()).filter(Boolean).filter(p => {
+    const k = p.split(':')[0].trim().toLowerCase();
+    return allow.includes(k) && !/url\(|expression|javascript:/i.test(p);
+  }).join(';');
+}
+function nvSanitizeInlineTag(tag) {
+  const m = tag.match(/^<(\/?)\s*([a-z]+)/i); if (!m) return '';
+  const close = m[1], raw = m[2].toLowerCase();
+  const name = raw === 'strong' ? 'b' : raw === 'em' ? 'i' : raw;
+  if (name === 'br') return '<br>';
+  if (close) return `</${name}>`;
+  if (name === 'span') {
+    const sm = tag.match(/style="([^"<>]*)"/i);
+    const style = sm ? nvCleanStyle(sm[1]) : '';
+    return style ? `<span style="${style}">` : '<span>';
+  }
+  if (name === 'code') return '<code class="nv-code">';
+  return `<${name}>`;
+}
+function escapeKeepSafe(line) {
+  const stash = [];
+  let s = line.replace(NV_SAFE_INLINE, mt => { stash.push(nvSanitizeInlineTag(mt)); return `${stash.length-1}`; });
+  s = escapeHtml(s);
+  return s.replace(/(\d+)/g, (_, i) => stash[+i]);
 }
 function mdInline(s) { // s는 이미 escape됨
   s = s.replace(/!\[([^\]]*)\]\(local:([a-z0-9]+)\)/g, '<img class="nv-img" data-img="$2" alt="$1">');
@@ -3293,19 +3322,19 @@ function renderMarkdown(text) {
       return;
     }
     if (/^---+\s*$/.test(line)) { html += `<hr class="nv-hr"${DL}>`; return; }
-    if ((m = line.match(/^(#{1,3})\s+(.+)/))) {
-      html += `<div class="nv-h${m[1].length}"${DL}>${mdInline(escapeHtml(m[2]))}</div>`; return;
+    if ((m = line.match(/^(#{1,3})\s+(.*)$/))) {
+      html += `<div class="nv-h${m[1].length}"${DL}>${mdInline(escapeKeepSafe(m[2]))}</div>`; return;
     }
     if ((m = line.match(/^\s*\[( |x)\]\s?(.*)$/))) {
       const done = m[1] === 'x';
-      html += `<button class="nv-check${done?' done':''}"${DL}><span class="nv-cb${done?' on':''}"></span><span class="nv-check-text">${mdInline(escapeHtml(m[2]))}</span></button>`;
+      html += `<button class="nv-check${done?' done':''}"${DL}><span class="nv-cb${done?' on':''}"></span><span class="nv-check-text">${mdInline(escapeKeepSafe(m[2]))}</span></button>`;
       return;
     }
-    if ((m = line.match(/^\s*-\s+(.+)/))) {
-      html += `<div class="nv-li"${DL}>•&nbsp;${mdInline(escapeHtml(m[1]))}</div>`; return;
+    if ((m = line.match(/^\s*-\s+(.*)$/))) {
+      html += `<div class="nv-li"${DL}>•&nbsp;${mdInline(escapeKeepSafe(m[1]))}</div>`; return;
     }
     if (line.trim() === '') { html += `<div class="nv-gap"${DL}></div>`; return; }
-    html += `<div class="nv-p"${DL}>${mdInline(escapeHtml(line))}</div>`;
+    html += `<div class="nv-p"${DL}>${mdInline(escapeKeepSafe(line))}</div>`;
   });
   return html || '<div class="nv-placeholder">클릭해서 작성... ( / 로 블록 삽입 )</div>';
 }
@@ -3318,6 +3347,65 @@ function moveNoteLine(text, from, to) {
   to = Math.max(0, Math.min(to, lines.length));
   lines.splice(to, 0, ln);
   return lines.join('\n');
+}
+// ── WYSIWYG 편집기 → 마크다운 역직렬화 ──
+function inlineNodeToMd(node) {
+  if (node.nodeType === 3) return node.nodeValue;                 // 텍스트(원문 그대로)
+  if (node.nodeType !== 1) return '';
+  const el = node, tag = el.tagName.toLowerCase();
+  if (tag === 'img' && el.dataset.img != null) return `![${el.getAttribute('alt') || ''}](local:${el.dataset.img})`;
+  if (tag === 'br') return '';
+  const inner = [...el.childNodes].map(inlineNodeToMd).join('');
+  if (tag === 'b' || tag === 'strong') return `**${inner}**`;
+  if (tag === 'i' || tag === 'em') return `*${inner}*`;
+  if (tag === 'code') return '`' + inner + '`';
+  if (tag === 'a') return el.getAttribute('href') || inner;
+  if (el.classList && (el.classList.contains('nv-tag') || el.classList.contains('nv-date'))) return inner; // #태그·@날짜는 원문 텍스트로(자동 재인식)
+  if (tag === 'u') return `<u>${inner}</u>`;
+  if (tag === 's' || tag === 'strike') return `<s>${inner}</s>`;
+  if (tag === 'span') {
+    const style = nvCleanStyle(el.getAttribute('style') || '');
+    return style ? `<span style="${style}">${inner}</span>` : inner;
+  }
+  return inner;
+}
+function childrenToMd(el) { return [...el.childNodes].map(inlineNodeToMd).join(''); }
+function serializeNoteEditor(editor) {
+  const lines = [];
+  editor.childNodes.forEach(node => {
+    if (node.nodeType === 3) { lines.push(node.nodeValue.replace(/\n+$/, '')); return; }
+    if (node.nodeType !== 1) return;
+    const el = node;
+    const cl = el.classList || { contains: () => false };
+    if (cl.contains('nv-page')) { lines.push(`[[${el.dataset.note || ''}]]`); return; }
+    if (cl.contains('nv-imgblock')) { const img = el.querySelector('img[data-img]'); lines.push(`![${(img && img.getAttribute('alt')) || ''}](local:${img ? img.dataset.img : ''})`); return; }
+    if (el.tagName === 'HR' || cl.contains('nv-hr')) { lines.push('---'); return; }
+    if (cl.contains('nv-check')) {
+      const done = cl.contains('done') || !!el.querySelector('.nv-cb.on');
+      const txt = el.querySelector('.nv-check-text');
+      lines.push(`[${done ? 'x' : ' '}] ${txt ? childrenToMd(txt) : ''}`); return;
+    }
+    let prefix = '';
+    if (cl.contains('nv-h1')) prefix = '# ';
+    else if (cl.contains('nv-h2')) prefix = '## ';
+    else if (cl.contains('nv-h3')) prefix = '### ';
+    else if (cl.contains('nv-li')) prefix = '- ';
+    let md = childrenToMd(el).replace(/^• ?\s*/, '');
+    lines.push(prefix + md);
+  });
+  return lines.join('\n');
+}
+// 편집기/뷰 안의 로컬 이미지 src 채우기 + 페이지링크·이미지 블록을 통째 비편집(atomic)으로
+function hydrateNoteMedia(root, editable) {
+  root.querySelectorAll('img[data-img]').forEach(img => {
+    idbGetImage(img.dataset.img).then(data => {
+      if (data) { const url = (typeof data === 'string') ? data : URL.createObjectURL(data); img.src = url; }
+      else { img.alt = '🖼 이미지는 첨부한 기기에서만 보여요'; img.classList.add('missing'); }
+    });
+  });
+  if (editable) {
+    root.querySelectorAll('.nv-page,.nv-imgblock').forEach(b => { b.setAttribute('contenteditable', 'false'); });
+  }
 }
 // 체크리스트 라인 토글 (뷰 모드에서 클릭)
 function toggleCheckLine(text, i) {
@@ -3422,32 +3510,55 @@ function renderSlashMenu() {
   });
 }
 function closeSlashMenu() { slashMenu.classList.add('hidden'); slashCtx = null; }
+// contentEditable에서 블록 시작 '/' 감지 → 슬래시 메뉴
+function detectSlashCE(m, editor, bodyWrap, win) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) { if (slashCtx) closeSlashMenu(); return; }
+  const range = sel.getRangeAt(0);
+  const node = range.startContainer;
+  if (node.nodeType === 3 && node.nodeValue.slice(0, range.startOffset) === '/') {
+    openSlashMenuCE(m, editor, bodyWrap, win, range);
+  } else if (slashCtx) { closeSlashMenu(); }
+}
+function openSlashMenuCE(m, editor, bodyWrap, win, range) {
+  slashCtx = { m, editor, bodyWrap, win };
+  slashSel = 0; renderSlashMenu();
+  let top = 0, left = 0;
+  try { const r = range.getBoundingClientRect(); top = r.bottom || r.top; left = r.left; } catch (e) {}
+  if (!top) { const er = editor.getBoundingClientRect(); top = er.top + 28; left = er.left + 16; }
+  top += 6; left += 2;
+  if (top + 240 > window.innerHeight) top = window.innerHeight - 250;
+  slashMenu.style.top = top + 'px'; slashMenu.style.left = left + 'px';
+  slashMenu.classList.remove('hidden');
+}
 function applySlash(i) {
   if (!slashCtx) return;
-  const {m, ta, pos} = slashCtx;
+  const { m, editor, bodyWrap, win } = slashCtx;
   const it = SLASH_ITEMS[i];
-  // 입력했던 '/' 제거
-  const pre = ta.value.slice(0, pos-1), post = ta.value.slice(pos);
-  if (it.action === 'image') {
-    ta.value = pre + post;
-    m.text = ta.value; saveMemos();
-    pendingImgTarget = {m, ta};
-    document.getElementById('noteImgInput').click();
-  } else {
-    const snip = typeof it.snippet === 'function' ? it.snippet() : it.snippet;
-    ta.value = pre + snip + post;
-    const cur = pre.length + snip.length;
-    ta.setSelectionRange(cur, cur);
-    m.text = ta.value; saveMemos();
-    ta.focus();
-  }
   closeSlashMenu();
+  if (!editor) return;
+  // 현재 편집기 내용을 모델로 반영하고 '/'만 있는 줄을 찾음
+  m.text = serializeNoteEditor(editor);
+  const lines = m.text.split('\n');
+  let idx = lines.findIndex(l => l.trim() === '/');
+  if (it.action === 'image') {
+    if (idx >= 0) { lines[idx] = ''; m.text = lines.join('\n'); }
+    pendingImgTarget = { m, editor };
+    document.getElementById('noteImgInput').click();
+    return;
+  }
+  const snip = (typeof it.snippet === 'function' ? it.snippet() : it.snippet).replace(/\n$/, '');
+  if (idx < 0) { lines.push(snip); } else { lines[idx] = snip; }
+  m.text = lines.join('\n');
+  if (!READ_ONLY) saveMemos();
+  renderNoteBody(m, bodyWrap, win, true);
 }
 let pendingImgTarget = null;
 document.getElementById('noteImgInput').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (f && pendingImgTarget) {
-    await insertImageFile(pendingImgTarget.m, pendingImgTarget.ta, f);
+    if (pendingImgTarget.editor) await insertImageCE(pendingImgTarget.m, pendingImgTarget.editor, f);
+    else await insertImageFile(pendingImgTarget.m, pendingImgTarget.ta, f);
     renderNoteWins();
   }
   pendingImgTarget = null;
@@ -3671,12 +3782,9 @@ function buildNoteWin(m) {
       if (!files.length) return;
       e.preventDefault();
       noteEditState[m.id] = true;
-      renderNoteBody(m, bodyWrap, win);
-      const ta = bodyWrap.querySelector('.note-textarea');
-      if (ta) {
-        for (const f of files) await insertImageFile(m, ta, f);
-        renderNoteWins();
-      }
+      renderNoteBody(m, bodyWrap, win, true);
+      const editor = bodyWrap.querySelector('.note-editor');
+      if (editor) { for (const f of files) await insertImageCE(m, editor, f); }
     });
   }
 
@@ -3719,44 +3827,59 @@ function buildNoteWin(m) {
 }
 
 // 노트 서식: 선택 영역을 마커로 감싸기
-function nvWrapSel(ta, open, close, m) {
-  const s = ta.selectionStart, e = ta.selectionEnd, val = ta.value;
-  const sel = e > s ? val.slice(s, e) : '텍스트';
-  ta.value = val.slice(0, s) + open + sel + close + val.slice(e);
-  m.text = ta.value; if (!READ_ONLY) saveMemos();
-  ta.focus();
-  ta.selectionStart = s + open.length;
-  ta.selectionEnd = s + open.length + sel.length;
+function placeCaretEnd(elx) {
+  elx.focus();
+  try { const r = document.createRange(); r.selectNodeContents(elx); r.collapse(false); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {}
 }
-function buildNoteToolbar(ta, m) {
+async function insertImageCE(m, editor, file) {
+  if (READ_ONLY || !file) return;
+  const dataUrl = await compressImage(file);
+  if (!dataUrl) { showToast('⚠️ 이미지를 읽을 수 없어요'); return; }
+  const id = uid(); await idbPutImage(id, dataUrl);
+  editor.focus();
+  document.execCommand('insertHTML', false,
+    `<div class="nv-imgblock" contenteditable="false" draggable="true"><img class="nv-img" data-img="${id}" alt="" draggable="false"><span class="nv-imgmove" title="드래그해서 위치 이동">⠿</span></div><div class="nv-p"><br></div>`);
+  hydrateNoteMedia(editor, true);
+  m.text = serializeNoteEditor(editor); if (!READ_ONLY) saveMemos();
+  showToast('🖼 이미지 첨부됨 (이 기기에만 저장)');
+}
+// WYSIWYG 서식 툴바 (contentEditable + execCommand)
+function buildNoteToolbar(editor, m) {
   const tb = el('div', 'note-toolbar');
+  const save = () => { m.text = serializeNoteEditor(editor); if (!READ_ONLY) saveMemos(); };
+  const exec = (cmd, val) => { editor.focus(); try { document.execCommand('styleWithCSS', false, true); } catch (e) {} try { document.execCommand(cmd, false, val); } catch (e) {} save(); };
+  const wrap = (prop, value) => {
+    editor.focus();
+    const sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0); if (range.collapsed) return;
+    const span = document.createElement('span'); span.style[prop] = value;
+    try { span.appendChild(range.extractContents()); range.insertNode(span); sel.removeAllRanges(); const r = document.createRange(); r.selectNodeContents(span); sel.addRange(r); } catch (e) {}
+    save();
+  };
+  const fontMap = { pretendard:"'Pretendard Variable',sans-serif", noto:"'Noto Sans KR',sans-serif", notoserif:"'Noto Serif KR',serif", nanum:"'Nanum Gothic',sans-serif", nanummyeongjo:"'Nanum Myeongjo',serif", gowun:"'Gowun Dodum',sans-serif", jua:"'Jua',sans-serif", dohyeon:"'Do Hyeon',sans-serif", gaegu:"'Gaegu',cursive", nanumpen:"'Nanum Pen Script',cursive" };
   const fontSel = el('select', 'nt-select', { title: '글꼴' });
-  fontSel.innerHTML = '<option value="">글꼴</option>'
-    + '<option value="pretendard">프리텐다드</option><option value="noto">본고딕</option>'
-    + '<option value="notoserif">본명조</option><option value="nanum">나눔고딕</option>'
-    + '<option value="nanummyeongjo">나눔명조</option><option value="gowun">고운돋움</option>'
-    + '<option value="jua">주아</option><option value="dohyeon">도현</option>'
-    + '<option value="gaegu">개구</option><option value="nanumpen">나눔펜</option>';
-  fontSel.onchange = () => { if (fontSel.value) nvWrapSel(ta, `{!ft=${fontSel.value}!}`, '{!/!}', m); fontSel.selectedIndex = 0; };
+  fontSel.innerHTML = '<option value="">글꼴</option><option value="pretendard">프리텐다드</option><option value="noto">본고딕</option><option value="notoserif">본명조</option><option value="nanum">나눔고딕</option><option value="nanummyeongjo">나눔명조</option><option value="gowun">고운돋움</option><option value="jua">주아</option><option value="dohyeon">도현</option><option value="gaegu">개구</option><option value="nanumpen">나눔펜</option>';
+  fontSel.onchange = () => { if (fontSel.value && fontMap[fontSel.value]) wrap('fontFamily', fontMap[fontSel.value]); fontSel.selectedIndex = 0; };
   const sizeSel = el('select', 'nt-select', { title: '글자 크기' });
   sizeSel.innerHTML = '<option value="">크기</option>' + [12,14,16,18,20,24,28,32].map(n => `<option value="${n}">${n}</option>`).join('');
-  sizeSel.onchange = () => { if (sizeSel.value) nvWrapSel(ta, `{!sz=${sizeSel.value}!}`, '{!/!}', m); sizeSel.selectedIndex = 0; };
+  sizeSel.onchange = () => { if (sizeSel.value) wrap('fontSize', sizeSel.value + 'px'); sizeSel.selectedIndex = 0; };
   tb.appendChild(fontSel); tb.appendChild(sizeSel);
-  [['b','<b>B</b>','굵게'],['i','<i>I</i>','기울임'],['u','<u>U</u>','밑줄'],['st','<s>S</s>','취소선']].forEach(([code,label,title]) => {
+  [['bold','<b>B</b>','굵게'],['italic','<i>I</i>','기울임'],['underline','<u>U</u>','밑줄'],['strikeThrough','<s>S</s>','취소선']].forEach(([cmd,label,title]) => {
     const b = el('button', 'nt-btn', { title, type: 'button' }); b.innerHTML = label;
-    b.addEventListener('mousedown', e => e.preventDefault()); // 선택/포커스 유지
-    b.onclick = () => nvWrapSel(ta, `{!${code}!}`, '{!/!}', m);
+    b.addEventListener('mousedown', e => e.preventDefault());
+    b.onclick = () => exec(cmd);
     tb.appendChild(b);
   });
   const foreLab = el('label', 'nt-color', { title: '글자색' });
   foreLab.innerHTML = '<span style="color:#1a73e8;font-weight:800">A</span>';
   const fore = el('input', null, { type: 'color', value: '#1a73e8' });
-  fore.onchange = () => nvWrapSel(ta, `{!c=${fore.value.slice(1)}!}`, '{!/!}', m);
+  fore.onchange = () => exec('foreColor', fore.value);
   foreLab.appendChild(fore); tb.appendChild(foreLab);
   const bgLab = el('label', 'nt-color', { title: '배경색(형광펜)' });
   bgLab.innerHTML = '<span style="background:#fff59d;border-radius:3px;padding:0 3px">H</span>';
   const bg = el('input', null, { type: 'color', value: '#fff59d' });
-  bg.onchange = () => nvWrapSel(ta, `{!bg=${bg.value.slice(1)}!}`, '{!/!}', m);
+  bg.onmousedown = e => e.stopPropagation();
+  bg.onchange = () => { editor.focus(); try { document.execCommand('styleWithCSS', false, true); } catch (e) {} if (!document.execCommand('hiliteColor', false, bg.value)) document.execCommand('backColor', false, bg.value); save(); };
   bgLab.appendChild(bg); tb.appendChild(bgLab);
   return tb;
 }
@@ -3764,59 +3887,54 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
   bodyWrap.innerHTML = '';
   const editing = !READ_ONLY && (noteEditState[m.id] || (!m.text.trim() && !memoChildren(m.id).length));
   if (editing) {
-    const ta = el('textarea', 'note-textarea');
-    ta.placeholder = '메모를 입력하세요...  ( / 입력 → 블록 메뉴, 이미지 붙여넣기 가능 )';
-    ta.value = m.text;
-    ta.addEventListener('input', () => {
-      m.text = ta.value;
-      saveMemos();
-      // 슬래시 명령 감지: 줄 시작 또는 공백 뒤 '/'
-      const pos = ta.selectionStart;
-      if (ta.value[pos-1] === '/') {
-        const before = ta.value.slice(0, pos-1);
-        const lineStart = before.lastIndexOf('\n') + 1;
-        if (/^\s*$/.test(before.slice(lineStart))) { openSlashMenu(m, ta); return; }
-      }
-      if (slashCtx) closeSlashMenu();
-    });
-    ta.addEventListener('keydown', e => {
+    const editor = el('div', 'note-editor');
+    editor.contentEditable = 'true';
+    editor.setAttribute('data-ph', '메모를 입력하세요...  ( / 입력 → 블록, 이미지 붙여넣기 )');
+    editor.innerHTML = m.text.trim() ? renderMarkdown(m.text) : '<div class="nv-p"><br></div>';
+    hydrateNoteMedia(editor, true);
+    const serialize = () => { m.text = serializeNoteEditor(editor); if (!READ_ONLY) saveMemos(); };
+    editor.addEventListener('input', () => { serialize(); detectSlashCE(m, editor, bodyWrap, win); });
+    editor.addEventListener('keydown', e => {
       if (slashCtx) {
         if (e.key === 'ArrowDown') { e.preventDefault(); slashSel = (slashSel+1)%SLASH_ITEMS.length; renderSlashMenu(); return; }
         if (e.key === 'ArrowUp') { e.preventDefault(); slashSel = (slashSel-1+SLASH_ITEMS.length)%SLASH_ITEMS.length; renderSlashMenu(); return; }
         if (e.key === 'Enter') { e.preventDefault(); applySlash(slashSel); return; }
         if (e.key === 'Escape') { e.stopPropagation(); closeSlashMenu(); return; }
       }
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        noteEditState[m.id] = false;
-        snapshotMemo(m); saveMemos();
-        renderNoteBody(m, bodyWrap, win);
-      }
+      if (e.key === 'Escape') { e.stopPropagation(); editor.blur(); }
     });
-    ta.addEventListener('blur', () => {
+    editor.addEventListener('blur', () => {
       setTimeout(() => {
-        if (slashCtx && slashCtx.ta === ta) return; // 슬래시 메뉴 조작 중
-        if (document.activeElement === ta) return;
+        if (slashCtx && slashCtx.editor === editor) return; // 슬래시 메뉴 조작 중
+        if (document.activeElement === editor) return;
         if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.note-toolbar')) return; // 서식 툴바 조작 중
         noteEditState[m.id] = false;
-        snapshotMemo(m);
+        serialize(); snapshotMemo(m);
         if (!READ_ONLY) saveMemos();
         if (bodyWrap.isConnected) renderNoteBody(m, bodyWrap, win);
       }, 150);
     });
-    ta.addEventListener('paste', e => {
+    editor.addEventListener('paste', e => {
       const items = [...(e.clipboardData?.items||[])].filter(i => i.type.startsWith('image/'));
-      if (!items.length) return;
+      if (items.length) {
+        e.preventDefault();
+        (async () => { for (const it of items) await insertImageCE(m, editor, it.getAsFile()); })();
+        return;
+      }
       e.preventDefault();
-      (async () => {
-        for (const it of items) await insertImageFile(m, ta, it.getAsFile());
-        noteEditState[m.id] = true;
-        renderNoteBody(m, bodyWrap, win, true);
-      })();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      if (text) document.execCommand('insertText', false, text);
     });
-    if (!READ_ONLY) bodyWrap.appendChild(buildNoteToolbar(ta, m));
-    bodyWrap.appendChild(ta);
-    if (focusEdit) setTimeout(() => ta.focus(), 30);
+    // 편집 중에도 페이지 링크 클릭→이동, 체크박스 클릭→토글
+    editor.addEventListener('click', e => {
+      const page = e.target.closest('.nv-page');
+      if (page) { e.preventDefault(); e.stopPropagation(); if (memos[page.dataset.note]) { serialize(); snapshotMemo(m); navigateNote(m.id, page.dataset.note); } return; }
+      const cb = e.target.closest('.nv-check');
+      if (cb) { e.preventDefault(); e.stopPropagation(); cb.classList.toggle('done'); const dot = cb.querySelector('.nv-cb'); if (dot) dot.classList.toggle('on'); serialize(); }
+    });
+    if (!READ_ONLY) bodyWrap.appendChild(buildNoteToolbar(editor, m));
+    bodyWrap.appendChild(editor);
+    if (focusEdit) setTimeout(() => placeCaretEnd(editor), 30);
   } else {
     const view = el('div', 'note-view');
     view.innerHTML = renderMarkdown(m.text);
@@ -4112,7 +4230,7 @@ document.getElementById('notesBtn').onclick = e => {
 document.addEventListener('click', e => {
   if (!notesMenu.classList.contains('hidden') && !e.target.closest('.more-menu-wrap'))
     notesMenu.classList.add('hidden');
-  if (slashCtx && !e.target.closest('#slashMenu') && !e.target.closest('.note-textarea'))
+  if (slashCtx && !e.target.closest('#slashMenu') && !e.target.closest('.note-editor'))
     closeSlashMenu();
 });
 
