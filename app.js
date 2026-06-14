@@ -49,7 +49,6 @@ const HOLIDAYS = {
   '2026-05-24': '부처님오신날',
   '2026-05-25': '부처님오신날 대체공휴일', // 5/24 일요일
   '2026-06-06': '현충일',
-  '2026-06-08': '현충일 대체공휴일',    // 6/6 토요일
   '2026-08-15': '광복절',
   '2026-08-17': '광복절 대체공휴일',    // 8/15 토요일
   '2026-09-24': '추석 연휴',
@@ -299,6 +298,7 @@ let dayDate = today();
 let yearNum = new Date().getFullYear();
 let tasks = loadTasks();
 let activeInput = null;
+let justToggledCb = null;   // 방금 토글한 체크박스만 팝 애니메이션 (재렌더 시 전체 팝 버그 방지)
 let weatherByDate = {};
 let weatherStatus = 'loading';  // 'loading' | 'ok' | 'error'
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
@@ -1687,8 +1687,10 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     item.appendChild(star);
   }
   if(task.color){const dot=el('div','color-dot');dot.style.background=task.color;item.appendChild(dot);}
-  const cb=el('div',`task-cb${checked?' checked':''}`);
-  const cbToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();if(isRepeatInst){if(isSub)toggleRepeatSub(originDk,parentId,task.id,instanceDk);else toggleRepeatInst(originDk,task.id,instanceDk);}else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
+  const cbKey=`${isRepeatInst?originDk:dk}|${parentId||''}|${task.id}|${isRepeatInst?instanceDk:''}`;
+  const cb=el('div',`task-cb${checked?' checked':''}${justToggledCb===cbKey?' cb-pop':''}`);
+  if(justToggledCb===cbKey) justToggledCb=null;
+  const cbToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();justToggledCb=cbKey;if(isRepeatInst){if(isSub)toggleRepeatSub(originDk,parentId,task.id,instanceDk);else toggleRepeatInst(originDk,task.id,instanceDk);}else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
   cb.onclick=cbToggle; addKbd(cb,cbToggle);
   cb.setAttribute('role','checkbox'); cb.tabIndex=0;
   cb.setAttribute('aria-checked',checked?'true':'false');
@@ -1876,6 +1878,8 @@ function buildInputForm(dk,parentId){
       cp.appendChild(dot);
     });
     form.appendChild(cp);
+    const psRow=el('div','add-field-row');
+    psRow.appendChild(el('span','add-field-label',{textContent:'중요도'}));
     const ps=el('div','priority-selector');
     [['high','🔴'],['mid','🟡'],['low','🟢']].forEach(([val,icon])=>{
       const btn=el('button','priority-opt',{type:'button',textContent:icon,title:val});
@@ -1886,9 +1890,10 @@ function buildInputForm(dk,parentId){
       };
       ps.appendChild(btn);
     });
-    form.appendChild(ps);
+    psRow.appendChild(ps);
+    form.appendChild(psRow);
     const rs=el('div','repeat-selector');
-    [['none','없음'],['daily','매일'],['weekdays','평일'],['weekly','매주'],['biweekly','격주'],['monthly','매월'],['monthlyNth','N째 요일'],['monthlyFirstBiz','월초 영업일'],['monthlyLastBiz','월말 영업일']].forEach(([val,label])=>{
+    [['none','없음'],['daily','매일'],['weekdays','평일'],['weekly','매주'],['biweekly','격주'],['monthly','매월'],['monthlyNth','N째요일'],['monthlyFirstBiz','월초영업일'],['monthlyLastBiz','월말영업일']].forEach(([val,label])=>{
       const btn=el('button',`repeat-opt${val==='none'?' active':''}`,{type:'button',textContent:label});
       btn.onclick=()=>{selRepeat=val;rs.querySelectorAll('.repeat-opt').forEach(b=>b.classList.remove('active'));btn.classList.add('active');};
       rs.appendChild(btn);
@@ -4837,16 +4842,29 @@ function renderComments() {
   box.innerHTML = '';
   const cs = (t && t.comments) || [];
   if (!cs.length) box.appendChild(el('div','day-empty-text',{textContent:'아직 댓글이 없어요',style:'text-align:center;padding:12px;color:var(--text3);font-size:12px'}));
-  cs.forEach(c => {
+  cs.forEach((c, i) => {
     const row = el('div','comment-row');
     const head = el('div','comment-head');
     head.appendChild(el('span','comment-author',{textContent:'👤 '+(c.by||'익명')}));
     const d = new Date(c.ts);
     head.appendChild(el('span','comment-time',{textContent:`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}));
+    if (!READ_ONLY) {
+      const del = el('button','comment-del',{type:'button',textContent:'✕',title:'댓글 삭제'});
+      del.onclick = () => deleteComment(i);
+      head.appendChild(del);
+    }
     row.appendChild(head);
     row.appendChild(el('div','comment-text',{textContent:c.text}));
     box.appendChild(row);
   });
+}
+function deleteComment(i) {
+  if (!commentCtx || READ_ONLY) return;
+  const t = (tasks[commentCtx.dk]||[]).find(x => x.id === commentCtx.taskId);
+  if (!t || !Array.isArray(t.comments) || !t.comments[i]) return;
+  if (!confirm('이 댓글을 삭제할까요?')) return;
+  t.comments.splice(i, 1);
+  saveTasks(commentCtx.dk); renderComments(); render();
 }
 function addComment() {
   if (!commentCtx || READ_ONLY) return;
@@ -5335,27 +5353,11 @@ function checkMondaySync(){
 }
 
 function appendSheetSyncRow(panel){
-  // remove old sync row if exists
+  // '지금 가져오기' 버튼 제거됨 — 기존에 그려진 행이 있으면 정리만 함
   const old=panel.querySelector('.sheet-sync-row');
   if(old) old.remove();
   const old2=panel.querySelector('.sheet-sync-divider');
   if(old2) old2.remove();
-  const divider=document.createElement('div');
-  divider.className='sheet-sync-divider';
-  divider.style.cssText='margin:14px 0 10px;border-top:1px solid var(--border)';
-  panel.appendChild(divider);
-  const syncRow=document.createElement('div');
-  syncRow.className='sheet-sync-row';
-  syncRow.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';
-  const syncLabel=document.createElement('div'); syncLabel.style.cssText='font-size:11px;color:var(--text3)';
-  const last=localStorage.getItem(SHEET_SYNC_KEY);
-  syncLabel.textContent=last?`마지막 동기화: ${last}`:'시트 미동기화';
-  const syncBtn=document.createElement('button'); syncBtn.id='sheetSyncBtn';
-  syncBtn.style.cssText='font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--primary);background:var(--primary-l);color:var(--primary);cursor:pointer;white-space:nowrap';
-  syncBtn.textContent='📥 지금 가져오기';
-  syncBtn.onclick=()=>syncSheetEvents(true);
-  syncRow.appendChild(syncLabel); syncRow.appendChild(syncBtn);
-  panel.appendChild(syncRow);
 }
 
 function initDashboard(){
