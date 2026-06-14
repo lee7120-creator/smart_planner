@@ -4857,19 +4857,103 @@ document.getElementById('icsFileInput').addEventListener('change', e => {
 // ═══════════════════════════════════════
 document.getElementById('teamBtn').onclick = () => {
   document.getElementById('moreMenu').classList.add('hidden');
-  if (IS_TEAM) {
-    if (confirm('내 개인 캘린더로 돌아갈까요?')) {
-      const last = localStorage.getItem('lastUser');
-      window.location.href = window.location.pathname + (last ? `?u=${encodeURIComponent(last)}` : '');
-    }
-    return;
-  }
-  const choice = prompt('팀 캘린더 이름을 입력하세요.\n같은 이름을 입력한 사람끼리 일정을 함께 편집합니다.\n(예: 마케팅2팀)');
-  if (!choice) return;
-  const id = choice.replace(/[.#$\[\]\/]/g, '').trim().slice(0, 40);
-  if (!id) return;
-  window.location.href = window.location.pathname + `?team=${encodeURIComponent(id)}`;
+  if (IS_TEAM) { gotoPersonal(); return; }
+  openTeamPicker();
 };
+
+// ═══ 팀 등록부 · 구독 · 빠른 전환 (Phase 1) ═══
+function myPersonalId(){ return IS_TEAM ? (localStorage.getItem('lastUser')||'') : (USER_ID||''); }
+const TEAM_SUBS_KEY = `calTeamSubs_${myPersonalId()||'anon'}`;
+let teamSubs = (()=>{ try{ return JSON.parse(localStorage.getItem(TEAM_SUBS_KEY)||'{}')||{}; }catch{ return {}; } })();
+function saveTeamSubs(){
+  localStorage.setItem(TEAM_SUBS_KEY, JSON.stringify(teamSubs));
+  const me = sanitizeId(myPersonalId());
+  if (fbDb && me && me!=='demo') fbDb.ref(`users/${me}/teamSubs`).set(Object.keys(teamSubs).length?teamSubs:null).catch(()=>{});
+}
+function registerTeamDirectory(id, name){ if (fbDb && id) fbDb.ref('teamDirectory/'+sanitizeId(id)).update({ name:name||id, ts:Date.now() }).catch(()=>{}); }
+function fetchTeamDirectory(cb){
+  if (!fbDb){ cb([]); return; }
+  fbDb.ref('teamDirectory').once('value').then(snap=>{
+    const v=snap.val()||{};
+    cb(Object.keys(v).map(id=>({id, name:(v[id]&&v[id].name)||id})).sort((a,b)=>String(a.name).localeCompare(String(b.name))));
+  }).catch(()=>cb([]));
+}
+function enterTeam(id){ const s=sanitizeId(id); if(!s) return; window.location.href = window.location.pathname + `?team=${encodeURIComponent(s)}`; }
+function gotoPersonal(){ const last=localStorage.getItem('lastUser'); window.location.href = window.location.pathname + (last?`?u=${encodeURIComponent(last)}`:''); }
+function toggleTeamSub(id, name){
+  if (teamSubs[id]) delete teamSubs[id]; else teamSubs[id]={name:name||id, ts:Date.now()};
+  saveTeamSubs();
+  return !!teamSubs[id];
+}
+function openTeamPicker(){
+  const old=document.getElementById('teamPickerOv'); if(old) old.remove();
+  const ov=el('div','modal-overlay'); ov.id='teamPickerOv';
+  const box=el('div','modal-box'); box.style.maxWidth='340px';
+  box.appendChild(el('div','modal-title',{textContent:'🤝 팀 캘린더'}));
+  box.appendChild(el('div','',{textContent:'팀 이름을 눌러 들어가거나, 구독하면 내 캘린더에서 그 팀 일정을 함께 봐요.',style:'font-size:11px;color:var(--text3);margin-bottom:8px'}));
+  const loading=el('div','',{textContent:'불러오는 중…',style:'font-size:12px;color:var(--text3)'});
+  const listWrap=el('div',null); listWrap.style.cssText='max-height:42vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:10px';
+  box.appendChild(loading); box.appendChild(listWrap);
+  const inRow=el('div','modal-row'); inRow.style.gap='6px';
+  const inp=el('input','modal-input',{type:'text',placeholder:'새 팀 이름'}); inp.style.cssText='flex:1;margin-bottom:0';
+  const goBtn=el('button','btn-primary',{type:'button',textContent:'들어가기'});
+  goBtn.onclick=()=>{ if(inp.value.trim()) enterTeam(inp.value.trim()); };
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&inp.value.trim()) enterTeam(inp.value.trim()); });
+  inRow.appendChild(inp); inRow.appendChild(goBtn); box.appendChild(inRow);
+  const closeBtn=el('button','btn-secondary',{type:'button',textContent:'닫기',style:'margin-top:8px;width:100%'});
+  closeBtn.onclick=()=>ov.remove(); box.appendChild(closeBtn);
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  fetchTeamDirectory(list=>{
+    loading.remove();
+    if(!list.length){ listWrap.appendChild(el('div','',{textContent:'아직 등록된 팀이 없어요. 아래에서 새로 만들어 보세요.',style:'font-size:12px;color:var(--text3)'})); return; }
+    list.forEach(t=>{
+      const row=el('div','team-pick-row');
+      const nm=el('button','team-pick-name',{type:'button',textContent:'🤝 '+t.name}); nm.onclick=()=>enterTeam(t.id);
+      const subBtn=el('button',`team-pick-sub${teamSubs[t.id]?' on':''}`,{type:'button',textContent:teamSubs[t.id]?'구독중 ✓':'구독'});
+      subBtn.onclick=()=>{ const on=toggleTeamSub(t.id,t.name); subBtn.textContent=on?'구독중 ✓':'구독'; subBtn.classList.toggle('on',on); };
+      row.appendChild(nm); row.appendChild(subBtn); listWrap.appendChild(row);
+    });
+  });
+}
+// 상단 캘린더 이름 클릭 → 빠른 전환 드롭다운
+(function initCalSwitch(){
+  const chip=document.getElementById('userChip'); if(!chip) return;
+  chip.style.cursor='pointer'; chip.title='캘린더 전환';
+  chip.addEventListener('click', e=>{
+    e.stopPropagation();
+    const ex=document.getElementById('calSwitchDD'); if(ex){ ex.remove(); return; }
+    const dd=el('div','cal-switch-dd'); dd.id='calSwitchDD';
+    const items=[];
+    if(IS_TEAM){
+      const last=localStorage.getItem('lastUser');
+      if(last) items.push({label:'👤 '+last+' (내 캘린더)', fn:gotoPersonal});
+    } else {
+      Object.keys(teamSubs).forEach(id=>items.push({label:'🤝 '+(teamSubs[id].name||id), fn:()=>enterTeam(id)}));
+    }
+    items.push({label:'＋ 팀 캘린더 관리', fn:openTeamPicker});
+    if(!items.length) return;
+    items.forEach(it=>{ const b=el('button','cal-switch-item',{type:'button',textContent:it.label}); b.onclick=()=>{ dd.remove(); it.fn(); }; dd.appendChild(b); });
+    const r=chip.getBoundingClientRect();
+    dd.style.left=Math.max(8,r.left)+'px'; dd.style.top=(r.bottom+6)+'px';
+    document.body.appendChild(dd);
+    setTimeout(()=>document.addEventListener('click',function h(){ const d=document.getElementById('calSwitchDD'); if(d)d.remove(); document.removeEventListener('click',h); }),0);
+  });
+})();
+// 팀 화면이면: 등록부 등록 + 더보기에 구독 토글 추가
+if (IS_TEAM) {
+  const _tid = sanitizeId(_rawTeam);
+  registerTeamDirectory(_tid, _rawTeam);
+  const tb=document.getElementById('teamBtn');
+  if (tb && tb.parentNode) {
+    const subItem=document.createElement('button'); subItem.className='more-menu-item'; subItem.id='teamSubBtn';
+    const refresh=()=>{ subItem.innerHTML = teamSubs[_tid] ? '🔕 <span>이 팀 구독취소</span>' : '🔔 <span>이 팀 구독</span>'; };
+    refresh();
+    subItem.onclick=()=>{ const on=toggleTeamSub(_tid,_rawTeam); refresh(); showUndoToast(on?'구독했어요 — 내 캘린더에서 이 팀 일정을 함께 봐요(곧 적용)':'구독을 취소했어요'); };
+    tb.parentNode.insertBefore(subItem, tb);
+    tb.innerHTML = '↩ <span>내 캘린더로</span>';
+  }
+}
 
 // ═══════════════════════════════════════
 // 💬 일정 댓글 + ✅ 수락/거절(받은 일정)
