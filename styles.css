@@ -847,6 +847,9 @@
     .tag-filter-chip { font-size:11px; padding:3px 10px; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--text2); cursor:pointer; font-family:inherit; transition:all .12s; }
     .tag-filter-chip:hover { border-color:var(--primary); }
     .tag-filter-chip.active { background:var(--primary); color:#fff; border-color:var(--primary); font-weight:600; }
+    .color-filter-chip { padding:3px 6px; line-height:1; }
+    .color-filter-chip .cf-dot { display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:middle; box-shadow:0 0 0 1px rgba(0,0,0,.12) inset; }
+    .color-filter-chip.active { box-shadow:0 0 0 2px var(--primary); border-color:var(--primary); }
     /* 인쇄 */
     @media print {
       .header, .fab-add, .dashboard, .weather-bar, .scroll-hint, .add-task-btn, .task-actions, .offday-btn { display:none !important; }
