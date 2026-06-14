@@ -109,16 +109,15 @@ function adjustedMonthlyDate(year, month, originDay) {
   if (isRestDay(d)) d = nextWorkday(d);
   return d; // 조정 결과가 다음 달로 넘어가도 그 날짜에 그대로 표기 (예: 5/31 토·일 → 6/1 월)
 }
-// 매월 반복 태스크의 원본일이 휴일이라 '다음 영업일'로 밀린 경우 → 원본 날짜에는 표시하지 않음(중복 방지)
-function isMonthlyDisplaced(t, dk) {
-  if (!t || t.repeat !== 'monthly') return false;
-  const d = parseDk(dk);
-  if (!isRestDay(d)) return false;
-  return dateKey(adjustedMonthlyDate(d.getFullYear(), d.getMonth(), d.getDate())) !== dk;
+// 날짜지정형 반복(주/매월/N째주)의 원본일이 휴일이면 '다음 영업일'로 밀려 표시되므로,
+// 원본 날짜(저장 위치)에는 표시하지 않음(중복 방지). 격주·첫/말영업일은 원본일이 발생일이 아니라 제외.
+function isDisplacedRecurringOrigin(t, dk) {
+  if (!t || !['monthly','monthlyNth'].includes(t.repeat)) return false;
+  return isRestDay(parseDk(dk));
 }
-// 해당 날짜에 '저장된' 태스크 중 화면에 보일 것 (휴일로 밀린 매월 원본 제외)
+// 해당 날짜에 '저장된' 태스크 중 화면에 보일 것 (휴일로 밀린 반복 원본 제외)
 function visibleStored(dk) {
-  return (tasks[dk] || []).filter(t => !isMonthlyDisplaced(t, dk));
+  return (tasks[dk] || []).filter(t => !isDisplacedRecurringOrigin(t, dk));
 }
 // 해당 월의 첫/마지막 영업일
 function firstBizDay(year, month) {
@@ -418,57 +417,77 @@ function dateToDayIdx(d) { const dd=(typeof d==='string')?parseDk(d):d; const da
 // ── Repeat helpers ──
 // 렌더 단위 캐시: 월/연/간트 뷰는 셀마다 호출하므로 dk별 1회 계산으로 재사용 (render 시작 시 비움)
 let _repeatCache = new Map();
+// 휴일이면 다음 영업일로 밀어 표시하는 '날짜 기준' 반복 타입 (요일 기준인 주간/격주는 제외)
+const SHIFT_REPEAT_TYPES = ['monthly','monthlyNth','monthlyFirstBiz','monthlyLastBiz'];
+// 반복이 cand일에 '자연 발생'하는가 (휴일 보정 전)
+function repeatNaturalOccurs(t, originDate, cand) {
+  switch (t.repeat) {
+    case 'weekly':
+      return cand.getDay() === originDate.getDay();
+    case 'biweekly': {
+      if (cand.getDay() !== originDate.getDay()) return false;
+      const weeksDiff = Math.round((getMonday(cand) - getMonday(originDate)) / (7*86400000));
+      return weeksDiff !== 0 && weeksDiff % 2 === 0;
+    }
+    case 'monthly': {
+      const dim = new Date(cand.getFullYear(), cand.getMonth()+1, 0).getDate();
+      return cand.getDate() === Math.min(originDate.getDate(), dim);
+    }
+    case 'monthlyNth':
+      return cand.getDay() === originDate.getDay() && Math.ceil(cand.getDate()/7) === Math.ceil(originDate.getDate()/7);
+    case 'monthlyFirstBiz':
+      return dateKey(firstBizDay(cand.getFullYear(), cand.getMonth())) === dateKey(cand);
+    case 'monthlyLastBiz':
+      return dateKey(lastBizDay(cand.getFullYear(), cand.getMonth())) === dateKey(cand);
+  }
+  return false;
+}
 function getRepeatTasksForDate(date, dayIdx) {
   const dk = dateKey(date);
   const _c = _repeatCache.get(dk);
   if (_c) return _c;
   const out = [];
+  const dateIsRest = isRestDay(date);
+  // date(영업일) 직전의 연속 휴일들 — 날짜지정형 반복이 그 휴일에 걸리면 이 영업일로 밀려 표시됨
+  const restBefore = [];
+  if (!dateIsRest) {
+    const probe = new Date(date);
+    for (let k=0; k<14; k++) { probe.setDate(probe.getDate()-1); if (!isRestDay(probe)) break; restBefore.push(new Date(probe)); }
+  }
   Object.entries(tasks).forEach(([oDk, list]) => {
-    if (oDk===dk || dk < oDk) return;  // 반복은 시작일 이후에만
     if (!Array.isArray(list)) return;
     list.forEach(t => {
-      if (!t||!t.repeat||t.repeat==='none') return;
+      if (!t || !t.repeat || t.repeat==='none') return;
       if (t.repeatEnd && dk > t.repeatEnd) return;   // 반복 종료일
-      if (t.skips && t.skips[dk]) return;            // "이 날짜만 삭제"
+      if (t.skips && t.skips[dk]) return;            // "이 날짜만 삭제"(표시일 기준)
       const originDate = parseDk(oDk);
-      const limitDate = parseDk(oDk);
-      limitDate.setFullYear(limitDate.getFullYear() + 1);
+      const limitDate = parseDk(oDk); limitDate.setFullYear(limitDate.getFullYear() + 1);
       if (date > limitDate) return; // 생성일로부터 1년 초과 시 반복 종료
       if (t.repeat==='daily') {
-        out.push({task:t, originDk:oDk, instanceDk:dk});
+        if (dk > oDk) out.push({task:t, originDk:oDk, instanceDk:dk});
+        return;
       }
-      if (t.repeat==='weekdays' && !isRestDay(date)) {  // 평일 = 영업일 (공휴일·휴무일 제외)
-        out.push({task:t, originDk:oDk, instanceDk:dk});
+      if (t.repeat==='weekdays') {
+        if (dk > oDk && !dateIsRest) out.push({task:t, originDk:oDk, instanceDk:dk}); // 영업일에만
+        return;
       }
-      if (t.repeat==='weekly' && dateToDayIdx(oDk)===dayIdx) {
-        out.push({task:t, originDk:oDk, instanceDk:dk});
+      // 주간/격주: 지정 요일이 의도된 선택 → 휴일 보정 없이 자연 발생대로 표시
+      if (t.repeat==='weekly' || t.repeat==='biweekly') {
+        if (dk > oDk && repeatNaturalOccurs(t, originDate, date)) out.push({task:t, originDk:oDk, instanceDk:dk});
+        return;
       }
-      if (t.repeat==='biweekly' && dateToDayIdx(oDk)===dayIdx) {
-        const weeksDiff = Math.round((getMonday(date) - getMonday(originDate)) / (7*86400000));
-        if (weeksDiff!==0 && weeksDiff%2===0) out.push({task:t, originDk:oDk, instanceDk:dk});
-      }
-      if (t.repeat==='monthly') {
-        const originDay = originDate.getDate();
-        // 이번 달 발생 + "전달 발생이 영업일 조정으로 이번 달 초로 밀려온 경우"까지 검사
-        for (const off of [0, -1]) {
-          const base = new Date(date.getFullYear(), date.getMonth() + off, 1);
-          const adj = adjustedMonthlyDate(base.getFullYear(), base.getMonth(), originDay);
-          if (adj && dateKey(adj) === dk) {
-            out.push({task:t, originDk:oDk, instanceDk:dk, adjusted: adj.getDate()!==originDay || adj.getMonth()!==base.getMonth()});
-            break;
-          }
-        }
-      }
-      if (t.repeat==='monthlyFirstBiz' && dateKey(firstBizDay(date.getFullYear(), date.getMonth()))===dk) {
-        out.push({task:t, originDk:oDk, instanceDk:dk});
-      }
-      if (t.repeat==='monthlyLastBiz' && dateKey(lastBizDay(date.getFullYear(), date.getMonth()))===dk) {
-        out.push({task:t, originDk:oDk, instanceDk:dk});
-      }
-      if (t.repeat==='monthlyNth') {
-        // 매월 N번째 요일 (예: 둘째 화요일) — 원본 날짜의 주차·요일과 일치하는 날
-        if (date.getDay()===originDate.getDay() && Math.ceil(date.getDate()/7)===Math.ceil(originDate.getDate()/7)) {
-          out.push({task:t, originDk:oDk, instanceDk:dk});
+      // 매월/매월N째/첫·말영업일: 날짜 기준 → 휴일이면 다음 영업일로 밀어 표시
+      if (!SHIFT_REPEAT_TYPES.includes(t.repeat)) return;
+      if (dateIsRest) return; // 휴일엔 표시 안 함 (다음 영업일로 밀려나감)
+      // date 및 직전 휴일 후보들에 대해 자연발생 검사 → 휴일이면 date로 밀어 1회 표시
+      for (const cand of [date, ...restBefore]) {
+        const cdk = dateKey(cand);
+        if (cdk < oDk) continue;
+        if (cdk === oDk && !isRestDay(cand)) continue; // origin이 영업일이면 저장(원본)으로 표시
+        if (cand > limitDate) continue;
+        if (repeatNaturalOccurs(t, originDate, cand)) {
+          out.push({task:t, originDk:oDk, instanceDk:dk, adjusted: cdk !== dk});
+          break;
         }
       }
     });
@@ -485,6 +504,15 @@ function toggleRepeatInst(originDk, taskId, instanceDk) {
   const t=(tasks[originDk]||[]).find(x=>x.id===taskId); if(!t)return;
   if(!t.completions) t.completions={};
   t.completions[instanceDk]=!isRepeatChecked(t,instanceDk);
+  saveTasks(originDk); render();
+}
+// 반복 인스턴스의 하위태스크 완료는 인스턴스별로 저장 (과거/이후 인스턴스와 분리)
+function toggleRepeatSub(originDk, parentId, subId, instanceDk) {
+  if(READ_ONLY)return;
+  const p=(tasks[originDk]||[]).find(x=>x.id===parentId); if(!p||!Array.isArray(p.subs))return;
+  const s=p.subs.find(x=>x.id===subId); if(!s)return;
+  if(!s.completions) s.completions={};
+  s.completions[instanceDk]=!isRepeatChecked(s,instanceDk);
   saveTasks(originDk); render();
 }
 
@@ -584,45 +612,63 @@ function carryOverFrom(fromDk, toDk) {
 }
 
 // ── 휴무일 지정/해제 (지정 시 미완료 할 일을 다음 영업일로 자동 이동) ──
-function toggleOffDay(dk) {
-  if (READ_ONLY) return;
-  if (offDays[dk]) {
-    delete offDays[dk];
-    saveOffDays(); render();
-    showUndoToast('🏖 휴무일을 해제했어요', () => { offDays[dk] = true; saveOffDays(); render(); });
-    return;
-  }
-  offDays[dk] = true;
-  const toDk = nextWorkdayAfter(dk);   // 새 휴무 상태 기준 다음 영업일
-  const movedIds = [];
+// 휴무일 지정: 비반복 미완료 할 일을 다음 영업일로 이동(movedFrom 태그). 반복은 표시단에서 자동 이동.
+function applyOffDayMove(dk) {
+  const toDk = nextWorkdayAfter(dk);
   const list = tasks[dk] || [];
+  let moved = 0;
   for (let i = list.length - 1; i >= 0; i--) {
     const t = list[i];
     if (t && !t.checked && (!t.repeat || t.repeat === 'none')) {
       list.splice(i, 1);
+      t.movedFrom = dk;
       if (!tasks[toDk]) tasks[toDk] = [];
       tasks[toDk].unshift(t);
-      movedIds.push(t.id);
+      moved++;
     }
   }
   if (tasks[dk] && !tasks[dk].length) delete tasks[dk];
-  saveOffDays(); saveTasks(); render();
-  const d = parseDk(toDk);
-  showUndoToast(movedIds.length
-    ? `🏖 휴무일 지정 — 할 일 ${movedIds.length}개를 ${d.getMonth()+1}/${d.getDate()}(${DAY_NAMES[dateToDayIdx(toDk)]})로 이동했어요`
-    : '🏖 휴무일로 지정했어요', () => {
-    delete offDays[dk];
-    movedIds.forEach(id => {
-      const l2 = tasks[toDk] || [];
-      const i2 = l2.findIndex(x => x.id === id);
-      if (i2 < 0) return;
-      const [b] = l2.splice(i2, 1);
-      if (!tasks[dk]) tasks[dk] = [];
-      tasks[dk].push(b);
-    });
-    if (tasks[toDk] && !tasks[toDk].length) delete tasks[toDk];
-    saveOffDays(); saveTasks(); render();
+  return moved;
+}
+// 휴무일 해제: 이 날(dk)에서 옮겨졌던 할 일들을 원래 날짜로 복원
+function restoreMovedFrom(dk) {
+  let restored = 0;
+  Object.keys(tasks).forEach(d => {
+    const list = tasks[d];
+    if (!Array.isArray(list)) return;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const t = list[i];
+      if (t && t.movedFrom === dk) {
+        list.splice(i, 1);
+        delete t.movedFrom;
+        if (!tasks[dk]) tasks[dk] = [];
+        tasks[dk].push(t);
+        restored++;
+      }
+    }
+    if (d !== dk && tasks[d] && !tasks[d].length) delete tasks[d];
   });
+  return restored;
+}
+function toggleOffDay(dk) {
+  if (READ_ONLY) return;
+  if (offDays[dk]) {
+    // 해제 — 이 휴무일로 옮겨졌던 할 일 원복
+    delete offDays[dk];
+    const restored = restoreMovedFrom(dk);
+    saveOffDays(); saveTasks(); render();
+    showUndoToast(restored ? `🏖 휴무일 해제 — 옮겼던 할 일 ${restored}개를 원래대로 되돌렸어요` : '🏖 휴무일을 해제했어요',
+      () => { offDays[dk] = true; applyOffDayMove(dk); saveOffDays(); saveTasks(); render(); });
+    return;
+  }
+  offDays[dk] = true;
+  const moved = applyOffDayMove(dk);
+  saveOffDays(); saveTasks(); render();
+  const toDk = nextWorkdayAfter(dk), d = parseDk(toDk);
+  showUndoToast(moved
+    ? `🏖 휴무일 지정 — 할 일 ${moved}개를 ${d.getMonth()+1}/${d.getDate()}(${DAY_NAMES[dateToDayIdx(toDk)]})로 이동했어요`
+    : '🏖 휴무일로 지정했어요',
+    () => { delete offDays[dk]; restoreMovedFrom(dk); saveOffDays(); saveTasks(); render(); });
 }
 
 // ── Undo toast ──
@@ -1642,7 +1688,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   if(task.color){const dot=el('div','color-dot');dot.style.background=task.color;item.appendChild(dot);}
   const cb=el('div',`task-cb${checked?' checked':''}`);
-  const cbToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();if(isRepeatInst)toggleRepeatInst(originDk,task.id,instanceDk);else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
+  const cbToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();if(isRepeatInst){if(isSub)toggleRepeatSub(originDk,parentId,task.id,instanceDk);else toggleRepeatInst(originDk,task.id,instanceDk);}else toggleTask(dk,parentId||task.id,parentId?task.id:null);};
   cb.onclick=cbToggle; addKbd(cb,cbToggle);
   cb.setAttribute('role','checkbox'); cb.tabIndex=0;
   cb.setAttribute('aria-checked',checked?'true':'false');
@@ -1723,10 +1769,11 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     body.appendChild(cb);
   }
   if(!isSub&&adjusted){
-    body.appendChild(el('div','repeat-adjusted-badge',{textContent:'📅 일정 앞당김'}));
+    body.appendChild(el('div','repeat-adjusted-badge',{textContent:'📅 휴일이라 다음 영업일로'}));
   }
   if(!isSub&&Array.isArray(task.subs)&&task.subs.length){
-    const subDone=task.subs.filter(s=>s&&s.checked).length;
+    const subChecked=s=>isRepeatInst?isRepeatChecked(s,instanceDk):(s&&s.checked);
+    const subDone=task.subs.filter(s=>s&&subChecked(s)).length;
     const subPct=Math.round(subDone/task.subs.length*100);
     const pbWrap=el('div','subprog');
     pbWrap.appendChild(el('span','checklist-badge',{textContent:`✓ ${subDone}/${task.subs.length}`}));
@@ -1735,7 +1782,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     bar.appendChild(fill); pbWrap.appendChild(bar);
     body.appendChild(pbWrap);
     const sl=el('div','subtask-list');
-    task.subs.forEach(s=>sl.appendChild(buildTaskItem(isRepeatInst?originDk:dk,s,true,task.id,false,null,null)));
+    task.subs.forEach(s=>sl.appendChild(buildTaskItem(isRepeatInst?originDk:dk,s,true,task.id,isRepeatInst,originDk,instanceDk)));
     body.appendChild(sl);
   }
   if(!isSub){
