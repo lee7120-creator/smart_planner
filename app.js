@@ -86,6 +86,8 @@ function isRestDay(date) {
   const day = date.getDay();
   return day === 0 || day === 6 || isHoliday(dateKey(date)) || !!offDays[dateKey(date)];
 }
+// 공휴일/수동휴무만(주말 제외) — 주간/격주는 지정 요일이 의도된 선택이라 주말엔 안 밀고 '휴일'에만 민다
+function isHolidayShift(date) { const dk = dateKey(date); return isHoliday(dk) || !!offDays[dk]; }
 // 휴일이면 직전 평일로 이동
 function prevWorkday(date) {
   let d = new Date(date);
@@ -111,8 +113,10 @@ function adjustedMonthlyDate(year, month, originDay) {
 // 날짜지정형 반복(주/매월/N째주)의 원본일이 휴일이면 '다음 영업일'로 밀려 표시되므로,
 // 원본 날짜(저장 위치)에는 표시하지 않음(중복 방지). 격주·첫/말영업일은 원본일이 발생일이 아니라 제외.
 function isDisplacedRecurringOrigin(t, dk) {
-  if (!t || !['monthly','monthlyNth'].includes(t.repeat)) return false;
-  return isRestDay(parseDk(dk));
+  if (!t) return false;
+  if (t.repeat === 'monthly' || t.repeat === 'monthlyNth') return isRestDay(parseDk(dk));
+  if (t.repeat === 'weekly') return isHolidayShift(parseDk(dk)); // 주간 원본이 공휴일/휴무일이면 다음 영업일로
+  return false;
 }
 // 해당 날짜에 '저장된' 태스크 중 화면에 보일 것 (휴일로 밀린 반복 원본 제외)
 function visibleStored(dk) {
@@ -471,9 +475,20 @@ function getRepeatTasksForDate(date, dayIdx) {
         if (dk > oDk && !dateIsRest) out.push({task:t, originDk:oDk, instanceDk:dk}); // 영업일에만
         return;
       }
-      // 주간/격주: 지정 요일이 의도된 선택 → 휴일 보정 없이 자연 발생대로 표시
+      // 주간/격주: 지정 요일은 의도된 선택 → 주말엔 그대로, '공휴일/수동휴무'에 걸리면 다음 영업일로 이동
       if (t.repeat==='weekly' || t.repeat==='biweekly') {
-        if (dk > oDk && repeatNaturalOccurs(t, originDate, date)) out.push({task:t, originDk:oDk, instanceDk:dk});
+        if (dk <= oDk) return; // 원본일은 저장(원본)으로 표시
+        // 1) 자연 발생일이고 공휴일/휴무일이 아니면 그대로(주말이어도) 표시
+        if (repeatNaturalOccurs(t, originDate, date) && !isHolidayShift(date)) { out.push({task:t, originDk:oDk, instanceDk:dk}); return; }
+        // 2) 공휴일/휴무일에 걸린 자연 발생일 → 다음 영업일로 1회 밀어 표시
+        if (!isRestDay(date)) {
+          const probe = new Date(date);
+          for (let k=0; k<14; k++) {
+            probe.setDate(probe.getDate()-1);
+            if (!isRestDay(probe)) break;
+            if (isHolidayShift(probe) && dateKey(probe) >= oDk && repeatNaturalOccurs(t, originDate, probe)) { out.push({task:t, originDk:oDk, instanceDk:dk, adjusted:true}); break; }
+          }
+        }
         return;
       }
       // 매월/매월N째/첫·말영업일: 날짜 기준 → 휴일이면 다음 영업일로 밀어 표시
@@ -1169,9 +1184,9 @@ function scheduleMemoSave(){
   const size=document.getElementById('mtSize');
   if(size) size.onchange=()=>{ if(size.value) memoWrapStyle('fontSize', size.value); size.selectedIndex=0; };
   const fore=document.getElementById('mtFore');
-  if(fore){ fore.onmousedown=e=>e.stopPropagation(); fore.onchange=()=>memoExec('foreColor', fore.value); }
+  if(fore){ fore.onmousedown=e=>e.stopPropagation(); fore.onchange=()=>memoWrapStyle('color', fore.value); }
   const back=document.getElementById('mtBack');
-  if(back){ back.onmousedown=e=>e.stopPropagation(); back.onchange=()=>{ try{document.execCommand('styleWithCSS',false,true);}catch(e){} if(!document.execCommand('hiliteColor',false,back.value)) document.execCommand('backColor',false,back.value); scheduleMemoSave(); }; }
+  if(back){ back.onmousedown=e=>e.stopPropagation(); back.onchange=()=>memoWrapStyle('backgroundColor', back.value); }
 })();
 
 // ── 메모 버전 히스토리 (최근 5개) ──
@@ -2411,8 +2426,8 @@ function buildTimelineView(){
 
 // ── Search ──
 let tagFilter = null;
-let attrFilter = { incomplete:false, starred:false, prio:null, memo:false };
-function attrFilterActive(){ return attrFilter.incomplete||attrFilter.starred||attrFilter.memo||!!attrFilter.prio; }
+let attrFilter = { incomplete:false, starred:false, prio:null, memo:false, timed:false, repeat:false, done:false, color:null };
+function attrFilterActive(){ return attrFilter.incomplete||attrFilter.starred||attrFilter.memo||!!attrFilter.prio||attrFilter.timed||attrFilter.repeat||attrFilter.done||!!attrFilter.color; }
 function allTaskTags(){
   const set = new Set();
   Object.values(tasks).forEach(list => Array.isArray(list) && list.forEach(t => {
@@ -2427,6 +2442,10 @@ function matchesQuery(t){
   if(attrFilter.prio && t.priority!==attrFilter.prio) return false;
   if(attrFilter.memo && !((t.memo&&t.memo.trim())||(Array.isArray(t.memoImages)&&t.memoImages.length))) return false;
   if(attrFilter.incomplete && t.checked) return false;
+  if(attrFilter.done && !t.checked) return false;
+  if(attrFilter.timed && !t.time) return false;
+  if(attrFilter.repeat && !(t.repeat && t.repeat!=='none')) return false;
+  if(attrFilter.color && t.color!==attrFilter.color) return false;
   if(!searchQuery) return true;
   const q=searchQuery.toLowerCase();
   return (t.text&&t.text.toLowerCase().includes(q))||(t.memo&&t.memo.toLowerCase().includes(q))||(Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q)));
@@ -2444,9 +2463,20 @@ function buildTagFilterBar(){
   };
   bar.appendChild(el('span','',{textContent:'필터',style:'font-size:11px;color:var(--text3)'}));
   toggle('incomplete','◻ 미완료');
+  toggle('done','✅ 완료');
   toggle('starred','★ 중요');
-  toggle('memo','📝 메모');
   toggle('prio','🔴 높음','high');
+  toggle('timed','⏰ 시간');
+  toggle('repeat','🔁 반복');
+  toggle('memo','📝 메모');
+  // 색상별 필터 (색 점)
+  (typeof COLORS!=='undefined'?COLORS:[]).forEach(c=>{
+    const on=attrFilter.color===c.hex;
+    const dot=el('button',`tag-filter-chip color-filter-chip${on?' active':''}`,{title:'색: '+c.name});
+    dot.innerHTML=`<span class="cf-dot" style="background:${c.hex}"></span>`;
+    dot.onclick=()=>{ attrFilter.color=on?null:c.hex; render(); };
+    bar.appendChild(dot);
+  });
   if(attrFilterActive()){
     const clr=el('button','tag-filter-chip attr-clear',{textContent:'✕ 해제'});
     clr.onclick=()=>{ attrFilter={incomplete:false,starred:false,prio:null,memo:false}; render(); };
@@ -3878,13 +3908,13 @@ function buildNoteToolbar(editor, m) {
   const foreLab = el('label', 'nt-color', { title: '글자색' });
   foreLab.innerHTML = '<span style="color:#1a73e8;font-weight:800">A</span>';
   const fore = el('input', null, { type: 'color', value: '#1a73e8' });
-  fore.onchange = () => exec('foreColor', fore.value);
+  fore.onchange = () => wrap('color', fore.value);
   foreLab.appendChild(fore); tb.appendChild(foreLab);
   const bgLab = el('label', 'nt-color', { title: '배경색(형광펜)' });
   bgLab.innerHTML = '<span style="background:#fff59d;border-radius:3px;padding:0 3px">H</span>';
   const bg = el('input', null, { type: 'color', value: '#fff59d' });
   bg.onmousedown = e => e.stopPropagation();
-  bg.onchange = () => { editor.focus(); try { document.execCommand('styleWithCSS', false, true); } catch (e) {} if (!document.execCommand('hiliteColor', false, bg.value)) document.execCommand('backColor', false, bg.value); save(); };
+  bg.onchange = () => wrap('backgroundColor', bg.value);
   bgLab.appendChild(bg); tb.appendChild(bgLab);
   return tb;
 }
