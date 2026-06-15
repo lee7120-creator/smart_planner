@@ -2,7 +2,7 @@
 const CACHE = 'myplanner';
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './styles.css', './app.js', './icon.svg', './manifest.webmanifest'])));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './styles.css', './app.js', './icon.svg', './icon-192.png', './icon-512.png', './icon-512-maskable.png', './manifest.webmanifest'])));
   self.skipWaiting();
 });
 
