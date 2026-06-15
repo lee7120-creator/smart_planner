@@ -776,6 +776,20 @@ function reorderTask(dk,dragId,targetId){
   list.splice(to,0,moved);
   saveTasks(dk);render();
 }
+// 하위 항목 순서 변경 (같은 부모 내에서)
+function reorderSub(dk,parentId,dragId,targetId){
+  if(READ_ONLY)return;
+  const parent=(tasks[dk]||[]).find(t=>t.id===parentId);
+  if(!parent||!Array.isArray(parent.subs))return;
+  const list=parent.subs;
+  const from=list.findIndex(s=>s.id===dragId);
+  if(from<0)return;
+  const [moved]=list.splice(from,1);
+  const to=list.findIndex(s=>s.id===targetId);
+  if(to<0){list.splice(from,0,moved);return;}
+  list.splice(to,0,moved);
+  saveTasks(dk);render();
+}
 
 // ── Quick input time parsing (예: "8시 회의"→08:00, "6시 보고"→18:00, "오후 2시반"→14:30) ──
 // 업무시간(8시~19시) 휴리스틱: 8~12시는 오전, 1~7시는 오후로 해석
@@ -1622,7 +1636,7 @@ function renderMemoImages(task){
   const ids=Array.isArray(task&&task.memoImages)?task.memoImages:[];
   wrap.style.display=ids.length?'flex':'none';
   ids.forEach(id=>{
-    const thumb=el('div','memo-img-thumb');
+    const thumb=el('div','memo-img-thumb'); thumb.draggable=false;
     const delBtn=el('button','memo-img-del',{textContent:'✕',title:'이미지 삭제'});
     delBtn.onclick=e=>{
       e.stopPropagation();
@@ -1637,7 +1651,7 @@ function renderMemoImages(task){
     idbGetImage(id).then(blob=>{
       if(blob){
         const url=URL.createObjectURL(blob);
-        const img=el('img',null,{src:url});
+        const img=el('img',null,{src:url}); img.draggable=false;
         thumb.insertBefore(img,delBtn);
         thumb.onclick=()=>{
           document.getElementById('imgLightboxImg').src=url;
@@ -1665,6 +1679,19 @@ document.getElementById('memoEditable').addEventListener('paste',e=>{
   const text=cd.getData('text/plain');
   if(text) document.execCommand('insertText', false, text);
 });
+// 편집영역 내 이미지 드래그로 인한 인라인 복사 버그 방지
+(()=>{
+  const med=document.getElementById('memoEditable');
+  med.addEventListener('dragstart',e=>{ if(e.target&&e.target.tagName==='IMG') e.preventDefault(); });
+  med.addEventListener('drop',e=>{
+    const dt=e.dataTransfer; if(!dt) return;
+    const files=[...(dt.files||[])].filter(f=>f.type.startsWith('image/'));
+    if(files.length){ e.preventDefault(); e.stopPropagation(); files.forEach(attachMemoImage); return; }
+    // 이미지/HTML 인라인 드롭 차단(복사본 생성 방지) — 일반 텍스트만 허용
+    const types=[...(dt.types||[])];
+    if(types.includes('Files')||types.some(t=>t.startsWith('image')||t==='text/html')) e.preventDefault();
+  });
+})();
 document.getElementById('imgLightbox').onclick=()=>{
   document.getElementById('imgLightbox').classList.add('hidden');
   document.getElementById('imgLightboxImg').src='';
@@ -1787,6 +1814,27 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       updateBulkBar();
     };
     item.onclick = toggleSel;
+  }
+  if(isSub&&!READ_ONLY&&!selectMode){
+    item.draggable=true;
+    item.ondragstart=e=>{
+      e.stopPropagation();
+      e.dataTransfer.setData('application/json',JSON.stringify({sub:true,dk:dk,parentId:parentId,id:task.id}));
+      e.dataTransfer.effectAllowed='move';
+      item.classList.add('dragging');
+    };
+    item.ondragend=e=>{ e.stopPropagation(); item.classList.remove('dragging'); };
+    item.ondragover=e=>{e.preventDefault();e.stopPropagation();item.classList.add('drag-target');};
+    item.ondragleave=()=>item.classList.remove('drag-target');
+    item.ondrop=e=>{
+      e.preventDefault();e.stopPropagation();
+      item.classList.remove('drag-target');
+      try{
+        const data=JSON.parse(e.dataTransfer.getData('application/json'));
+        if(!data||!data.sub||data.id===task.id||data.parentId!==parentId)return;
+        reorderSub(dk,parentId,data.id,task.id);
+      }catch(err){}
+    };
   }
   if(!isSub&&!READ_ONLY&&!selectMode){
     item.draggable=true;

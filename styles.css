@@ -954,10 +954,12 @@
     .memo-overlay.hidden { display:none; }
     .memo-popup {
       position:fixed; width:330px; max-width:calc(100vw - 32px);
+      display:flex; flex-direction:column;
       background:var(--surface); border:1px solid var(--border);
-      border-radius:16px; overflow:hidden; pointer-events:auto;
+      border-radius:16px 16px 4px 16px; overflow:hidden; pointer-events:auto;
       box-shadow:0 16px 48px rgba(0,0,0,.22), 0 3px 12px rgba(0,0,0,.10);
       animation:memoIn .15s ease; z-index:451;
+      resize:both; min-width:280px; min-height:240px; max-height:calc(100vh - 24px);
     }
     .memo-popup::before { content:''; display:block; height:3px;
       background:linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24); }
@@ -1007,7 +1009,7 @@
     .mt-color input[type=color] { position:absolute; inset:0; opacity:0; cursor:pointer; border:none; padding:0; }
     /* WYSIWYG 편집 영역 */
     .memo-editable {
-      width:100%; min-height:150px; max-height:340px; overflow-y:auto;
+      width:100%; flex:1 1 auto; min-height:90px; max-height:none; overflow-y:auto;
       outline:none; padding:13px 14px; font-size:13px;
       font-family:inherit; line-height:1.65; background:transparent; color:var(--text); word-break:break-word;
     }
@@ -1109,7 +1111,7 @@
         position:fixed !important; bottom:0 !important; top:auto !important;
         left:0 !important; right:0 !important; width:100% !important;
         border-radius:18px 18px 0 0; transform:none !important;
-        animation:memoUp .2s ease;
+        animation:memoUp .2s ease; resize:none; max-height:85vh;
         padding-bottom:env(safe-area-inset-bottom);
       }
       @keyframes memoUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
