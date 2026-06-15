@@ -11,6 +11,14 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// 백그라운드 푸시 수신 → 알림 표시 (앱이 닫혀 있어도 동작)
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: '🗓 마이플래너', body: e.data ? e.data.text() : '' }; }
+  const title = d.title || '🗓 마이플래너';
+  const opts = { body: d.body || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: d.tag || undefined, data: d.data || {}, renotify: !!d.tag };
+  e.waitUntil(self.registration.showNotification(title, opts));
+});
 // 알림 클릭 → 열린 앱 포커스(없으면 새 창)
 self.addEventListener('notificationclick', e => {
   e.notification.close();

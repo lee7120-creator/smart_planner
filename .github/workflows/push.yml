@@ -1,0 +1,32 @@
+name: 백그라운드 푸시 발송
+
+# 약 5분마다 실행 (GitHub Actions cron은 정확하지 않고 수 분 지연될 수 있음)
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}   # 수동 실행 버튼
+
+# 동시에 두 번 돌지 않도록
+concurrency:
+  group: push-sender
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        working-directory: push-sender
+        run: npm install --omit=dev --no-audit --no-fund
+      - name: Send pushes
+        working-directory: push-sender
+        env:
+          DB_URL: https://my-calendar-1a589-default-rtdb.firebaseio.com
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+        run: node send.js
