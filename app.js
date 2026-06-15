@@ -949,15 +949,64 @@ function moveTask(fromDk, taskId, toDk, silent){
     showUndoToast(`"${task.text.slice(0,16)}" → ${d.getMonth()+1}/${d.getDate()} 이동됨`,()=>moveTask(toDk,taskId,fromDk,true));
   }
 }
+// 반복 일정의 '이 회차만' 이동: 해당 회차는 건너뛰고, 대상일에 단발 복사본 생성
+function moveRepeatInstanceOne(originDk, taskId, instanceDk, toDk){
+  if(READ_ONLY)return;
+  const t=(tasks[originDk]||[]).find(x=>x.id===taskId);
+  if(!t)return;
+  if(!t.skips) t.skips={};
+  t.skips[instanceDk]=true;
+  const copy={
+    id: uid(), text: t.text, color: t.color||null, starred: !!t.starred,
+    repeat:'none', repeatEnd:null, priority: t.priority||null, time: t.time||null, duration: t.duration||null,
+    checked:false, completions:{}, skips:{},
+    subs:(Array.isArray(t.subs)?t.subs:[]).map(s=>({id:uid(),text:s.text,checked:false,starred:false,color:s.color||null,subs:[]})),
+    memo:'', memoImages:[], memoHistory:[], comments:[], movedFromRepeat:{originDk,taskId,instanceDk}
+  };
+  if(!tasks[toDk]) tasks[toDk]=[];
+  tasks[toDk].push(copy);
+  saveTasks(originDk); saveTasks(toDk); render();
+  const d=parseDk(toDk);
+  showUndoToast(`이 회차만 ${d.getMonth()+1}/${d.getDate()}로 이동했어요`,()=>{
+    const tt=(tasks[originDk]||[]).find(x=>x.id===taskId);
+    if(tt&&tt.skips) delete tt.skips[instanceDk];
+    if(tasks[toDk]) tasks[toDk]=tasks[toDk].filter(x=>x.id!==copy.id);
+    if(tasks[toDk]&&!tasks[toDk].length) delete tasks[toDk];
+    saveTasks(originDk); saveTasks(toDk); render();
+  });
+}
+// 반복 일정 이동 범위 묻기: 'one'(이 회차만) / 'all'(전체 시작일 변경) / null(취소)
+function askRepeatMoveScope(cb){
+  const ov=el('div','modal-overlay'); const box=el('div','modal-box'); box.style.maxWidth='320px';
+  box.appendChild(el('div','modal-title',{textContent:'🔄 반복 일정 이동'}));
+  box.appendChild(el('div','',{textContent:'이 회차만 옮길까요, 반복 전체를 옮길까요?',style:'font-size:13px;color:var(--text2);margin-bottom:12px'}));
+  const mk=(label,sub,fn,primary)=>{ const b=el('button',primary?'btn-primary':'btn-secondary',{type:'button'}); b.style.cssText='width:100%;margin-bottom:8px;text-align:left;padding:10px 12px'; b.appendChild(el('div','',{textContent:label,style:'font-weight:600'})); b.appendChild(el('div','',{textContent:sub,style:'font-size:11px;opacity:.8;margin-top:2px'})); b.onclick=()=>{ov.remove();fn();}; return b; };
+  box.appendChild(mk('이 회차만 이동','선택한 날짜에 단발 일정으로 (반복은 유지)',()=>cb('one'),true));
+  box.appendChild(mk('반복 전체 이동','반복 시작일을 바꿔 전체가 이동',()=>cb('all')));
+  const c=el('button','btn-secondary',{type:'button',textContent:'취소'}); c.style.cssText='width:100%;margin-top:4px'; c.onclick=()=>{ov.remove();cb(null);}; box.appendChild(c);
+  ov.appendChild(box); document.body.appendChild(ov); ov.onclick=e=>{ if(e.target===ov){ov.remove();cb(null);} };
+}
 
 let activeMovePopup=null;
 function closeMovePopup(){ if(activeMovePopup){activeMovePopup.remove();activeMovePopup=null;} }
 
-function openMovePopup(anchor, fromDk, taskId){
+function openMovePopup(anchor, fromDk, taskId, repCtx){
   closeMovePopup();
   const popup=el('div','move-popup');
   const base=new Date(fromDk); base.setHours(0,0,0,0);
   const tod=today();
+  // 이동 확정 — 반복 인스턴스면 '이 회차만/전체'를 물어본 뒤 실행
+  const commit=(toDk)=>{
+    closeMovePopup();
+    if(repCtx&&repCtx.isRepeatInst){
+      askRepeatMoveScope(scope=>{
+        if(scope==='one') moveRepeatInstanceOne(repCtx.originDk, taskId, repCtx.instanceDk, toDk);
+        else if(scope==='all') moveTask(repCtx.originDk, taskId, toDk);
+      });
+    } else {
+      moveTask(fromDk, taskId, toDk);
+    }
+  };
 
   const opts=[
     {label:'내일',       icon:'☀️', date: (()=>{const d=new Date(tod);d.setDate(d.getDate()+1);return d;})()},
@@ -970,7 +1019,7 @@ function openMovePopup(anchor, fromDk, taskId){
     if(toDk===fromDk) return;
     const btn=el('button','move-opt');
     btn.innerHTML=`<span>${opt.icon}</span><span>${opt.label}</span><span class="move-opt-date">${opt.date.getMonth()+1}/${opt.date.getDate()}</span>`;
-    btn.onclick=e=>{e.stopPropagation();closeMovePopup();moveTask(fromDk,taskId,toDk);};
+    btn.onclick=e=>{e.stopPropagation();commit(toDk);};
     popup.appendChild(btn);
   });
 
@@ -982,8 +1031,7 @@ function openMovePopup(anchor, fromDk, taskId){
   inp.min=dateKey(new Date(tod.getTime()+86400000));
   inp.onchange=e=>{
     if(!inp.value) return;
-    closeMovePopup();
-    moveTask(fromDk,taskId,inp.value);
+    commit(inp.value);
   };
   pickBtn.appendChild(el('span',null,{textContent:'🗓'}));
   pickBtn.appendChild(el('span',null,{textContent:'날짜 선택'}));
@@ -1743,7 +1791,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   if(!isSub&&!READ_ONLY&&!selectMode){
     item.draggable=true;
     item.ondragstart=e=>{
-      e.dataTransfer.setData('application/json',JSON.stringify({dk:isRepeatInst?originDk:dk,id:task.id,isRepeat:!!isRepeatInst}));
+      e.dataTransfer.setData('application/json',JSON.stringify({dk:isRepeatInst?originDk:dk,id:task.id,isRepeat:!!isRepeatInst,instanceDk:isRepeatInst?instanceDk:null}));
       e.dataTransfer.effectAllowed='move';
       item.classList.add('dragging');
     };
@@ -1758,10 +1806,13 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
           const data=JSON.parse(e.dataTransfer.getData('application/json'));
           if(!data||!data.id||data.id===task.id)return;
           if(data.dk===dk&&!data.isRepeat){reorderTask(dk,data.id,task.id);}
-          else{
-            if(data.isRepeat&&!confirm('반복 일정 전체의 시작일을 변경합니다. 계속할까요?'))return;
-            moveTask(data.dk,data.id,dk);
+          else if(data.isRepeat){
+            askRepeatMoveScope(scope=>{
+              if(scope==='one') moveRepeatInstanceOne(data.dk, data.id, data.instanceDk, dk);
+              else if(scope==='all') moveTask(data.dk, data.id, dk);
+            });
           }
+          else{ moveTask(data.dk,data.id,dk); }
         }catch(err){}
       };
     }
@@ -1914,9 +1965,8 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   };
   trayItem('🍅','포모도로 시작',null,()=>startPomodoroForTask(task.text));
   trayItem('✏️','수정',null,()=>openEdit(dk,task,isRepeatInst,originDk));
-  trayItem('📅',isRepeatInst?'반복 시작일 변경':'다른 날짜로 이동',null,()=>{
-    if(isRepeatInst&&!confirm('반복 일정 전체의 시작일을 변경합니다. 계속할까요?'))return;
-    openMovePopup(actionsWrap,isRepeatInst?originDk:dk,task.id);
+  trayItem('📅','다른 날짜로 이동',null,()=>{
+    openMovePopup(actionsWrap, dk, task.id, isRepeatInst?{isRepeatInst:true, originDk, instanceDk}:null);
   });
   if(!isRepeatInst) trayItem('⏭','다음 영업일로 미루기',null,()=>postponeTask(dk,task.id));
   trayItem('💬','댓글',null,()=>openComments(dk,task.id,isRepeatInst,originDk));
@@ -2059,8 +2109,12 @@ function buildDayCol(date,dayIdx){
     try{
       const data=JSON.parse(e.dataTransfer.getData('application/json'));
       if(!data||!data.dk||!data.id||data.dk===dk) return;
-      if(data.isRepeat&&!confirm('반복 일정 전체의 시작일을 변경합니다. 계속할까요?'))return;
-      moveTask(data.dk,data.id,dk);
+      if(data.isRepeat){
+        askRepeatMoveScope(scope=>{
+          if(scope==='one') moveRepeatInstanceOne(data.dk, data.id, data.instanceDk, dk);
+          else if(scope==='all') moveTask(data.dk, data.id, dk);
+        });
+      } else { moveTask(data.dk,data.id,dk); }
     }catch(err){}
   };
   // header
