@@ -6070,11 +6070,25 @@ function collectAllData() {
     icsSubs: (typeof icsSubs !== 'undefined' ? icsSubs : []),
     templates: JSON.parse(localStorage.getItem(TPL_KEY) || '[]'),
     trash: JSON.parse(localStorage.getItem(TRASH_KEY) || '[]'),
+    teamSubs: (typeof teamSubs !== 'undefined' ? teamSubs : {}),
+    myTeams: (typeof myTeams !== 'undefined' ? myTeams : {}),
   };
 }
-function exportAllData() {
+function _collectImageIds() {
+  const ids = new Set();
+  Object.values(tasks || {}).forEach(list => { if (Array.isArray(list)) list.forEach(t => { if (t && Array.isArray(t.memoImages)) t.memoImages.forEach(id => ids.add(id)); }); });
+  return [...ids];
+}
+function _blobToDataURL(blob) { return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(blob); }); }
+function _dataURLToBlob(d) { try { const [h, b] = String(d).split(','); const mime = (h.match(/:(.*?);/) || [])[1] || 'image/png'; const bin = atob(b); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime }); } catch (e) { return null; } }
+async function exportAllData() {
   try {
-    const blob = new Blob([JSON.stringify(collectAllData(), null, 2)], { type: 'application/json' });
+    const data = collectAllData();
+    // 메모 이미지(IndexedDB)도 base64로 포함 → 완전 백업
+    const images = {};
+    for (const id of _collectImageIds()) { try { const blob = await idbGetImage(id); if (blob) { const d = await _blobToDataURL(blob); if (d) images[id] = d; } } catch (e) {} }
+    data.images = images;
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -6105,8 +6119,14 @@ function importAllData(file) {
     if (data.icsSubs && typeof icsSubs !== 'undefined') { icsSubs = data.icsSubs; saveIcsSubs(); }
     if (data.templates) saveTpls(data.templates);
     if (data.trash) saveTrash(data.trash);
+    if (data.teamSubs && typeof teamSubs !== 'undefined') { teamSubs = data.teamSubs; saveTeamSubs(); }
+    if (data.myTeams && typeof myTeams !== 'undefined') { myTeams = data.myTeams; saveMyTeams(); }
+    // 메모 이미지 복원(IndexedDB)
+    if (data.images && typeof data.images === 'object') {
+      Object.entries(data.images).forEach(([id, d]) => { const b = _dataURLToBlob(d); if (b) idbPutImage(id, b); });
+    }
     render();
-    alert('복원이 완료되었습니다.');
+    alert('복원이 완료되었습니다.' + (data.images ? ' (이미지 포함)' : ''));
   };
   reader.onerror = () => alert('파일을 읽지 못했습니다.');
   reader.readAsText(file);
