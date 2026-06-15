@@ -4391,6 +4391,36 @@ function exportNotesMd() {
 }
 
 // ── 🗺 캔버스 모드 (화이트보드: 자유 배치 + 부모-자식 연결선) ──
+// 마우스+터치 통합 드래그. 터치는 longPressMs>0이면 꾹 누른 뒤 시작(스크롤/팬과 구분), 0이면 즉시.
+function attachDrag(handle, opts){
+  const { onStart, onMove, onEnd, longPressMs=0, stopPropagation=false } = opts||{};
+  handle.addEventListener('pointerdown', e=>{
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    if(e.target.closest && e.target.closest('input,button,textarea,select,a')) return;
+    if(stopPropagation) e.stopPropagation();
+    const isTouch = e.pointerType==='touch';
+    const sx=e.clientX, sy=e.clientY;
+    let started=false, lp=null;
+    const begin=()=>{ if(started)return; started=true; clearTimeout(lp); if(onStart) onStart(e); };
+    const move=ev=>{
+      if(ev.pointerId!==e.pointerId) return;
+      if(!started){
+        if(isTouch){
+          if(longPressMs>0){ if(Math.hypot(ev.clientX-sx,ev.clientY-sy)>10) cleanup(); return; }
+          begin();
+        } else begin();
+      }
+      ev.preventDefault();
+      if(onMove) onMove(ev);
+    };
+    const end=ev=>{ if(ev.pointerId!==e.pointerId) return; const was=started; cleanup(); if(was&&onEnd) onEnd(ev); };
+    const cleanup=()=>{ clearTimeout(lp); document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',end); document.removeEventListener('pointercancel',end); };
+    document.addEventListener('pointermove',move);
+    document.addEventListener('pointerup',end);
+    document.addEventListener('pointercancel',end);
+    if(isTouch){ if(longPressMs>0) lp=setTimeout(begin,longPressMs); } else begin();
+  });
+}
 let canvasPan = {x: 0, y: 0};
 function ensureCanvasCoords() {
   let rootIdx = 0;
@@ -4443,23 +4473,18 @@ function renderCanvas() {
     if (preview) card.appendChild(el('div', 'canvas-card-preview', {textContent: preview}));
     const tags = extractTags(m);
     if (tags.length) card.appendChild(el('div', 'canvas-card-tags', {textContent: tags.map(t=>'#'+t).join(' ')}));
-    // 드래그 재배치
-    card.addEventListener('mousedown', e => {
-      e.preventDefault(); e.stopPropagation();
-      const sx = e.clientX, sy = e.clientY, ox = m.cx, oy = m.cy;
-      const mv = ev => {
-        m.cx = ox + ev.clientX - sx; m.cy = oy + ev.clientY - sy;
+    // 드래그 재배치 (PC: 즉시, 모바일: 꾹 눌러서)
+    let _csx, _csy, _cox, _coy;
+    attachDrag(card, {
+      longPressMs: 180, stopPropagation: true,
+      onStart: e => { _csx=e.clientX; _csy=e.clientY; _cox=m.cx; _coy=m.cy; card.classList.add('dragging'); },
+      onMove: ev => {
+        m.cx = _cox + ev.clientX - _csx; m.cy = _coy + ev.clientY - _csy;
         card.style.left = (m.cx + canvasPan.x) + 'px';
         card.style.top = (m.cy + canvasPan.y) + 'px';
         drawLines();
-      };
-      const up = () => {
-        document.removeEventListener('mousemove', mv);
-        document.removeEventListener('mouseup', up);
-        if (!READ_ONLY) saveMemos();
-      };
-      document.addEventListener('mousemove', mv);
-      document.addEventListener('mouseup', up);
+      },
+      onEnd: () => { card.classList.remove('dragging'); if (!READ_ONLY) saveMemos(); }
     });
     card.addEventListener('dblclick', e => {
       e.stopPropagation();
@@ -4474,15 +4499,13 @@ function renderCanvas() {
   if (!Object.keys(memos).length) {
     board.appendChild(el('div', 'canvas-empty', {textContent: '메모가 없습니다 — 캘린더 빈 곳을 더블클릭해 만들어보세요'}));
   }
-  // 배경 드래그로 팬
-  board.onmousedown = e => {
-    if (e.target !== board && e.target !== svg) return;
-    const sx = e.clientX, sy = e.clientY, ox = canvasPan.x, oy = canvasPan.y;
-    const mv = ev => { canvasPan.x = ox + ev.clientX - sx; canvasPan.y = oy + ev.clientY - sy; renderCanvas(); };
-    const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
-    document.addEventListener('mousemove', mv);
-    document.addEventListener('mouseup', up);
-  };
+  // 배경 드래그로 팬 (PC/모바일 즉시)
+  let _psx, _psy, _pox, _poy;
+  attachDrag(board, {
+    longPressMs: 0,
+    onStart: e => { _psx=e.clientX; _psy=e.clientY; _pox=canvasPan.x; _poy=canvasPan.y; },
+    onMove: ev => { canvasPan.x = _pox + ev.clientX - _psx; canvasPan.y = _poy + ev.clientY - _psy; renderCanvas(); }
+  });
 }
 
 // ── 📝 메모 보관함 메뉴 ──
