@@ -570,6 +570,13 @@ function nextWorkdayAfter(dk) {
   while (isRestDay(d) && guard++ < 366) d.setDate(d.getDate() + 1);
   return dateKey(d);
 }
+function prevWorkdayBefore(dk) {
+  const d = parseDk(dk);
+  d.setDate(d.getDate() - 1);
+  let guard = 0;
+  while (isRestDay(d) && guard++ < 366) d.setDate(d.getDate() - 1);
+  return dateKey(d);
+}
 function postponeTask(dk, id) {
   if (READ_ONLY) return;
   const list = tasks[dk]||[];
@@ -626,8 +633,8 @@ function carryOverFrom(fromDk, toDk) {
 
 // ── 휴무일 지정/해제 (지정 시 미완료 할 일을 다음 영업일로 자동 이동) ──
 // 휴무일 지정: 비반복 미완료 할 일을 다음 영업일로 이동(movedFrom 태그). 반복은 표시단에서 자동 이동.
-function applyOffDayMove(dk) {
-  const toDk = nextWorkdayAfter(dk);
+function applyOffDayMove(dk, dir) {
+  const toDk = (dir === 'prev') ? prevWorkdayBefore(dk) : nextWorkdayAfter(dk);
   const list = tasks[dk] || [];
   let moved = 0;
   for (let i = list.length - 1; i >= 0; i--) {
@@ -636,7 +643,7 @@ function applyOffDayMove(dk) {
       list.splice(i, 1);
       t.movedFrom = dk;
       if (!tasks[toDk]) tasks[toDk] = [];
-      tasks[toDk].unshift(t);
+      (dir === 'prev') ? tasks[toDk].push(t) : tasks[toDk].unshift(t);
       moved++;
     }
   }
@@ -674,14 +681,51 @@ function toggleOffDay(dk) {
       () => { offDays[dk] = true; applyOffDayMove(dk); saveOffDays(); saveTasks(); render(); });
     return;
   }
-  offDays[dk] = true;
-  const moved = applyOffDayMove(dk);
-  saveOffDays(); saveTasks(); render();
-  const toDk = nextWorkdayAfter(dk), d = parseDk(toDk);
-  showUndoToast(moved
-    ? `🏖 휴무일 지정 — 할 일 ${moved}개를 ${d.getMonth()+1}/${d.getDate()}(${DAY_NAMES[dateToDayIdx(toDk)]})로 이동했어요`
-    : '🏖 휴무일로 지정했어요',
-    () => { delete offDays[dk]; restoreMovedFrom(dk); saveOffDays(); saveTasks(); render(); });
+  // 지정 — 옮길 할 일(비반복·미완료)이 있으면 전/후 영업일 중 선택 팝업
+  const doSet = (dir) => {
+    offDays[dk] = true;
+    const moved = dir ? applyOffDayMove(dk, dir) : 0;
+    saveOffDays(); saveTasks(); render();
+    let msg = '🏖 휴무일로 지정했어요';
+    if (moved) {
+      const toDk = (dir === 'prev') ? prevWorkdayBefore(dk) : nextWorkdayAfter(dk), d = parseDk(toDk);
+      msg = `🏖 휴무일 지정 — 할 일 ${moved}개를 ${d.getMonth()+1}/${d.getDate()}(${DAY_NAMES[dateToDayIdx(toDk)]})로 이동했어요`;
+    }
+    showUndoToast(msg, () => { delete offDays[dk]; restoreMovedFrom(dk); saveOffDays(); saveTasks(); render(); });
+  };
+  const movable = (tasks[dk] || []).filter(t => t && !t.checked && (!t.repeat || t.repeat === 'none')).length;
+  if (movable > 0) {
+    askOffDayDirection(dk, movable, (choice) => { if (choice !== null) doSet(choice === 'none' ? null : choice); });
+  } else {
+    doSet(null);
+  }
+}
+// 휴무일 지정 시 할 일을 전/후 영업일 중 어디로 옮길지 묻는 팝업
+function askOffDayDirection(dk, count, cb) {
+  const d = parseDk(dk);
+  const prevDk = prevWorkdayBefore(dk), nextDk = nextWorkdayAfter(dk);
+  const pd = parseDk(prevDk), nd = parseDk(nextDk);
+  const ov = el('div', 'modal-overlay');
+  const box = el('div', 'modal-box'); box.style.maxWidth = '340px';
+  box.appendChild(el('div', 'modal-title', { textContent: '🏖 휴무일 지정' }));
+  box.appendChild(el('div', '', { textContent: `${d.getMonth()+1}/${d.getDate()}(${DAY_NAMES[dateToDayIdx(dk)]})에 옮길 할 일이 ${count}개 있어요. 어디로 옮길까요?`, style: 'font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.5' }));
+  const mk = (label, sub, fn, primary) => {
+    const b = el('button', primary ? 'btn-primary' : 'btn-secondary', { type: 'button' });
+    b.style.cssText = 'width:100%;margin-bottom:8px;text-align:left;padding:10px 12px';
+    b.appendChild(el('div', '', { textContent: label, style: 'font-weight:600' }));
+    b.appendChild(el('div', '', { textContent: sub, style: 'font-size:11px;opacity:.8;margin-top:2px' }));
+    b.onclick = () => { ov.remove(); fn(); };
+    return b;
+  };
+  box.appendChild(mk('⬅ 전 영업일로', `${pd.getMonth()+1}/${pd.getDate()}(${DAY_NAMES[dateToDayIdx(prevDk)]})`, () => cb('prev')));
+  box.appendChild(mk('➡ 다음 영업일로', `${nd.getMonth()+1}/${nd.getDate()}(${DAY_NAMES[dateToDayIdx(nextDk)]})`, () => cb('next'), true));
+  box.appendChild(mk('옮기지 않고 지정', '할 일은 그대로 두기', () => cb('none')));
+  const c = el('button', 'btn-secondary', { type: 'button', textContent: '취소' });
+  c.style.cssText = 'width:100%;margin-top:4px';
+  c.onclick = () => { ov.remove(); cb(null); };
+  box.appendChild(c);
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick = e => { if (e.target === ov) { ov.remove(); cb(null); } };
 }
 
 // ── Undo toast ──
