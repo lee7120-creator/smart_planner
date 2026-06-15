@@ -2137,8 +2137,69 @@ function buildWeatherBar(dk){
     info.appendChild(el('div','weather-desc',{textContent:w.desc}));
     if(w.rain>0)info.appendChild(el('div','weather-rain',{textContent:`💧 ${w.rain}%`}));
     bar.appendChild(info);
+    bar.style.cursor='pointer'; bar.title='상세 날씨 보기';
+    bar.onclick=()=>openWeatherDetail(dk);
   }
   return bar;
+}
+// 날씨 상세: 해당 날짜의 시간대별 기온/습도/강수 + 일출·일몰·자외선 (요청 시 시간별 데이터 fetch)
+const weatherHourlyCache={};
+function openWeatherDetail(dk){
+  const w=weatherByDate[dk];
+  const d=parseDk(dk);
+  const dayN=['일','월','화','수','목','금','토'][d.getDay()];
+  const ov=el('div','modal-overlay'); ov.id='weatherDetailOv';
+  const box=el('div','modal-box'); box.style.maxWidth='480px';
+  const head=el('div','wx-head');
+  head.appendChild(el('span','wx-emoji-lg',{textContent:(w&&w.emoji)||'🌡️'}));
+  const ht=el('div',null); ht.style.cssText='display:flex;flex-direction:column';
+  ht.appendChild(el('div','wx-date',{textContent:`${d.getMonth()+1}월 ${d.getDate()}일 (${dayN})`}));
+  ht.appendChild(el('div','wx-desc-sub',{textContent:(w&&w.desc)||''}));
+  head.appendChild(ht);
+  box.appendChild(head);
+  const body=el('div','wx-body'); body.appendChild(el('div','wx-loading',{textContent:'상세 날씨 불러오는 중…'}));
+  box.appendChild(body);
+  const close=el('button','btn-secondary',{type:'button',textContent:'닫기'}); close.style.cssText='width:100%;margin-top:12px'; close.onclick=()=>ov.remove();
+  box.appendChild(close);
+  ov.appendChild(box); document.body.appendChild(ov); ov.onclick=e=>{ if(e.target===ov)ov.remove(); };
+
+  const renderDetail=(data)=>{
+    body.innerHTML='';
+    const H=(data&&data.hourly)||{}; const times=H.time||[];
+    if(!times.length){ body.appendChild(el('div','wx-loading',{textContent:'이 날짜는 상세 예보가 없어요 (예보 범위 밖)'})); return; }
+    const avg=arr=>arr&&arr.length?Math.round(arr.reduce((a,b)=>a+(+b||0),0)/arr.length):null;
+    const chips=el('div','wx-chips');
+    const mkChip=(label,val)=>{ const c=el('div','wx-chip'); c.appendChild(el('div','wx-chip-v',{textContent:val})); c.appendChild(el('div','wx-chip-l',{textContent:label})); chips.appendChild(c); };
+    if(w) mkChip('최고/최저', `${w.max}° / ${w.min}°`);
+    const humAvg=avg(H.relativehumidity_2m); if(humAvg!=null) mkChip('평균 습도', `${humAvg}%`);
+    if(w&&w.rain!=null) mkChip('강수확률', `${w.rain}%`);
+    if(H.windspeed_10m&&H.windspeed_10m.length) mkChip('최대 바람', `${Math.round(Math.max(...H.windspeed_10m.map(x=>+x||0)))}km/h`);
+    const appAvg=avg(H.apparent_temperature); if(appAvg!=null) mkChip('평균 체감', `${appAvg}°`);
+    const D=(data&&data.daily)||{};
+    if(D.sunrise&&D.sunrise[0]) mkChip('일출', D.sunrise[0].slice(11,16));
+    if(D.sunset&&D.sunset[0]) mkChip('일몰', D.sunset[0].slice(11,16));
+    if(D.uv_index_max&&D.uv_index_max[0]!=null) mkChip('자외선 지수', String(Math.round(D.uv_index_max[0])));
+    body.appendChild(chips);
+    body.appendChild(el('div','wx-sec-title',{textContent:'⏱ 시간대별'}));
+    const strip=el('div','wx-hourly');
+    times.forEach((t,i)=>{
+      const hr=+t.slice(11,13);
+      const cell=el('div','wx-hr');
+      cell.appendChild(el('div','wx-hr-t',{textContent:hr+'시'}));
+      cell.appendChild(el('div','wx-hr-e',{textContent:WMO[(H.weathercode&&H.weathercode[i])||0]||'🌡️'}));
+      cell.appendChild(el('div','wx-hr-temp',{textContent:Math.round(+H.temperature_2m[i])+'°'}));
+      if(H.relativehumidity_2m) cell.appendChild(el('div','wx-hr-hum',{textContent:'💧'+Math.round(+H.relativehumidity_2m[i])+'%'}));
+      const pp=H.precipitation_probability&&H.precipitation_probability[i];
+      if(pp>0) cell.appendChild(el('div','wx-hr-rain',{textContent:'☔'+pp+'%'}));
+      strip.appendChild(cell);
+    });
+    body.appendChild(strip);
+  };
+
+  if(weatherHourlyCache[dk]){ renderDetail(weatherHourlyCache[dk]); return; }
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${weatherLoc.lat}&longitude=${weatherLoc.lon}&hourly=temperature_2m,relativehumidity_2m,apparent_temperature,precipitation_probability,weathercode,windspeed_10m&daily=sunrise,sunset,uv_index_max&timezone=auto&start_date=${dk}&end_date=${dk}`;
+  fetch(url).then(r=>r.ok?r.json():Promise.reject()).then(j=>{ weatherHourlyCache[dk]=j; renderDetail(j); })
+    .catch(()=>{ body.innerHTML=''; body.appendChild(el('div','wx-loading',{textContent:'상세 날씨를 불러오지 못했어요'})); });
 }
 
 // ── Day column ──

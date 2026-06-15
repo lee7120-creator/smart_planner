@@ -519,7 +519,27 @@
       background:linear-gradient(to bottom, var(--surface), var(--surface2));
       min-height:46px;
     }
+    .weather-bar:hover { filter:brightness(1.03); }
     .weather-emoji { font-size:20px; }
+    /* 날씨 상세 모달 */
+    .wx-head { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+    .wx-emoji-lg { font-size:40px; line-height:1; }
+    .wx-date { font-size:16px; font-weight:700; color:var(--text); }
+    .wx-desc-sub { font-size:13px; color:var(--text2); }
+    .wx-body { min-height:60px; }
+    .wx-loading { font-size:13px; color:var(--text3); text-align:center; padding:18px 0; }
+    .wx-chips { display:grid; grid-template-columns:repeat(auto-fit,minmax(78px,1fr)); gap:8px; margin-bottom:14px; }
+    .wx-chip { background:var(--surface2); border:1px solid var(--border2); border-radius:10px; padding:8px 6px; text-align:center; }
+    .wx-chip-v { font-size:15px; font-weight:700; color:var(--text); }
+    .wx-chip-l { font-size:10px; color:var(--text3); margin-top:2px; }
+    .wx-sec-title { font-size:13px; font-weight:700; color:var(--text2); margin:4px 0 8px; }
+    .wx-hourly { display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; }
+    .wx-hr { flex:0 0 auto; width:54px; background:var(--surface2); border:1px solid var(--border2); border-radius:10px; padding:8px 4px; display:flex; flex-direction:column; align-items:center; gap:3px; }
+    .wx-hr-t { font-size:11px; color:var(--text3); }
+    .wx-hr-e { font-size:18px; line-height:1; }
+    .wx-hr-temp { font-size:14px; font-weight:700; color:var(--text); }
+    .wx-hr-hum { font-size:10px; color:var(--primary); }
+    .wx-hr-rain { font-size:10px; color:#1a73e8; }
     .weather-info { display:flex; flex-direction:column; align-items:center; gap:1px; }
     .weather-temp { font-size:12px; font-weight:600; }
     .weather-temp .hi { color:var(--red); }
