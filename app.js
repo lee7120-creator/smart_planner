@@ -2978,7 +2978,7 @@ function render(){
             if(d.getTime()===today().getTime()){todayIdx=i;break;}
           }
           const target=cols[todayIdx>=0?todayIdx:0];
-          if(target) target.scrollIntoView({behavior:'smooth',inline:'start',block:'nearest'});
+          if(target) target.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
         },80);
       }
     }

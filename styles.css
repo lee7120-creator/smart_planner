@@ -671,7 +671,7 @@
       }
       .header-title { font-size:15px; order:1; }
       .view-toggle { order:2; flex-wrap:wrap; }
-      .nav-group { order:3; flex:1; justify-content:flex-end; gap:4px; }
+      .nav-group { order:3; flex:1; justify-content:center; gap:4px; }
       .search-wrap { order:5; max-width:100%; flex:1 1 100%; }
       .header-actions { order:4; margin-left:0; gap:4px; }
       /* 기본 .user-chip(max-width:180px)가 소스 순서상 뒤에 와서 덮어쓰므로 명시도를 높여 모바일 캡 적용 */
@@ -685,12 +685,12 @@
       /* Week view: horizontal snap scroll (swipe between days) */
       .calendar-wrap { padding:10px 8px; overflow-x:scroll; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
       .calendar-wrap::-webkit-scrollbar { display:none; }
-      .calendar-grid { display:flex; gap:8px; min-width:unset; width:max-content; padding-bottom:2px; }
+      .calendar-grid { display:flex; gap:8px; min-width:unset; width:max-content; padding-bottom:2px; padding-inline:9vw; }
       .day-col {
         width:82vw; min-width:82vw; flex-shrink:0; min-height:480px;
-        scroll-snap-align:start;
+        scroll-snap-align:center;
       }
-      .weekend-col { width:82vw; min-width:82vw; flex-shrink:0; min-height:480px; display:flex; flex-direction:column; gap:8px; scroll-snap-align:start; }
+      .weekend-col { width:82vw; min-width:82vw; flex-shrink:0; min-height:480px; display:flex; flex-direction:column; gap:8px; scroll-snap-align:center; }
       .weekend-col > .day-col { width:auto; min-width:0; flex:1 1 0; min-height:0; scroll-snap-align:unset; }
 
       /* Task items: bigger touch targets */
@@ -761,6 +761,7 @@
 
     /* Very small screens (≤ 380px) */
     @media (max-width: 380px) {
+      .calendar-grid { padding-inline:5vw; }
       .day-col { width:90vw; min-width:90vw; }
       .weekend-col { width:90vw; min-width:90vw; }
       .view-btn { padding:4px 8px; font-size:11px; }
