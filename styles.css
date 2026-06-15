@@ -130,10 +130,11 @@
     .day-progress-fill { height:100%; background:var(--green); border-radius:2px; transition:width .3s; }
 
     /* ─── Tasks ─── */
-    .tasks-list { flex:1; padding:6px; overflow-y:auto; }
+    .tasks-list { flex:1; padding:6px; overflow-y:auto; text-align:left; }
     .task-item {
       display:flex; align-items:flex-start; gap:5px; padding:6px 6px;
       border-radius:8px; position:relative; transition:background .12s, box-shadow .12s;
+      text-align:left;
     }
     .task-item:hover { background:var(--surface2); box-shadow:0 1px 4px rgba(0,0,0,.05); }
     .task-item:hover .task-actions { opacity:1; }
