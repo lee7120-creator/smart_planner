@@ -1,0 +1,21 @@
+{
+  "//": "Firebase Realtime Database 보안 규칙 — 팀/사용자 목록(디렉터리) 조회가 안 되는 문제 해결용.",
+  "//2": "증상: 개인 일정 동기화(users/{id})는 되는데, 팀 캘린더 목록과 공유용 사용자 목록이 비어 보임.",
+  "//3": "원인: 기존 규칙이 users/* 만 허용하고 teamDirectory · userDirectory(최상위 경로) 읽기/쓰기를 막기 때문.",
+  "//4": "적용: Firebase 콘솔 → Realtime Database → 규칙(Rules) 탭에 아래 rules 객체를 붙여넣고 게시(Publish).",
+  "//5": "주의: 이 앱은 로그인이 없어 누구나 접근 가능한 공개 데이터 모델입니다(기존과 동일한 보안 수준). 민감정보를 넣지 마세요.",
+  "rules": {
+    "users": {
+      ".read": true,
+      ".write": true
+    },
+    "teamDirectory": {
+      ".read": true,
+      ".write": true
+    },
+    "userDirectory": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

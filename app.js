@@ -403,6 +403,7 @@ function initFirebaseSync() {
       }
     });
     // 3) 개인 트리 로드 후에 구독 팀 동기화 시작 (먼저 실행되면 복사본이 덮어쓰기로 사라질 수 있음)
+    if (typeof loadTeamDataFromFb === 'function') loadTeamDataFromFb();
     if (typeof syncSubscribedTeams === 'function') syncSubscribedTeams();
   }).catch(() => { setSyncStatus('offline'); if (typeof syncSubscribedTeams === 'function') syncSubscribedTeams(); });
 }
@@ -4700,13 +4701,26 @@ function registerUserDirectory(){
   ref.set({ name: USER_ID, ts: Date.now() }).catch(()=>{});
 }
 let _userDirCache = [];
+// 내가 따라보거나(shares) 보냈던 사용자 — 전역 디렉터리(userDirectory)가 규칙에 막혀도 목록에 표시
+function localKnownUsers(){
+  const set = new Set();
+  try { (JSON.parse(localStorage.getItem('calKnownUsers')||'[]')||[]).forEach(u=>set.add(u)); } catch(e){}
+  Object.keys(shares||{}).forEach(u=>set.add(u));
+  set.delete(sanitizeId(USER_ID));
+  return [...set].filter(Boolean);
+}
+function rememberUser(id){
+  const s = sanitizeId(id); if(!s || s===sanitizeId(USER_ID)) return;
+  try { const a=JSON.parse(localStorage.getItem('calKnownUsers')||'[]')||[]; if(!a.includes(s)){ a.push(s); localStorage.setItem('calKnownUsers', JSON.stringify(a)); } } catch(e){}
+}
 function fetchUserDirectory(cb){
-  if (!fbDb) { cb(_userDirCache); return; }
+  const merge = remote => [...new Set([...(remote||[]), ...localKnownUsers()])];
+  if (!fbDb) { cb(merge(_userDirCache)); return; }
   fbDb.ref('userDirectory').once('value').then(snap => {
     const v = snap.val() || {};
     _userDirCache = Object.keys(v).filter(id => id && id !== sanitizeId(USER_ID));
-    cb(_userDirCache);
-  }).catch(() => cb(_userDirCache));
+    cb(merge(_userDirCache));
+  }).catch(() => cb(merge(_userDirCache)));
 }
 
 // ── 태스크 보내기 모달 (검색·복수선택, 수락 필요) ──
@@ -4768,6 +4782,7 @@ function confirmSend(){
   if (typed && typed !== USER_ID && !sendSelected.includes(typed)) sendSelected.push(typed);
   const recipients = [...new Set(sendSelected.filter(id => id && id !== USER_ID))];
   if (!recipients.length) { showUndoToast('받는 사람을 선택하세요'); return; }
+  recipients.forEach(rememberUser);   // 보낸 사람 로컬 기억 → 다음에 목록에 표시
   const { dk, taskId } = sendCtx;
   const t = (tasks[dk] || []).find(x => x.id === taskId);
   if (!t) { closeSendModal(); return; }
@@ -5133,8 +5148,24 @@ let teamSubs = (()=>{ try{ return JSON.parse(localStorage.getItem(TEAM_SUBS_KEY)
 // 내가 들어가거나 만든 팀을 로컬에도 기억 → 피커에 항상 표시(원격 teamDirectory 규칙과 무관)
 const MY_TEAMS_KEY = `calMyTeams_${myPersonalId()||deviceId()}`;
 let myTeams = (()=>{ try{ return JSON.parse(localStorage.getItem(MY_TEAMS_KEY)||'{}')||{}; }catch{ return {}; } })();
-function rememberTeam(id, name){ const s=sanitizeId(id); if(!s) return; myTeams[s]={name:name||s, ts:Date.now()}; try{ localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(myTeams)); }catch(e){} }
-function forgetTeam(id){ const s=sanitizeId(id); if(myTeams[s]){ delete myTeams[s]; try{ localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(myTeams)); }catch(e){} } }
+function saveMyTeams(){
+  try{ localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(myTeams)); }catch(e){}
+  const me=sanitizeId(myPersonalId());
+  if(fbDb && me && me!=='demo') fbDb.ref(`users/${me}/myTeams`).set(Object.keys(myTeams).length?myTeams:null).catch(()=>{});
+}
+function rememberTeam(id, name){ const s=sanitizeId(id); if(!s) return; myTeams[s]={name:name||s, ts:Date.now()}; saveMyTeams(); }
+function forgetTeam(id){ const s=sanitizeId(id); if(myTeams[s]){ delete myTeams[s]; saveMyTeams(); } }
+// 시작 시 내 팀 구독/목록을 Firebase(users/{me})에서 복원·병합 — 기기/세션/컨텍스트 무관하게 유지
+function loadTeamDataFromFb(){
+  const me=sanitizeId(myPersonalId());
+  if(!fbDb || !me || me==='demo') return;
+  fbDb.ref(`users/${me}/teamSubs`).once('value').then(snap=>{
+    const v=snap.val(); if(v && typeof v==='object'){ Object.keys(v).forEach(id=>{ if(!teamSubs[id]) teamSubs[id]=v[id]; }); localStorage.setItem(TEAM_SUBS_KEY, JSON.stringify(teamSubs)); if(!IS_TEAM) syncSubscribedTeams(); }
+  }).catch(()=>{});
+  fbDb.ref(`users/${me}/myTeams`).once('value').then(snap=>{
+    const v=snap.val(); if(v && typeof v==='object'){ Object.keys(v).forEach(id=>{ if(!myTeams[id]) myTeams[id]=v[id]; }); localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(myTeams)); }
+  }).catch(()=>{});
+}
 const TEAM_COPIED_KEY = `calTeamCopied_${myPersonalId()||deviceId()}`;
 let teamCopied = (()=>{ try{ return JSON.parse(localStorage.getItem(TEAM_COPIED_KEY)||'{}')||{}; }catch{ return {}; } })();
 function saveTeamCopied(){ localStorage.setItem(TEAM_COPIED_KEY, JSON.stringify(teamCopied)); }
