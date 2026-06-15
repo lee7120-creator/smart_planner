@@ -3129,6 +3129,19 @@ function notifyAllowed() {
   return localStorage.getItem('notifyEnabled')==='true'
     && 'Notification' in window && Notification.permission==='granted';
 }
+// 알림 표시: 서비스워커 경유(모바일 PWA에서 더 안정적·클릭 시 앱 포커스), 실패 시 일반 Notification
+function notify(title, opts){
+  const o = Object.assign({ icon:'icon-192.png', badge:'icon-192.png' }, opts||{});
+  try{
+    if('serviceWorker' in navigator && navigator.serviceWorker){
+      navigator.serviceWorker.ready
+        .then(reg=>{ if(reg && reg.showNotification) reg.showNotification(title, o); else new Notification(title, o); })
+        .catch(()=>{ try{ new Notification(title, o); }catch(e){} });
+      return;
+    }
+  }catch(e){}
+  try{ new Notification(title, o); }catch(e){}
+}
 // 우선순위 가중치: 🔴 > 🟡 > 🟢 > ★ > 일반
 function priorityWeight(t){
   return (t.priority==='high'?30:t.priority==='mid'?20:t.priority==='low'?10:0)+(t.starred?5:0);
@@ -3168,7 +3181,7 @@ function checkNotificationSchedule() {
   localStorage.setItem('lastNotifyDate', todayDk);
   const list=getTodayIncomplete();
   if(!list.length) return;
-  new Notification(`🗓 오늘의 할 일 ${list.length}건`, {body: summarizeTasks(list)});
+  notify(`🗓 오늘의 할 일 ${list.length}건`, {body: summarizeTasks(list)});
 }
 // 3) 매일 오후 5시: 미완료 태스크 리마인드
 function checkEveningReminder() {
@@ -3180,7 +3193,7 @@ function checkEveningReminder() {
   localStorage.setItem('lastNotify5pm', todayDk);
   const list=getTodayIncomplete();
   if(!list.length) return;
-  new Notification(`🔔 미완료 태스크 ${list.length}건`, {body: summarizeTasks(list)});
+  notify(`🔔 미완료 태스크 ${list.length}건`, {body: summarizeTasks(list)});
 }
 function updateNotifyBtn() {
   const enabled = localStorage.getItem('notifyEnabled')==='true' && 'Notification' in window && Notification.permission==='granted';
@@ -3199,7 +3212,7 @@ document.getElementById('notifyBtn').onclick=()=>{
   Notification.requestPermission().then(perm=>{
     if(perm==='granted'){
       localStorage.setItem('notifyEnabled','true');
-      new Notification('🗓 마이플래너', {body:`알림 설정 완료!\n· 매일 ${NOTIFY_HOUR}시 오늘 할 일 · 🔴중요(높음) 태스크\n· 시간지정 태스크 ${NOTIFY_LEAD}분 전\n· 매일 ${NOTIFY_EVENING}시 미완료 리마인드\n(더보기 → 알림 시간 설정에서 변경)`});
+      notify('🗓 마이플래너', {body:`알림 설정 완료!\n· 매일 ${NOTIFY_HOUR}시 오늘 할 일 · 🔴중요(높음) 태스크\n· 시간지정 태스크 ${NOTIFY_LEAD}분 전\n· 매일 ${NOTIFY_EVENING}시 미완료 리마인드\n(더보기 → 알림 시간 설정에서 변경)`});
     } else {
       alert('알림 권한이 거부되었습니다. 브라우저 설정에서 알림을 허용해주세요.');
     }
@@ -3229,7 +3242,7 @@ function checkTimeNotifications(){
     const remainMin=(h*60+m)-nowMin; // 마감까지 남은 분
     if(remainMin<=NOTIFY_LEAD&&remainMin>=0){
       const msg=remainMin===0?'지금 마감 시간입니다':remainMin<=5?'곧 마감입니다':`마감 ${remainMin}분 전입니다 (${c.time} 마감)`;
-      new Notification('⏰ '+c.text,{body:msg});
+      notify('⏰ '+c.text,{body:msg});
       state.ids.push(c.id);
     }
   });
@@ -3247,7 +3260,7 @@ function checkHighPriorityAlert(){
   const reds=getTodayIncomplete().filter(t=>t.priority==='high');
   if(!reds.length)return;
   const names=reds.slice(0,3).map(t=>(t.time?t.time+' ':'')+t.text).join(', ');
-  new Notification(`🔴 중요(높음) 태스크 ${reds.length}건`,{body:names+(reds.length>3?` 외 ${reds.length-3}건`:'')});
+  notify(`🔴 중요(높음) 태스크 ${reds.length}건`,{body:names+(reds.length>3?` 외 ${reds.length-3}건`:'')});
 }
 
 // 받은 일정(pending) 도착 알림 + 제목 배지
@@ -3266,7 +3279,7 @@ function checkPendingNotifications(){
     list.forEach(t=>{ if(t&&t.pending){ current.push(t.id); if(!seenSet.has(t.id)) fresh.push({text:t.text,from:t.from}); } });
   });
   if(fresh.length && notifyAllowed()){
-    try{ new Notification('👤 받은 일정 '+fresh.length+'건', {body: fresh.map(x=>`· ${x.from||'누군가'}: ${x.text}`).join('\n').slice(0,180)}); }catch(e){}
+    try{ notify('👤 받은 일정 '+fresh.length+'건', {body: fresh.map(x=>`· ${x.from||'누군가'}: ${x.text}`).join('\n').slice(0,180)}); }catch(e){}
   }
   localStorage.setItem('pendingNotified', JSON.stringify(current));
   updatePendingBadge();
@@ -3299,6 +3312,10 @@ setInterval(checkTimeNotifications, 60*1000);
 checkTimeNotifications();
 setInterval(checkHighPriorityAlert, 60*1000);
 checkHighPriorityAlert();
+// 백그라운드 인터벌은 throttle/중단되므로, 앱으로 돌아오면 놓친 알림을 즉시 catch-up
+function runNotifChecks(){ [checkNotificationSchedule,checkEveningReminder,checkTimeNotifications,checkHighPriorityAlert].forEach(f=>{ try{ f(); }catch(e){} }); }
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) runNotifChecks(); });
+window.addEventListener('focus', runNotifChecks);
 
 // ── Pomodoro timer ──
 let pomodoroInterval=null, pomodoroSeconds=25*60, pomodoroRunning=false;
@@ -3320,7 +3337,7 @@ function startPomodoro(){
     if(pomodoroSeconds<=0){
       pausePomodoro();
       pomodoroSeconds=25*60; updatePomodoroDisplay();
-      if('Notification' in window && Notification.permission==='granted') new Notification('🍅 포모도로 완료!',{body:'25분 집중을 마쳤습니다. 잠시 휴식하세요!'});
+      if('Notification' in window && Notification.permission==='granted') notify('🍅 포모도로 완료!',{body:'25분 집중을 마쳤습니다. 잠시 휴식하세요!'});
       else alert('🍅 25분 집중 완료! 잠시 휴식하세요.');
     }
   },1000);
