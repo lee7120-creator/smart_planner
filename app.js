@@ -3142,6 +3142,41 @@ function notify(title, opts){
   }catch(e){}
   try{ new Notification(title, o); }catch(e){}
 }
+// ── 백그라운드 푸시(Web Push + VAPID) — 앱을 닫아도 GitHub Actions 발송 서버가 알림 전송 ──
+// 아래 키는 `npx web-push generate-vapid-keys`의 publicKey를 붙여넣으세요(비우면 백그라운드 푸시 비활성, 로컬 알림은 동작).
+const VAPID_PUBLIC_KEY = '';
+function urlB64ToUint8Array(b64){
+  const pad='='.repeat((4-b64.length%4)%4);
+  const base=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base); const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+function savePushPrefs(){
+  const me=sanitizeId(myPersonalId()||USER_ID);
+  if(!fbDb || !me || me==='demo' || READ_ONLY) return;
+  fbDb.ref(`users/${me}/notifyPrefs`).set({
+    enabled: localStorage.getItem('notifyEnabled')==='true',
+    morningHour: NOTIFY_HOUR, eveningHour: NOTIFY_EVENING, leadMin: NOTIFY_LEAD,
+    tzOffset: -new Date().getTimezoneOffset()   // 분, UTC 기준 동쪽(+540=KST)
+  }).catch(()=>{});
+}
+async function subscribeForPush(){
+  try{
+    if(!VAPID_PUBLIC_KEY) return;                 // 키 미설정 → 백그라운드 푸시 비활성(로컬 알림만)
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if(!('Notification' in window) || Notification.permission!=='granted') return;
+    const me=sanitizeId(myPersonalId()||USER_ID);
+    if(!fbDb || !me || me==='demo' || READ_ONLY) return;
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY) });
+    const j=sub.toJSON();
+    let h=0; const ep=j.endpoint||''; for(let i=0;i<ep.length;i++) h=(h*31+ep.charCodeAt(i))>>>0;
+    fbDb.ref(`users/${me}/pushSubs/${h}`).set({ endpoint:j.endpoint, keys:j.keys||{}, ua:(navigator.userAgent||'').slice(0,80), ts:Date.now() }).catch(()=>{});
+    savePushPrefs();
+  }catch(e){ console.warn('push 구독 실패', e); }
+}
 // 우선순위 가중치: 🔴 > 🟡 > 🟢 > ★ > 일반
 function priorityWeight(t){
   return (t.priority==='high'?30:t.priority==='mid'?20:t.priority==='low'?10:0)+(t.starred?5:0);
@@ -3212,6 +3247,7 @@ document.getElementById('notifyBtn').onclick=()=>{
   Notification.requestPermission().then(perm=>{
     if(perm==='granted'){
       localStorage.setItem('notifyEnabled','true');
+      subscribeForPush();   // 백그라운드 푸시 구독(키 설정 시)
       notify('🗓 마이플래너', {body:`알림 설정 완료!\n· 매일 ${NOTIFY_HOUR}시 오늘 할 일 · 🔴중요(높음) 태스크\n· 시간지정 태스크 ${NOTIFY_LEAD}분 전\n· 매일 ${NOTIFY_EVENING}시 미완료 리마인드\n(더보기 → 알림 시간 설정에서 변경)`});
     } else {
       alert('알림 권한이 거부되었습니다. 브라우저 설정에서 알림을 허용해주세요.');
@@ -3301,6 +3337,7 @@ if (_notifySettingsBtn) _notifySettingsBtn.onclick = () => {
   if (!isNaN(mhi)) { NOTIFY_HOUR = mhi; localStorage.setItem('notifyMorningHour', mhi); }
   if (!isNaN(ehi)) { NOTIFY_EVENING = ehi; localStorage.setItem('notifyEveningHour', ehi); }
   if (!isNaN(li)) { NOTIFY_LEAD = li; localStorage.setItem('notifyLeadMin', li); }
+  savePushPrefs();   // 백그라운드 발송 서버에 시간/타임존 반영
   alert(`알림 시간을 저장했어요.\n· 아침 ${NOTIFY_HOUR}시 · 저녁 ${NOTIFY_EVENING}시 · 마감 ${NOTIFY_LEAD}분 전`);
 };
 
@@ -3316,6 +3353,8 @@ checkHighPriorityAlert();
 function runNotifChecks(){ [checkNotificationSchedule,checkEveningReminder,checkTimeNotifications,checkHighPriorityAlert].forEach(f=>{ try{ f(); }catch(e){} }); }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) runNotifChecks(); });
 window.addEventListener('focus', runNotifChecks);
+// 이미 알림이 켜져 있으면 로드 시 백그라운드 푸시 구독 갱신
+if(notifyAllowed()) setTimeout(subscribeForPush, 1500);
 
 // ── Pomodoro timer ──
 let pomodoroInterval=null, pomodoroSeconds=25*60, pomodoroRunning=false;
