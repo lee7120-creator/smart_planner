@@ -793,6 +793,59 @@ function reorderSub(dk,parentId,dragId,targetId){
   list.splice(to,0,moved);
   saveTasks(dk);render();
 }
+// 모바일: 태스크/하위항목 터치 드래그(꾹 눌러서) — 데스크탑 HTML5 DnD와 동일 동작
+function attachTaskTouchDrag(item){
+  item.addEventListener('pointerdown', e=>{
+    if(e.pointerType!=='touch' || READ_ONLY || selectMode) return;
+    if(e.target.closest('button,input,textarea,.task-cb,.task-star,.memo-icon-btn,.task-more-btn,.add-sub-btn')) return;
+    const meta=item._task; if(!meta) return;
+    const sx=e.clientX, sy=e.clientY;
+    let lifted=false, lp=null, target=null;
+    const clearHi=()=>document.querySelectorAll('.drag-target,.drag-over').forEach(x=>x.classList.remove('drag-target','drag-over'));
+    const lift=()=>{ lifted=true; item.classList.add('touch-dragging'); if(navigator.vibrate) navigator.vibrate(15); };
+    const move=ev=>{
+      if(ev.pointerId!==e.pointerId) return;
+      if(!lifted){ if(Math.hypot(ev.clientX-sx,ev.clientY-sy)>12) clearTimeout(lp); return; }
+      ev.preventDefault();
+      item.style.visibility='hidden';
+      const under=document.elementFromPoint(ev.clientX, ev.clientY);
+      item.style.visibility='';
+      clearHi(); target=null;
+      const tEl=under&&under.closest('.task-item');
+      const cEl=under&&under.closest('.day-col');
+      if(tEl && tEl!==item && tEl._task){ tEl.classList.add('drag-target'); target={type:'task', meta:tEl._task}; }
+      else if(cEl && cEl.dataset.dk){ cEl.classList.add('drag-over'); target={type:'col', dk:cEl.dataset.dk}; }
+    };
+    const end=ev=>{
+      if(ev.pointerId!==e.pointerId) return;
+      cleanup(); if(!lifted) return;
+      item.classList.remove('touch-dragging'); clearHi();
+      if(target) doDrop(target);
+    };
+    const doDrop=tg=>{
+      if(meta.isSub){
+        if(tg.type==='task' && tg.meta.isSub && tg.meta.parentId===meta.parentId && tg.meta.id!==meta.id)
+          reorderSub(meta.dk, meta.parentId, meta.id, tg.meta.id);
+        return;
+      }
+      let toDk=null;
+      if(tg.type==='task'){
+        const tm=tg.meta;
+        if(tm.colDk===meta.colDk && !meta.isRepeat && !tm.isSub){ if(tm.id!==meta.id) reorderTask(meta.colDk, meta.id, tm.id); return; }
+        toDk=tm.colDk;
+      } else if(tg.type==='col'){ toDk=tg.dk; }
+      if(!toDk || toDk===meta.colDk) return;
+      if(meta.isRepeat){
+        askRepeatMoveScope(scope=>{ if(scope==='one') moveRepeatInstanceOne(meta.dk, meta.id, meta.instanceDk, toDk); else if(scope==='all') moveTask(meta.dk, meta.id, toDk); });
+      } else moveTask(meta.dk, meta.id, toDk);
+    };
+    const cleanup=()=>{ clearTimeout(lp); document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',end); document.removeEventListener('pointercancel',end); };
+    document.addEventListener('pointermove',move);
+    document.addEventListener('pointerup',end);
+    document.addEventListener('pointercancel',end);
+    lp=setTimeout(lift, 280);
+  });
+}
 
 // ── Quick input time parsing (예: "8시 회의"→08:00, "6시 보고"→18:00, "오후 2시반"→14:30) ──
 // 업무시간(8시~19시) 휴리스틱: 8~12시는 오전, 1~7시는 오후로 해석
@@ -1804,6 +1857,9 @@ function addKbd(elem,handler){elem.onkeydown=e=>{if(e.key==='Enter'||e.key===' '
 function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
   const prioCls = (!isSub && task.priority) ? ' prio-'+task.priority : '';
   const item=el('div',`task-item${isSub?' sub':''}${prioCls}`);
+  // 드래그(터치) 메타 — 데스크탑 HTML5 DnD와 동일 정보
+  item._task = { dk: isRepeatInst?originDk:dk, id: task.id, isRepeat: !!isRepeatInst, instanceDk: isRepeatInst?instanceDk:null, isSub: !!isSub, parentId: parentId||null, colDk: dk };
+  if(!READ_ONLY && !selectMode) attachTaskTouchDrag(item);
   const checked=isRepeatInst?isRepeatChecked(task,instanceDk):task.checked;
   // 다중 선택 모드: 일반(비반복·비하위·비대기) 태스크만 선택 가능
   const selectable = selectMode && !isSub && !task.pending && !isRepeatInst;
@@ -2216,6 +2272,7 @@ function buildDayCol(date,dayIdx){
   const isOff=!!offDays[dk];
   const holiday=HOLIDAYS[dk]||(isOff?'휴무일':null);
   const col=el('div',`day-col${isToday?' is-today':''}${isWeekend?' is-weekend':''}${holiday?' is-holiday':''}`);
+  col.dataset.dk=dk;
   col.ondragover=e=>{e.preventDefault();col.classList.add('drag-over');};
   col.ondragleave=()=>col.classList.remove('drag-over');
   col.ondrop=e=>{
