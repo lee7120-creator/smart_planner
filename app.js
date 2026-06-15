@@ -402,7 +402,9 @@ function initFirebaseSync() {
         if (typeof checkPendingNotifications === 'function') checkPendingNotifications();
       }
     });
-  }).catch(() => setSyncStatus('offline'));
+    // 3) 개인 트리 로드 후에 구독 팀 동기화 시작 (먼저 실행되면 복사본이 덮어쓰기로 사라질 수 있음)
+    if (typeof syncSubscribedTeams === 'function') syncSubscribedTeams();
+  }).catch(() => { setSyncStatus('offline'); if (typeof syncSubscribedTeams === 'function') syncSubscribedTeams(); });
 }
 
 // ── Date helpers ──
@@ -1620,13 +1622,14 @@ function memoTask(){
 function attachMemoImage(file){
   if(!file||!file.type.startsWith('image/'))return;
   if(file.size>8*1024*1024){alert('이미지가 너무 큽니다 (최대 8MB)');return;}
-  const task=memoTask(); if(!task)return;
+  const task=memoTask(); if(!task||!memoCtx)return;
+  const dk=memoCtx.dk;
   const id='img_'+uid();
   idbPutImage(id,file).then(()=>{
     if(!Array.isArray(task.memoImages))task.memoImages=[];
     task.memoImages.push(id);
-    saveTasks(memoCtx.dk);
-    renderMemoImages(task);
+    saveTasks(dk);
+    if(memoCtx && memoCtx.dk===dk) renderMemoImages(task);
     render();
   }).catch(()=>alert('이미지 저장 실패'));
 }
@@ -2145,6 +2148,7 @@ function buildWeatherBar(dk){
 // 날씨 상세: 해당 날짜의 시간대별 기온/습도/강수 + 일출·일몰·자외선 (요청 시 시간별 데이터 fetch)
 const weatherHourlyCache={};
 function openWeatherDetail(dk){
+  const _ex=document.getElementById('weatherDetailOv'); if(_ex) _ex.remove();
   const w=weatherByDate[dk];
   const d=parseDk(dk);
   const dayN=['일','월','화','수','목','금','토'][d.getDay()];
@@ -2187,8 +2191,9 @@ function openWeatherDetail(dk){
       const cell=el('div','wx-hr');
       cell.appendChild(el('div','wx-hr-t',{textContent:hr+'시'}));
       cell.appendChild(el('div','wx-hr-e',{textContent:WMO[(H.weathercode&&H.weathercode[i])||0]||'🌡️'}));
-      cell.appendChild(el('div','wx-hr-temp',{textContent:Math.round(+H.temperature_2m[i])+'°'}));
-      if(H.relativehumidity_2m) cell.appendChild(el('div','wx-hr-hum',{textContent:'💧'+Math.round(+H.relativehumidity_2m[i])+'%'}));
+      const tv=H.temperature_2m&&H.temperature_2m[i]!=null?Math.round(+H.temperature_2m[i])+'°':'–';
+      cell.appendChild(el('div','wx-hr-temp',{textContent:tv}));
+      if(H.relativehumidity_2m&&H.relativehumidity_2m[i]!=null) cell.appendChild(el('div','wx-hr-hum',{textContent:'💧'+Math.round(+H.relativehumidity_2m[i])+'%'}));
       const pp=H.precipitation_probability&&H.precipitation_probability[i];
       if(pp>0) cell.appendChild(el('div','wx-hr-rain',{textContent:'☔'+pp+'%'}));
       strip.appendChild(cell);
@@ -5144,7 +5149,7 @@ function applyTeamSnapshot(id, data){
   const copies={}; // teamRef -> {dk, task}
   Object.keys(tasks).forEach(dk=>{ (tasks[dk]||[]).forEach(t=>{ if(t&&t.fromTeam===id&&t.teamRef) copies[t.teamRef]={dk,task:t}; }); });
   const teamRefs=new Set();
-  const MIRROR=['text','color','starred','repeat','repeatEnd','priority','time','duration'];
+  const MIRROR=['text','color','repeat','repeatEnd','priority','time','duration']; // starred·완료·메모는 로컬 유지
   Object.entries(data).forEach(([oDk,list])=>{
     const arr=Array.isArray(list)?list:Object.values(list||{});
     arr.forEach(t=>{
@@ -5471,8 +5476,7 @@ initFirebaseSync();
 renderNoteWins();
 initMemoSync();
 initOffSync();
-// 구독한 팀 일정을 내 캘린더로 자동 복사 (초기 동기화 후)
-setTimeout(() => { try { syncSubscribedTeams(); } catch(e){} }, 2800);
+// (구독 팀 동기화는 initFirebaseSync에서 개인 트리 로드 후 호출됨)
 initShareSync();
 registerUserDirectory();
 initGoalSync();
