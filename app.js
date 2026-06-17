@@ -1634,6 +1634,11 @@ document.getElementById('memoAllBtn').onclick=()=>{
   renderMemoAllModal();
   document.getElementById('memoAllModal').classList.remove('hidden');
 };
+// 우상단 태스크 메모 버튼 — 동일 모달 재사용
+{
+  const _tmb=document.getElementById('taskMemoBtn');
+  if(_tmb) _tmb.onclick=()=>{ renderMemoAllModal(); document.getElementById('memoAllModal').classList.remove('hidden'); };
+}
 document.getElementById('memoAllCloseBtn').onclick=()=>document.getElementById('memoAllModal').classList.add('hidden');
 document.getElementById('memoAllModal').onclick=e=>{if(e.target===document.getElementById('memoAllModal'))document.getElementById('memoAllModal').classList.add('hidden');};
 
