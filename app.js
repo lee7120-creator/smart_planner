@@ -5452,11 +5452,10 @@ function registerTaskToTeam(dk, task, isRepeatInst, originDk){
           const orig=(tasks[srcDk]||[]).find(x=>x.id===task.id);
           if(orig){ orig.fromTeam=tid; orig.teamRef=refKey; orig.selfRegistered=true; }
           teamCopied[refKey]=Date.now(); saveTeamCopied();
-          // 자동 구독 → 이 팀의 (다른) 일정도 내 캘린더로 흘러오게(이미 구독이면 유지)
-          let added=false;
-          if(!teamSubs[tid]){ teamSubs[tid]={name:teamId, ts:Date.now()}; saveTeamSubs(); attachTeamListener(tid); added=true; }
+          // 자동 구독하지 않음 — 등록만으로 팀 전체 일정이 내 캘린더로 흘러오지 않게.
+          // (팀 전체를 함께 보려면 팀 캘린더 메뉴에서 직접 '구독')
           saveTasks(srcDk); render();
-          showUndoToast(`🤝 '${teamId}' 팀에 등록했어요${(t.repeat&&t.repeat!=='none')?' (반복 포함)':''}${added?' · 이 팀 구독함':''}`);
+          showUndoToast(`🤝 '${teamId}' 팀에 등록했어요${(t.repeat&&t.repeat!=='none')?' (반복 포함)':''}`);
         })
         .catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
     }).catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
