@@ -5621,7 +5621,14 @@ function rejectTask(dk, taskId) {
 
 // ── Keyboard shortcuts ──
 document.addEventListener('keydown',e=>{
-  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  // Escape는 입력/편집 중에도 동작(모달·메모·팝업 닫기)
+  if(e.key==='Escape'){closeMemo();closeEdit();closeRepeatDel();closeNoteHist();closeCanvas();closeSlashMenu();closeLightbox();closeShareModal();
+    ['quickModal','goalsModal','reviewModal','icsModal','commentModal'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+    document.getElementById('notesMenu').classList.add('hidden');activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();return;}
+  // 입력창·텍스트영역·편집영역(메모/노트 등 contentEditable) 안에서는 전역 단축키 비활성
+  const tgt=e.target;
+  if(tgt && (tgt.tagName==='INPUT'||tgt.tagName==='TEXTAREA'||tgt.isContentEditable||(tgt.closest&&tgt.closest('[contenteditable=""],[contenteditable="true"]')))) return;
+  if(e.metaKey||e.ctrlKey||e.altKey) return; // 조합키(복사/붙여넣기 등)는 단축키로 처리하지 않음
   if(e.key==='ArrowLeft'){document.getElementById('prevBtn').click();}
   if(e.key==='ArrowRight'){document.getElementById('nextBtn').click();}
   if(e.key==='t'||e.key==='T'){document.getElementById('todayBtn').click();}
@@ -5636,9 +5643,6 @@ document.addEventListener('keydown',e=>{
     render();
     return;
   }
-  if(e.key==='Escape'){closeMemo();closeEdit();closeRepeatDel();closeNoteHist();closeCanvas();closeSlashMenu();closeLightbox();closeShareModal();
-    ['quickModal','goalsModal','reviewModal','icsModal','commentModal'].forEach(id=>document.getElementById(id).classList.add('hidden'));
-    document.getElementById('notesMenu').classList.add('hidden');activeInput=null;searchQuery='';document.getElementById('searchInput').value='';render();}
 });
 
 // ── Init ──
