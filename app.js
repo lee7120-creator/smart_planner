@@ -301,6 +301,7 @@ let yearNum = new Date().getFullYear();
 let tasks = loadTasks();
 let activeInput = null;
 let justToggledCb = null;   // 방금 토글한 체크박스만 팝 애니메이션 (재렌더 시 전체 팝 버그 방지)
+let _justDoneId = null;
 let weatherByDate = {};
 let weatherStatus = 'loading';  // 'loading' | 'ok' | 'error'
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
@@ -914,7 +915,7 @@ function toggleTask(dk,id,subId) {
   if(subId){const p=list.find(x=>x.id===id);if(p){const s=p.subs.find(x=>x.id===subId);if(s)s.checked=!s.checked;}}
   else{
     const t=list.find(x=>x.id===id);
-    if(t){t.checked=!t.checked; if(t.checked)t.completedAt=Date.now(); else delete t.completedAt;}
+    if(t){t.checked=!t.checked; if(t.checked){t.completedAt=Date.now();_justDoneId=t.id;} else delete t.completedAt;}
   }
   saveTasks(dk); render();
 }
@@ -934,7 +935,7 @@ function deleteTask(dk,id,subId) {
     if(idx>=0){const removed=tasks[dk].splice(idx,1)[0];deletedText=removed.text;trashId=addToTrash(dk,removed,null);}
   }
   saveTasks(dk); render();
-  if(trashId) showUndoToast(`"${deletedText.slice(0,16)}" 삭제됨`,()=>restoreFromTrash(trashId));
+  if(trashId) showUndoToast(`"${deletedText.slice(0,16)}" 삭제했어요`,()=>restoreFromTrash(trashId));
 }
 
 // ── Trash (휴지통, 30일 보관) ──
@@ -979,14 +980,14 @@ function renderTrashModal(){
   const list=document.getElementById('trashList');
   list.innerHTML='';
   const trash=loadTrash();
-  if(!trash.length){ list.appendChild(el('div','trash-empty',{textContent:'휴지통이 비어있습니다'})); return; }
+  if(!trash.length){ list.appendChild(el('div','trash-empty',{textContent:'아직 삭제한 항목이 없어요'})); return; }
   trash.forEach(item=>{
     const row=el('div','trash-item');
     const info=el('div','trash-info');
     info.appendChild(el('div',`trash-text${item.task.checked?' done':''}`,{textContent:(item.task.starred?'★ ':'')+item.task.text}));
     const d=new Date(item.dk);
     const daysLeft=30-Math.floor((Date.now()-item.deletedAt)/86400000);
-    info.appendChild(el('div','trash-meta',{textContent:`${d.getMonth()+1}/${d.getDate()} 삭제됨 · ${daysLeft}일 후 영구삭제`}));
+    info.appendChild(el('div','trash-meta',{textContent:`${d.getMonth()+1}/${d.getDate()} 삭제 · ${daysLeft}일 후 사라져요`}));
     row.appendChild(info);
     const actions=el('div','trash-actions');
     const restoreBtn=el('button','trash-act-btn',{textContent:'↩ 복구'});
@@ -1298,7 +1299,7 @@ function saveMemoNow() {
 
 // ── 메모 마크다운 → HTML 변환 (옛 메모 호환용) ──
 function renderMemoMD(text){
-  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   return esc(text)
     .replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>')
     .replace(/`([^`\n]+)`/g,'<code>$1</code>')
@@ -1315,11 +1316,12 @@ function renderMemoMD(text){
 function memoIsHtml(s){ return /<\/?(b|i|u|s|strike|em|strong|span|div|font|br|a|code|p|ul|ol|li|h[1-6]|img)\b/i.test(s); }
 function sanitizeMemoHtml(html){
   const tpl=document.createElement('template'); tpl.innerHTML=html||'';
-  tpl.content.querySelectorAll('script,style,iframe,object,embed,link,meta,form,input,textarea,button').forEach(n=>n.remove());
+  tpl.content.querySelectorAll('script,style,iframe,object,embed,link,meta,form,input,textarea,button,svg,math').forEach(n=>n.remove());
   tpl.content.querySelectorAll('*').forEach(elx=>{
     [...elx.attributes].forEach(a=>{ const n=a.name.toLowerCase();
       if(n.startsWith('on')) elx.removeAttribute(a.name);
-      else if((n==='href'||n==='src')&&/^\s*javascript:/i.test(a.value)) elx.removeAttribute(a.name);
+      else if((n==='href'||n==='src')&&/^\s*(javascript|data|vbscript):/i.test(a.value)) elx.removeAttribute(a.name);
+      else if(n==='style'&&/url\s*\(/i.test(a.value)) elx.removeAttribute(a.name);
     });
   });
   return tpl.innerHTML;
@@ -1387,7 +1389,7 @@ function renderMemoHistory(){
   const task=memoTask();
   const hist=Array.isArray(task&&task.memoHistory)?task.memoHistory:[];
   if(!hist.length){
-    wrap.appendChild(el('div','memo-hist-empty',{textContent:'이전 버전이 없습니다'}));
+    wrap.appendChild(el('div','memo-hist-empty',{textContent:'아직 이전 버전이 없어요'}));
     return;
   }
   [...hist].reverse().forEach(h=>{
@@ -1474,7 +1476,11 @@ const GUIDE_SECTIONS=[
     ['☑️','여러 개 선택','한 번에 완료·삭제할 수 있어요.'],
     ['📝','메모 전체보기','모든 메모를 한눈에 볼 수 있어요.'],
     ['🗑','휴지통','삭제한 할 일을 30일 안에 복구할 수 있어요.'],
+    ['📤','내보내기','구글 캘린더나 아웃룩에서 쓸 수 있는 .ics 파일로 내보내요.'],
     ['💾','백업','모든 데이터를 파일로 저장하고 복원할 수 있어요.'],
+    ['✏️','이름 변경','다른 이름으로 데이터를 옮길 수 있어요.'],
+    ['📍','내 위치 날씨','날씨를 내 위치 기준으로 바꿔요.'],
+    ['👤','받은 일정','다른 사람이 보낸 일정이 도착하면 알림으로 알려줘요.'],
   ]},
   { title:'⌨️ 단축키', items:[
     ['←  →','주 이동','이전/다음 주로 이동해요.'],
@@ -1542,7 +1548,7 @@ function renderTemplateModal(){
   list.innerHTML='';
   const tpls=loadTpls();
   if(!tpls.length){
-    list.appendChild(el('div','trash-empty',{textContent:'저장된 템플릿이 없습니다.\n아래에서 만들어보세요.'}));
+    list.appendChild(el('div','trash-empty',{textContent:'아직 템플릿이 없어요.\n아래에서 만들어 보세요.'}));
     return;
   }
   tpls.forEach((tpl,i)=>{
@@ -1605,7 +1611,7 @@ function renderMemoAllModal(){
   });
   items.sort((a,b)=>b.ts-a.ts);
   if(!items.length){
-    list.appendChild(el('div','trash-empty',{textContent:'작성된 메모가 없습니다'}));
+    list.appendChild(el('div','trash-empty',{textContent:'아직 작성한 메모가 없어요'}));
     return;
   }
   items.forEach(({dk,task})=>{
@@ -1857,7 +1863,9 @@ function addKbd(elem,handler){elem.onkeydown=e=>{if(e.key==='Enter'||e.key===' '
 // ── Task item builder ──
 function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
   const prioCls = (!isSub && task.priority) ? ' prio-'+task.priority : '';
-  const item=el('div',`task-item${isSub?' sub':''}${prioCls}`);
+  const doneCls=(!isSub&&task.id===_justDoneId)?' just-done':'';
+  if(task.id===_justDoneId)_justDoneId=null;
+  const item=el('div',`task-item${isSub?' sub':''}${prioCls}${doneCls}`);
   // 드래그(터치) 메타 — 데스크탑 HTML5 DnD와 동일 정보
   item._task = { dk: isRepeatInst?originDk:dk, id: task.id, isRepeat: !!isRepeatInst, instanceDk: isRepeatInst?instanceDk:null, isSub: !!isSub, parentId: parentId||null, colDk: dk };
   if(!READ_ONLY && !selectMode) attachTaskTouchDrag(item);
@@ -2454,7 +2462,7 @@ function buildTimeblockView(){
     wrap.appendChild(ut);
   }
   if(!items.length){
-    wrap.appendChild(el('div','focus-empty',{textContent:'이 날 일정이 없습니다 — 시간을 지정하면 여기 블록으로 표시돼요'}));
+    wrap.appendChild(el('div','focus-empty',{textContent:'이 날 일정이 없어요 — 시간을 지정하면 여기 블록으로 표시돼요'}));
   }
   return wrap;
 }
@@ -2481,7 +2489,7 @@ function buildFocusView(){
   const sortedDirect=[...directToday].sort(taskSort);
   sortedDirect.forEach(t=>list1.appendChild(buildTaskItem(dk,t,false,null,false,null,null)));
   repeatsToday.forEach(({task,originDk,instanceDk,adjusted})=>list1.appendChild(buildTaskItem(dk,task,false,null,true,originDk,instanceDk,adjusted)));
-  if(!sortedDirect.length&&!repeatsToday.length) list1.appendChild(el('div','focus-empty',{textContent:'오늘 할 일이 없습니다 🎉'}));
+  if(!sortedDirect.length&&!repeatsToday.length) list1.appendChild(el('div','focus-empty',{textContent:'오늘 할 일이 없어요 🎉'}));
   sec1.appendChild(list1);
   container.appendChild(sec1);
 
@@ -2678,7 +2686,7 @@ function buildTimelineView(){
   }
   const allRows=[...rows,...Object.values(repRows)].sort((a,b)=>a.cells[0].d-b.cells[0].d);
   if(!allRows.length){
-    wrap.appendChild(el('div','search-empty',{textContent:'이번 달 할 일이 없습니다'}));
+    wrap.appendChild(el('div','search-empty',{textContent:'이번 달 할 일이 없어요'}));
     return wrap;
   }
   const scroller=el('div','gantt-scroller');
@@ -2802,7 +2810,7 @@ function buildTagFilterBar(){
 
 function buildSearchView(query){
   const wrap=el('div','search-results-wrap');
-  if(!query.trim()){wrap.appendChild(el('div','search-empty',{textContent:'검색어를 입력하세요'}));return wrap;}
+  if(!query.trim()){wrap.appendChild(el('div','search-empty',{textContent:'검색어를 입력해 주세요'}));return wrap;}
   const q=query.toLowerCase();
   const results=[];
   Object.entries(tasks).forEach(([dk,list])=>{
@@ -3197,7 +3205,7 @@ function summarizeTasks(list){
   const name=(top.time?top.time+' ':'')+top.text;
   return list.length===1
     ? `${priorityFlag(top)}${name}`
-    : `${priorityFlag(top)}${name} 외 ${list.length-1}건이 남아있습니다`;
+    : `${priorityFlag(top)}${name} 외 ${list.length-1}건이 남아 있어요`;
 }
 // 오늘의 미완료 태스크 (반복 인스턴스 포함)
 function getTodayIncomplete(){
@@ -3242,7 +3250,7 @@ function updateNotifyBtn() {
   btn.title = enabled?`알림 켜짐 (${NOTIFY_HOUR}시 오늘할일·🔴중요 · 시간 ${NOTIFY_LEAD}분 전 · ${NOTIFY_EVENING}시 미완료)`:'알림 꺼짐 (클릭하여 켜기)';
 }
 document.getElementById('notifyBtn').onclick=()=>{
-  if(!('Notification' in window)){ alert('이 브라우저는 알림을 지원하지 않습니다.'); return; }
+  if(!('Notification' in window)){ alert('이 브라우저는 알림을 지원하지 않아요.'); return; }
   const enabled = localStorage.getItem('notifyEnabled')==='true';
   if(enabled){
     localStorage.setItem('notifyEnabled','false');
@@ -3255,7 +3263,7 @@ document.getElementById('notifyBtn').onclick=()=>{
       subscribeForPush();   // 백그라운드 푸시 구독(키 설정 시)
       notify('🗓 마이플래너', {body:`알림 설정 완료!\n· 매일 ${NOTIFY_HOUR}시 오늘 할 일 · 🔴중요(높음) 태스크\n· 시간지정 태스크 ${NOTIFY_LEAD}분 전\n· 매일 ${NOTIFY_EVENING}시 미완료 리마인드\n(더보기 → 알림 시간 설정에서 변경)`});
     } else {
-      alert('알림 권한이 거부되었습니다. 브라우저 설정에서 알림을 허용해주세요.');
+      alert('알림 권한이 거부됐어요. 브라우저 설정에서 알림을 허용해 주세요.');
     }
     updateNotifyBtn();
   });
@@ -3381,7 +3389,7 @@ function startPomodoro(){
     if(pomodoroSeconds<=0){
       pausePomodoro();
       pomodoroSeconds=25*60; updatePomodoroDisplay();
-      if('Notification' in window && Notification.permission==='granted') notify('🍅 포모도로 완료!',{body:'25분 집중을 마쳤습니다. 잠시 휴식하세요!'});
+      if('Notification' in window && Notification.permission==='granted') notify('🍅 포모도로 완료!',{body:'25분 집중 끝! 잠시 쉬어 가요.'});
       else alert('🍅 25분 집중 완료! 잠시 휴식하세요.');
     }
   },1000);
@@ -3858,7 +3866,7 @@ function openNoteHist(m) {
   const list = document.getElementById('noteHistList');
   list.innerHTML = '';
   if (!m.hist.length) {
-    list.appendChild(el('div','day-modal-empty',{textContent:'저장된 버전이 없습니다 (편집을 마치면 자동 기록)'}));
+    list.appendChild(el('div','day-modal-empty',{textContent:'아직 저장된 버전이 없어요 (편집하면 자동으로 기록돼요)'}));
   }
   [...m.hist].reverse().forEach((h, ri) => {
     const idx = m.hist.length - 1 - ri;
@@ -4026,7 +4034,7 @@ function deleteMemoTree(id) {
   }
   saveMemos(); renderNoteWins();
   const cnt = removedIds.length;
-  showToast(`메모 ${cnt}개 삭제됨`, () => {
+  showToast(`메모 ${cnt}개를 삭제했어요`, () => {
     Object.assign(memos, removed);
     if (parentPrevText !== null && memos[parentId]) memos[parentId].text = parentPrevText;
     saveMemos(); renderNoteWins();
@@ -4615,7 +4623,7 @@ function renderCanvas() {
     board.appendChild(card);
   });
   if (!Object.keys(memos).length) {
-    board.appendChild(el('div', 'canvas-empty', {textContent: '메모가 없습니다 — 캘린더 빈 곳을 더블클릭해 만들어보세요'}));
+    board.appendChild(el('div', 'canvas-empty', {textContent: '메모가 없어요 — 빈 곳을 더블클릭해서 만들어 보세요'}));
   }
   // 배경 드래그로 팬 (PC/모바일 즉시)
   let _psx, _psy, _pox, _poy;
@@ -4922,7 +4930,7 @@ function confirmSend(){
   const typed = sanitizeId(document.getElementById('sendSearchInput').value);
   if (typed && typed !== USER_ID && !sendSelected.includes(typed)) sendSelected.push(typed);
   const recipients = [...new Set(sendSelected.filter(id => id && id !== USER_ID))];
-  if (!recipients.length) { showUndoToast('받는 사람을 선택하세요'); return; }
+  if (!recipients.length) { showUndoToast('받는 사람을 선택해 주세요'); return; }
   recipients.forEach(rememberUser);   // 보낸 사람 로컬 기억 → 다음에 목록에 표시
   const { dk, taskId } = sendCtx;
   const t = (tasks[dk] || []).find(x => x.id === taskId);
@@ -4946,7 +4954,7 @@ function confirmSend(){
   })).then(() => {
     closeSendModal();
     if (done) showUndoToast(`👥 ${done}명에게 보냈어요 — 상대가 수락하면 추가돼요`);
-    if (fail) showUndoToast(`⚠️ ${fail}명 전송 실패 — 네트워크를 확인해주세요`);
+    if (fail) showUndoToast(`⚠️ ${fail}명에게 보내지 못했어요 — 네트워크를 확인해 주세요`);
   });
 }
 document.getElementById('sendCancelBtn').onclick = closeSendModal;
@@ -5017,7 +5025,7 @@ function renderGoals() {
     ? `<div style="text-align:center;padding:10px;background:var(--surface2);border-radius:10px">
          <div style="font-size:26px">🔥 ${best}일</div>
          <div style="font-size:11px;color:var(--text3)">최고 연속 달성</div></div>`
-    : '<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">목표를 추가하고 매일 체크해보세요</div>';
+    : '<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">목표를 추가하고 매일 체크해 보세요</div>';
   const list = document.getElementById('goalsList');
   list.innerHTML = '';
   const tk = todayKey();
@@ -5429,7 +5437,7 @@ function pickTeamForRegister(cb){
 }
 // 내 태스크를 팀 캘린더에 등록(복사) — 반복 유지, 작성자 이름 태그
 function registerTaskToTeam(dk, task, isRepeatInst, originDk){
-  if(IS_TEAM){ showUndoToast('개인 캘린더에서 사용하세요'); return; }
+  if(IS_TEAM){ showUndoToast('개인 캘린더에서만 사용할 수 있어요'); return; }
   if(!fbDb){ showUndoToast('⚠️ 오프라인 상태예요'); return; }
   const srcDk=isRepeatInst?originDk:dk;
   const t=(tasks[srcDk]||[]).find(x=>x.id===task.id) || task;
@@ -5885,7 +5893,7 @@ function buildDashCalendar(){
   } else {
     const empty=document.createElement('div');
     empty.style.cssText='font-size:12px;color:var(--text3);text-align:center;padding:14px';
-    empty.textContent='예정된 할 일이 없습니다 🎉';
+    empty.textContent='예정된 할 일이 없어요 🎉';
     panel.appendChild(empty);
   }
 
@@ -6072,7 +6080,7 @@ async function syncSheetEvents(manual=false){
       syncBtn.disabled=false; syncBtn.textContent=`⚠️ 실패`;
       setTimeout(()=>{ if(syncBtn.isConnected) syncBtn.textContent='📥 지금 가져오기'; },4000);
     }
-    if(manual) alert('시트 동기화에 실패했습니다.\n\n1) 구글시트가 "링크가 있는 모든 사용자" 공개로 설정되어 있는지 확인해주세요.\n2) 잠시 후 다시 시도해주세요. (외부 프록시 일시 장애일 수 있습니다)');
+    if(manual) alert('시트를 가져오지 못했어요.\n\n1) 구글시트가 "링크가 있는 모든 사용자"로 공개되어 있는지 확인해 주세요.\n2) 잠시 후 다시 시도해 주세요.');
     console.warn('Sheet sync error:',e);
     return {success:false,error:e.message};
   }
@@ -6108,7 +6116,7 @@ checkMondaySync();
 function renameAccount() {
   if (READ_ONLY || IS_TEAM || !USER_ID) { alert('내 캘린더(?u=이름)에서만 사용할 수 있어요.'); return; }
   const cur = USER_ID;
-  const next = prompt('새 이름을 입력하세요.\n현재 데이터가 새 이름으로 복사·이전되고, 새 URL로 이동합니다.\n(이전 이름의 데이터는 그대로 남아 있어요)', cur);
+  const next = prompt('새 이름을 입력해 주세요.\n데이터가 새 이름으로 복사되고, 새 URL로 이동해요.\n(이전 이름 데이터는 그대로 남아요)', cur);
   if (next == null) return;
   const nn = next.trim();
   if (!nn || nn === cur) return;
@@ -6118,7 +6126,7 @@ function renameAccount() {
   for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('cal') && k.endsWith(oldSuffix)) keys.push(k); }
   keys.forEach(k => { const base = k.slice(0, k.length - oldSuffix.length); localStorage.setItem(base + newSuffix, localStorage.getItem(k)); });
   localStorage.setItem('lastUser', nn);
-  alert(`'${nn}'(으)로 이전했습니다. 새 캘린더로 이동합니다.`);
+  alert(`'${nn}'(으)로 이전했어요. 새 캘린더로 이동할게요.`);
   window.location.href = window.location.pathname + `?u=${encodeURIComponent(nn)}`;
 }
 
@@ -6159,20 +6167,20 @@ async function exportAllData() {
     a.download = `myplanner-backup-${USER_ID || 'local'}-${todayKey()}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch (e) { alert('백업 실패: ' + e.message); }
+  } catch (e) { alert('백업에 실패했어요: ' + e.message); }
 }
 function importAllData(file) {
-  if (READ_ONLY) { alert('읽기 전용 모드에서는 복원할 수 없습니다.'); return; }
+  if (READ_ONLY) { alert('읽기 전용 모드에서는 복원할 수 없어요.'); return; }
   const reader = new FileReader();
   reader.onload = () => {
     let data;
-    try { data = JSON.parse(reader.result); } catch { alert('올바른 백업 파일이 아닙니다 (JSON 파싱 실패).'); return; }
+    try { data = JSON.parse(reader.result); } catch { alert('올바른 백업 파일이 아니에요.'); return; }
     if (!data || data._app !== 'myplanner' || typeof data.tasks !== 'object') {
-      alert('이 앱의 백업 파일이 아닙니다.'); return;
+      alert('마이플래너 백업 파일이 아니에요.'); return;
     }
     const cnt = Object.values(data.tasks || {}).reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
-    if (!confirm(`현재 데이터를 백업본으로 덮어씁니다.\n할 일 ${cnt}개 · 내보낸 시각 ${data._exported || '알 수 없음'}\n계속할까요?`)) return;
-    // Firebase 동기화 컬렉션: 메모리 갱신 + 각 저장함수로 localStorage·Firebase 반영
+    if (!confirm(`현재 데이터를 백업본으로 덮어써요.\n할 일 ${cnt}개 · 내보낸 시각 ${data._exported || '알 수 없음'}\n계속할까요?`)) return;
+    Object.values(data.tasks||{}).forEach(list=>{if(Array.isArray(list))list.forEach(t=>{if(t&&t.memo)t.memo=sanitizeMemoHtml(t.memo);});});
     tasks = normalizeTasks(data.tasks);
     if (typeof saveTasks === 'function') saveTasks();
     if (data.offDays && typeof offDays !== 'undefined') { offDays = data.offDays; saveOffDays(); }
@@ -6190,9 +6198,9 @@ function importAllData(file) {
       Object.entries(data.images).forEach(([id, d]) => { const b = _dataURLToBlob(d); if (b) idbPutImage(id, b); });
     }
     render();
-    alert('복원이 완료되었습니다.' + (data.images ? ' (이미지 포함)' : ''));
+    alert('복원을 완료했어요.' + (data.images ? ' (이미지 포함)' : ''));
   };
-  reader.onerror = () => alert('파일을 읽지 못했습니다.');
+  reader.onerror = () => alert('파일을 읽지 못했어요.');
   reader.readAsText(file);
 }
 const _backupBtn = document.getElementById('backupBtn');
