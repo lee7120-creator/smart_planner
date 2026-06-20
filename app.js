@@ -1965,8 +1965,6 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   const txt=el('div',`task-text${checked?' done':''}`,{textContent:task.text});
   textWrap.appendChild(txt);
-  if(!isSub && task.by){ textWrap.appendChild(el('span','task-by',{textContent:'👤'+task.by,title:'등록: '+task.by})); }
-  if(!isSub && task.fromTeam){ textWrap.appendChild(el('span','task-fromteam',{textContent:'🤝'+((teamSubs&&teamSubs[task.fromTeam]&&teamSubs[task.fromTeam].name)||task.fromTeam),title:'팀 일정(복사본)'})); }
   if(!isSub){
     const hasMemo=!!(task.memo&&task.memo.trim());
     const memoBtn=el('span',`memo-icon-btn${hasMemo?' has':''}`,{textContent:'📝',title:hasMemo?'메모 보기/편집':'메모 추가'});
@@ -1981,6 +1979,12 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     textWrap.setAttribute('aria-label',(task.text||'할 일')+' — 수정');
   }
   body.appendChild(textWrap);
+  if(!isSub && (task.by || task.fromTeam)){
+    const metaWrap=el('div','task-meta');
+    if(task.by){ metaWrap.appendChild(el('span','task-by',{textContent:'👤'+task.by,title:'등록: '+task.by})); }
+    if(task.fromTeam){ metaWrap.appendChild(el('span','task-fromteam',{textContent:'🤝'+((teamSubs&&teamSubs[task.fromTeam]&&teamSubs[task.fromTeam].name)||task.fromTeam),title:'팀 일정(복사본)'})); }
+    body.appendChild(metaWrap);
+  }
   if(!isSub){
     const tags=task.text.match(/#[\w가-힣]+/g);
     if(tags&&tags.length){
