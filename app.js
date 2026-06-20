@@ -277,15 +277,15 @@ if (!USER_ID) {
     btn.innerHTML = '⏳ <span>저장 중...</span>';
     btn.disabled = true;
     fbUpload()
-      .then(() => { btn.innerHTML = '✅ <span>저장됨</span>'; })
-      .catch(() => { btn.innerHTML = '❌ <span>실패</span>'; })
+      .then(() => { btn.innerHTML = '✅ <span>저장 완료</span>'; })
+      .catch(() => { btn.innerHTML = '❌ <span>저장 실패</span>'; })
       .finally(() => setTimeout(() => { btn.innerHTML = '☁️ <span>저장</span>'; btn.disabled = false; }, 2000));
   };
   document.getElementById('renameBtn').style.display = 'flex';
   document.getElementById('renameBtn').onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); renameAccount(); };
   document.getElementById('switchUserBtn').style.display = 'flex';
   document.getElementById('switchUserBtn').onclick = () => {
-    if (confirm('다른 사용자로 전환할까요? 현재 데이터는 유지됩니다.')) {
+    if (confirm('다른 캘린더로 전환할까요? 지금 데이터는 그대로 남아요.')) {
       localStorage.removeItem('lastUser');
       window.location.href = window.location.href.split('?')[0];
     }
@@ -541,7 +541,7 @@ function skipRepeatInstance(originDk, taskId, instanceDk) {
   if (!t.skips) t.skips = {};
   t.skips[instanceDk] = true;
   saveTasks(originDk); render();
-  showUndoToast('이 날짜의 반복 항목을 삭제했어요', () => {
+  showUndoToast('이번 반복을 삭제했어요', () => {
     const tt = (tasks[originDk]||[]).find(x => x.id === taskId);
     if (tt && tt.skips) { delete tt.skips[instanceDk]; saveTasks(originDk); render(); }
   });
@@ -620,7 +620,7 @@ function carryOverFrom(fromDk, toDk) {
   });
   if (tasks[fromDk] && !tasks[fromDk].length) delete tasks[fromDk];
   saveTasks(); render();
-  showUndoToast(`미완료 ${ids.length}개를 오늘로 가져왔어요`, () => {
+  showUndoToast(`어제 못 끝낸 ${ids.length}개를 가져왔어요`, () => {
     ids.forEach(id => {
       const list = tasks[toDk]||[];
       const idx = list.findIndex(t => t.id === id);
@@ -680,7 +680,7 @@ function toggleOffDay(dk) {
     delete offDays[dk];
     const restored = restoreMovedFrom(dk);
     saveOffDays(); saveTasks(); render();
-    showUndoToast(restored ? `🏖 휴무일 해제 — 옮겼던 할 일 ${restored}개를 원래대로 되돌렸어요` : '🏖 휴무일을 해제했어요',
+    showUndoToast(restored ? `🏖 휴무일 해제 — ${restored}개를 원래 자리로 돌려놨어요` : '🏖 휴무일 해제했어요',
       () => { offDays[dk] = true; applyOffDayMove(dk); saveOffDays(); saveTasks(); render(); });
     return;
   }
@@ -1397,7 +1397,7 @@ function renderMemoHistory(){
     const excerpt=el('div','memo-hist-excerpt',{textContent:memoPlainText(h.text).split('\n')[0].slice(0,40)||'(빈 메모)'});
     const restoreBtn=el('button','trash-act-btn',{textContent:'복원'});
     restoreBtn.onclick=()=>{
-      if(!confirm('이 버전으로 복원할까요? 현재 내용은 히스토리에 저장됩니다.'))return;
+      if(!confirm('이 버전으로 되돌릴까요? 지금 내용은 히스토리에 남아요.'))return;
       document.getElementById('memoEditable').innerHTML=memoToHtml(h.text);
       hydrateMemoSubmemos(document.getElementById('memoEditable'));
       saveMemoNow();
@@ -1419,79 +1419,75 @@ document.getElementById('memoHistBtn').onclick=()=>{
 //    (배열에 추가하면 가이드 모달에 자동 반영됩니다)
 const GUIDE_SECTIONS=[
   { title:'🚀 시작하기', items:[
-    ['👤','나만의 캘린더','이름을 입력하면 나만의 URL이 생겨요. 이 URL을 북마크해두면 어디서든 내 일정에 접근할 수 있어요. PC·휴대폰에서 같은 URL을 열면 자동으로 동기화됩니다.'],
-    ['☁️','저장 버튼','변경사항은 자동 저장되지만, 헤더의 저장 버튼을 누르면 즉시 클라우드에 백업돼요.'],
-    ['📱','앱으로 설치','브라우저 주소창의 "설치" 아이콘(또는 공유→홈 화면에 추가)을 누르면 앱처럼 쓸 수 있고, 오프라인에서도 열려요.'],
+    ['👤','내 캘린더','이름을 입력하면 나만의 URL이 만들어져요. PC·모바일 어디서든 같은 URL로 접속하면 자동 동기화돼요.'],
+    ['☁️','저장','자동 저장되지만, 바로 저장하고 싶으면 헤더의 ☁️ 버튼을 눌러 주세요.'],
+    ['📱','앱 설치','브라우저에서 "홈 화면에 추가"를 누르면 앱처럼 쓸 수 있어요.'],
   ]},
-  { title:'🗓 화면 전환 (헤더 왼쪽 버튼)', items:[
-    ['📋','일간','하루에 집중하는 화면. 상단에서 목록 ↔ 타임라인(시간대별 배치)으로 전환할 수 있어요.'],
-    ['📅','주간','기본 화면. 월~일 7개 칸에 할 일을 관리해요.'],
-    ['🗓','월간','한 달 전체를 한눈에. 날짜를 누르면 그 주의 주간 화면으로 이동해요.'],
-    ['📆','연간','12개월 미니 달력. 점이 찍힌 날 = 할 일이 있는 날이에요.'],
-    ['📊','타임라인','한 달의 할 일을 가로 막대(간트차트)로 보여줘요. 반복 일정의 패턴이 한눈에 보여요.'],
-    ['🎯','포커스','오늘 할 일 + 지난 미완료만 모아서 보여주는 집중 모드예요.'],
+  { title:'🗓 화면 전환', items:[
+    ['📋','일간','하루만 크게 볼 수 있어요.'],
+    ['📅','주간','기본 화면이에요. 한 주를 한눈에 관리해요.'],
+    ['🗓','월간','한 달 전체를 볼 수 있어요. 날짜를 누르면 주간 화면으로 이동해요.'],
+    ['📆','연간','12개월 달력이에요. 점이 있으면 할 일이 있는 날이에요.'],
+    ['📊','타임라인','할 일을 가로 막대로 보여줘요. 반복 패턴이 잘 보여요.'],
+    ['🎯','포커스','오늘 할 일과 밀린 일만 모아서 보여줘요.'],
   ]},
-  { title:'✏️ 할 일 입력 꿀팁', items:[
-    ['⌨️','빠른 입력','"내일 3시 회의"처럼 입력하면 날짜와 시간을 자동 인식해요. (오늘/내일/모레/다음주 화요일/3월 15일/3/15 등)'],
-    ['🕐','시간 자동 인식','"8시"는 오전 8시, "6시"는 저녁 6시로 알아서 해석해요. (업무시간 8시~19시 기준) "오후 2시반", "14:30"도 OK!'],
-    ['🔴','우선순위','입력란 아래에서 🔴높음 🟡중간 🟢낮음을 선택. 알림 메시지에도 우선순위 높은 일이 먼저 나와요.'],
-    ['🎨','색상','색 점을 눌러 할 일에 색을 입혀요. 월간 화면에서도 색으로 구분돼요.'],
-    ['🔄','반복','매주/격주/매월/매월 N째 요일(예: 둘째 화요일) 반복을 설정할 수 있어요.'],
-    ['#️⃣','태그','할 일에 #태그를 쓰면 칩으로 표시되고, 누르면 같은 태그를 모아 검색해줘요.'],
+  { title:'✏️ 입력 꿀팁', items:[
+    ['⌨️','똑똑한 입력','"내일 3시 회의"라고 쓰면 날짜와 시간을 알아서 인식해요.'],
+    ['🕐','시간 인식','"8시"→오전, "6시"→저녁으로 자동 판단해요. "오후 2시반", "14:30"도 돼요.'],
+    ['🔴','중요도','🔴높음 🟡중간 🟢낮음으로 우선순위를 정할 수 있어요.'],
+    ['🎨','색상','색 점을 눌러 구분해 보세요.'],
+    ['🔄','반복','매주·격주·매월·N째 요일 반복을 설정할 수 있어요.'],
+    ['#️⃣','태그','#태그를 쓰면 같은 태그끼리 모아볼 수 있어요.'],
   ]},
-  { title:'✅ 할 일 다루기 (마우스를 올리면 아이콘이 나타나요)', items:[
-    ['★','중요 표시','별을 누르면 항상 맨 위로 정렬돼요.'],
-    ['🍅','포모도로','25분 집중 타이머가 시작돼요.'],
-    ['✏️','수정','내용·색상·우선순위·반복·마감시간을 변경해요.'],
-    ['📅','날짜 이동','내일/모레/다음 주 또는 날짜를 직접 골라 옮겨요.'],
-    ['✕','삭제','휴지통으로 이동돼요 (30일간 보관, 복구 가능). 삭제 직후 하단의 "실행 취소"로 즉시 되돌릴 수도 있어요.'],
-    ['🖱','드래그앤드롭','할 일을 끌어서 다른 날짜로 이동하거나, 같은 날 안에서 순서를 바꿀 수 있어요.'],
-    ['＋','하위 항목','할 일에 마우스를 올리면 "+ 하위 항목"이 나타나요. 체크리스트로 진행률(✓ 2/5)이 표시돼요.'],
+  { title:'✅ 할 일 관리', items:[
+    ['★','중요 표시','별을 누르면 맨 위로 올라가요.'],
+    ['🍅','집중 타이머','25분 포모도로 타이머를 시작해요.'],
+    ['✏️','수정','내용·색상·중요도·반복·마감시간을 바꿀 수 있어요.'],
+    ['📅','날짜 이동','다른 날짜로 옮길 수 있어요.'],
+    ['✕','삭제','휴지통으로 이동해요. 30일 안에 복구할 수 있어요.'],
+    ['🖱','드래그','끌어서 다른 날짜로 옮기거나 순서를 바꿀 수 있어요.'],
+    ['＋','하위 항목','체크리스트를 만들 수 있어요. 진행률도 표시돼요.'],
   ]},
   { title:'📝 메모', items:[
-    ['📝','메모 열기','할 일 제목을 클릭하면 노란 메모장이 열려요. 자동 저장됩니다.'],
-    ['👁','보기/편집','메모는 보기 모드로 열려요. **굵게**, - 목록, - [ ] 체크박스, # 제목 같은 마크다운이 예쁘게 표시돼요. ✏️를 누르거나 더블클릭하면 편집!'],
-    ['📷','이미지 첨부','버튼을 누르거나 스크린샷을 붙여넣기(Ctrl+V)하면 첨부돼요. 이미지는 이 기기에만 저장돼요.'],
-    ['🕐','버전 히스토리','이전에 쓴 내용을 최대 5개까지 복원할 수 있어요.'],
-    ['🔗','링크','메모에 URL을 쓰면 하단에 클릭 가능한 링크 칩이 생겨요.'],
+    ['📝','메모','할 일 옆 📝 아이콘을 누르면 열려요. 자동 저장돼요.'],
+    ['✍️','서식','굵게·기울임·밑줄·색상 등 서식을 적용할 수 있어요.'],
+    ['📷','이미지','버튼 또는 Ctrl+V로 이미지를 첨부할 수 있어요.'],
+    ['🕐','히스토리','이전 버전을 최대 5개까지 되돌릴 수 있어요.'],
+    ['🔗','링크','URL을 쓰면 클릭 가능한 링크로 바뀌어요.'],
   ]},
-  { title:'🔔 알림 (더보기 → 마감 알림 켜기)', items:[
-    ['🌅','아침 요약','설정한 아침 시각(기본 9시)에 오늘 할 일을 요약해서 알려줘요.'],
-    ['⏰','마감 전 알림','마감시간이 있는 할 일을 마감 전(기본 1시간, 설정 가능)에 미리 알려줘요.'],
-    ['🌆','저녁 리마인드','설정한 저녁 시각(기본 17시)에 미완료 할 일을 리마인드해줘요.'],
-    ['👤','받은 일정 알림','다른 사람이 보낸 일정이 도착하면 알림과 함께 제목에 "(n)" 배지로 표시돼요.'],
-    ['⏱','알림 시간 설정','더보기 → "알림 시간 설정"에서 아침·저녁 시각과 마감 N분 전을 바꿀 수 있어요.'],
-    ['💡','참고','브라우저 탭이 열려 있어야 알림이 와요. (백그라운드 탭은 OK)'],
+  { title:'🔔 알림', items:[
+    ['🌅','아침','매일 아침(기본 9시) 오늘 할 일을 알려줘요.'],
+    ['⏰','마감 전','마감 전(기본 30분)에 미리 알려줘요.'],
+    ['🌆','저녁','저녁(기본 17시)에 남은 할 일을 알려줘요.'],
+    ['⏱','설정','더보기 → 알림 설정에서 시간을 바꿀 수 있어요.'],
+    ['💡','참고','브라우저 탭이 열려 있어야 알림이 와요.'],
   ]},
-  { title:'🔍 검색 · 필터', items:[
-    ['🔎','검색','상단 검색창에서 제목·메모·하위 항목까지 찾아요.'],
-    ['🎚','상태/속성 필터','주간뷰 필터바에서 미완료·★중요·📝메모·🔴높은 우선순위로 추려봐요.'],
-    ['🏷','태그 필터','#태그가 있으면 태그 칩으로도 모아볼 수 있어요.'],
+  { title:'🔍 검색', items:[
+    ['🔎','검색','제목·메모·하위 항목까지 찾아줘요.'],
+    ['🎚','필터','미완료·중요·메모 있는 것만 골라 볼 수 있어요.'],
+    ['🏷','태그','#태그로 관련 일정을 모아볼 수 있어요.'],
   ]},
-  { title:'⋯ 더보기 메뉴', items:[
-    ['🔗','내 URL 복사','내 캘린더 주소를 복사해요.'],
-    ['👁','읽기전용 링크','보기만 가능한 공유 링크를 만들어요. 받은 사람은 수정할 수 없어요.'],
-    ['📑','템플릿','자주 쓰는 할일 묶음을 저장해두고 원하는 날짜에 한 번에 추가해요.'],
-    ['☑️','선택 모드','여러 할 일을 한 번에 완료·미완료·삭제하는 일괄 작업 모드예요.'],
-    ['📝','메모 모아보기','모든 메모를 최신순으로 한눈에 봐요.'],
+  { title:'⋯ 더보기', items:[
+    ['🔗','URL 복사','내 캘린더 주소를 복사해요.'],
+    ['👁','읽기전용 링크','보기만 가능한 링크를 만들어요.'],
+    ['📑','템플릿','자주 쓰는 할 일을 저장해두고 한 번에 추가해요.'],
+    ['☑️','여러 개 선택','한 번에 완료·삭제할 수 있어요.'],
+    ['📝','메모 전체보기','모든 메모를 한눈에 볼 수 있어요.'],
     ['🗑','휴지통','삭제한 할 일을 30일 안에 복구할 수 있어요.'],
-    ['📤','캘린더 내보내기','.ics 파일로 구글캘린더/아웃룩에 가져갈 수 있어요. (반복·시간·하위 항목 포함)'],
-    ['💾','전체 백업 / 복원','모든 데이터를 .json 파일로 내보내고 되돌릴 수 있어요. 기기 이전·실수 대비용.'],
-    ['✏️','이름 변경 / 이전','지금 이름의 데이터를 새 이름으로 복사·이전해요.'],
-    ['📍','내 위치 날씨','요일 칸 하단의 날씨를 내 위치 기준으로 바꿔요.'],
+    ['💾','백업','모든 데이터를 파일로 저장하고 복원할 수 있어요.'],
   ]},
   { title:'⌨️ 단축키', items:[
     ['←  →','주 이동','이전/다음 주로 이동해요.'],
-    ['T','오늘','오늘이 있는 주로 돌아와요.'],
-    ['N','새 할 일','오늘 칸에 입력란이 바로 열려요.'],
+    ['T','오늘','이번 주로 돌아와요.'],
+    ['N','새 할 일','바로 입력할 수 있어요.'],
     ['F','포커스','포커스 모드로 전환해요.'],
-    ['/','검색','검색창에 커서가 가요.'],
-    ['D','다크모드','어두운 테마로 전환해요.'],
+    ['/','검색','검색창으로 이동해요.'],
+    ['D','다크모드','테마를 바꿔요.'],
   ]},
-  { title:'📈 하단 대시보드', items:[
-    ['📊','이번 주 현황','완료 수, 전체 달성률, 연속 완료 일수와 요일별 분포를 보여줘요.'],
-    ['⭐','다가오는 중요 일정','별표/높은 우선순위 할 일의 D-day를 보여줘요.'],
-    ['📈','완료 통계','최근 8주 완료율 추이와 앞으로 해야 할 일 목록이에요.'],
+  { title:'📈 대시보드', items:[
+    ['📊','이번 주','완료 수, 달성률, 연속 기록을 보여줘요.'],
+    ['⭐','중요 일정','곧 다가오는 중요 일정을 보여줘요.'],
+    ['📈','통계','최근 8주 완료율 추이를 볼 수 있어요.'],
   ]},
 ];
 function renderGuide(){
@@ -1579,9 +1575,9 @@ document.getElementById('templateBtn').onclick=()=>{
 document.getElementById('tplCreateBtn').onclick=()=>{
   const name=document.getElementById('tplNameInput').value.trim();
   const srcDk=document.getElementById('tplSrcDate').value;
-  if(!name){alert('템플릿 이름을 입력하세요');return;}
+  if(!name){alert('템플릿 이름을 입력해 주세요');return;}
   const src=(tasks[srcDk]||[]).filter(t=>t);
-  if(!src.length){alert('해당 날짜에 할 일이 없습니다');return;}
+  if(!src.length){alert('그 날짜에는 할 일이 없어요');return;}
   const items=src.map(t=>({
     text:t.text,starred:!!t.starred,color:t.color||null,priority:t.priority||null,time:t.time||null,
     subs:(t.subs||[]).map(s=>({text:s.text}))
@@ -1680,7 +1676,7 @@ function memoTask(){
 }
 function attachMemoImage(file){
   if(!file||!file.type.startsWith('image/'))return;
-  if(file.size>8*1024*1024){alert('이미지가 너무 큽니다 (최대 8MB)');return;}
+  if(file.size>8*1024*1024){alert('8MB 이하 이미지만 올릴 수 있어요');return;}
   const task=memoTask(); if(!task||!memoCtx)return;
   const dk=memoCtx.dk;
   const id='img_'+uid();
@@ -1690,7 +1686,7 @@ function attachMemoImage(file){
     saveTasks(dk);
     if(memoCtx && memoCtx.dk===dk) renderMemoImages(task);
     render();
-  }).catch(()=>alert('이미지 저장 실패'));
+  }).catch(()=>alert('이미지를 저장하지 못했어요'));
 }
 function renderMemoImages(task){
   const wrap=document.getElementById('memoImages');
@@ -1774,7 +1770,7 @@ function updateMemoLinks() {
 function setMemoStatus(state) {
   const el = document.getElementById('memoStatus');
   el.className = 'memo-status ' + (state==='saved'?'ok':'saving');
-  el.textContent = state==='saved' ? '자동 저장됨 ✓' : '저장 중...';
+  el.textContent = state==='saved' ? '저장했어요 ✓' : '저장하는 중...';
 }
 
 function updateMemoCount() {
@@ -2191,7 +2187,7 @@ function buildWeatherBar(dk){
   const bar=el('div','weather-bar');
   const w=weatherByDate[dk];
   if(!w&&weatherStatus==='error'){
-    const retry=el('span','weather-skeleton weather-error',{textContent:'날씨 불러오기 실패 · 다시 시도',title:'클릭하여 다시 시도'});
+    const retry=el('span','weather-skeleton weather-error',{textContent:'날씨를 불러오지 못했어요 · 다시 시도',title:'클릭하여 다시 시도'});
     retry.style.cursor='pointer';
     retry.onclick=()=>fetchWeather(weatherLoc.lat,weatherLoc.lon);
     bar.appendChild(retry);
@@ -2236,7 +2232,7 @@ function openWeatherDetail(dk){
   const renderDetail=(data)=>{
     body.innerHTML='';
     const H=(data&&data.hourly)||{}; const times=H.time||[];
-    if(!times.length){ body.appendChild(el('div','wx-loading',{textContent:'이 날짜는 상세 예보가 없어요 (예보 범위 밖)'})); return; }
+    if(!times.length){ body.appendChild(el('div','wx-loading',{textContent:'아직 이 날짜의 상세 예보가 준비되지 않았어요'})); return; }
     const avg=arr=>arr&&arr.length?Math.round(arr.reduce((a,b)=>a+(+b||0),0)/arr.length):null;
     const chips=el('div','wx-chips');
     const mkChip=(label,val)=>{ const c=el('div','wx-chip'); c.appendChild(el('div','wx-chip-v',{textContent:val})); c.appendChild(el('div','wx-chip-l',{textContent:label})); chips.appendChild(c); };
@@ -2333,7 +2329,7 @@ function buildDayCol(date,dayIdx){
     const ydk=dateKey(y);
     const pendingCnt=(tasks[ydk]||[]).filter(t=>t&&!t.pending&&!t.checked&&(!t.repeat||t.repeat==='none')).length;
     if(pendingCnt>0){
-      const banner=el('button','carryover-banner',{textContent:`⏬ 어제 미완료 ${pendingCnt}개 가져오기`});
+      const banner=el('button','carryover-banner',{textContent:`⏬ 어제 못 끝낸 ${pendingCnt}개 가져오기`});
       banner.onclick=()=>carryOverFrom(ydk,dk);
       col.appendChild(banner);
     }
@@ -2370,7 +2366,7 @@ function buildDayCol(date,dayIdx){
   if(total===0&&sharedRows.length===0&&icsEventsFor(dk).length===0){
     const empty=el('div','day-empty');
     empty.appendChild(el('div','day-empty-icon',{textContent:'○'}));
-    empty.appendChild(el('div','day-empty-text',{textContent:'할 일 없음'}));
+    empty.appendChild(el('div','day-empty-text',{textContent:'아직 할 일이 없어요'}));
     list.appendChild(empty);
   }
   const ai=activeInput;
@@ -2843,7 +2839,7 @@ function buildSearchView(query){
     });
     wrap.appendChild(grp);
   }
-  if(!results.length&&!noteHits.length){wrap.appendChild(el('div','search-empty',{textContent:`"${query}" 검색 결과 없음`}));return wrap;}
+  if(!results.length&&!noteHits.length){wrap.appendChild(el('div','search-empty',{textContent:`"${query}"에 해당하는 결과가 없어요`}));return wrap;}
   if(!results.length)return wrap;
   const groups={};
   results.forEach(({dk,task})=>{if(!groups[dk])groups[dk]=[];groups[dk].push(task);});
@@ -2885,11 +2881,11 @@ function calcProgress(){
 
 // ── 당일 완료 축하 ──
 const CELEBRATE_MSGS = [
-  ['오늘 할 일 끝!', '완벽한 하루를 보냈어요 🙌'],
-  ['전부 완료! 🎉', '오늘의 목표를 모두 달성했어요'],
-  ['수고했어요!', '깔끔하게 비운 오늘, 멋져요 ✨'],
-  ['올 클리어! 🏆', '이 기세 그대로 내일도 화이팅'],
-  ['굿잡! 👏', '미루지 않고 다 해낸 당신, 최고예요'],
+  ['다 끝냈어요!', '오늘 하루 정말 잘했어요 🙌'],
+  ['올 클리어!', '목표 달성, 대단해요 🎉'],
+  ['수고했어요!', '오늘도 해냈네요 ✨'],
+  ['완벽해요!', '내일도 이 기세로 💪'],
+  ['최고예요!', '미루지 않고 끝까지 👏'],
 ];
 const CELEBRATE_EMOJIS = ['🎉','🎊','🥳','🏆','✨','🙌','💪'];
 let _celebrateArmed = false;   // 최초 렌더(로드)에서는 축하 띄우지 않음
