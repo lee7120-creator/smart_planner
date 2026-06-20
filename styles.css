@@ -297,7 +297,7 @@
     .task-meta { margin-top:3px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
     .task-by, .task-fromteam { font-size:10px; padding:1px 6px; border-radius:8px; white-space:nowrap; vertical-align:middle; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
     .task-by { background:var(--surface3); color:var(--text2); }
-    .task-fromteam { background:var(--primary-l); color:var(--primary); font-weight:600; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+    .task-fromteam { background:var(--primary-l); color:var(--primary); font-weight:600; }
     .tag-chips { margin-top:3px; display:flex; flex-wrap:wrap; gap:4px; }
     .tag-chip {
       font-size:10px; padding:1px 7px; border-radius:10px; background:var(--primary-l);
@@ -1127,7 +1127,7 @@
     }
     .memo-icon-btn.has { opacity:1; filter:none; }
     .memo-icon-btn:hover { opacity:1; filter:none; background:var(--primary-l); }
-    .task-text-wrap { cursor:pointer; display:flex; align-items:flex-start; gap:4px; flex:1; min-width:0; flex-wrap:wrap; }
+    .task-text-wrap { cursor:pointer; display:flex; align-items:flex-start; gap:4px; flex:1; min-width:0; }
     .task-text-wrap:hover .task-text { text-decoration:underline; text-decoration-style:dotted; text-decoration-color:var(--primary); }
 
     @media (max-width:768px) {
