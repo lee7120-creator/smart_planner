@@ -2328,7 +2328,7 @@ function buildDayCol(date,dayIdx){
     hdr.appendChild(meta);
   }
   col.appendChild(hdr);
-  if(isToday && !READ_ONLY){
+  if(isToday && !READ_ONLY && !holiday){
     const y=new Date(date); y.setDate(y.getDate()-1);
     const ydk=dateKey(y);
     const pendingCnt=(tasks[ydk]||[]).filter(t=>t&&!t.pending&&!t.checked&&(!t.repeat||t.repeat==='none')).length;
