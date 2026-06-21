@@ -13,13 +13,13 @@ let fbSaveTimer = null;
 try {
   firebase.initializeApp(FB_CONFIG);
   fbDb = firebase.database();
-} catch(e) { console.warn('Firebase 초기화 실패:', e); }
+} catch(e) { console.warn('Firebase 초기화 실패:', e); setTimeout(()=>setSyncStatus('local'),500); }
 
 function setSyncStatus(s) {
   const dot = document.getElementById('syncDot');
   if (!dot) return;
   dot.className = 'sync-dot ' + s;
-  dot.title = s === 'synced' ? '✅ 동기화됨' : s === 'syncing' ? '🔄 동기화 중...' : '❌ 오프라인';
+  dot.title = s === 'synced' ? '✅ 동기화됨' : s === 'syncing' ? '🔄 동기화 중...' : s === 'local' ? '💾 로컬 저장' : '❌ 오프라인 (로컬 저장됨)';
 }
 
 function fbRef() {
@@ -182,7 +182,8 @@ function saveOffDays() {
   offSaveTimer = setTimeout(() => {
     offSaveTimer = null;
     ref.set(Object.keys(offDays).length ? offDays : null)
-      .then(() => { pendingOffLocal = false; }).catch(() => {});
+      .then(() => { pendingOffLocal = false; _pendingCollections.delete('off'); })
+      .catch(() => { _pendingCollections.add('off'); });
   }, 300);
 }
 function initOffSync() {
@@ -340,7 +341,8 @@ function loadTasks() {
 }
 
 let pendingUpload = false;
-let pendingTasksLocal = false;  // 로컬 편집이 Firebase로 반영되는 중 → 원격 스냅샷이 덮어쓰지 않도록 가드
+let pendingTasksLocal = false;
+let _pendingCollections = new Set();
 
 function saveTasks(dk) {
   if (READ_ONLY) return;
@@ -3530,8 +3532,8 @@ function saveMemos() {
   memoSaveTimer2 = setTimeout(() => {
     memoSaveTimer2 = null;
     ref.set(memos)
-      .then(() => { pendingMemoLocal = false; setSyncStatus('synced'); })
-      .catch(() => setSyncStatus('offline'));
+      .then(() => { pendingMemoLocal = false; _pendingCollections.delete('memos'); setSyncStatus('synced'); })
+      .catch(() => { _pendingCollections.add('memos'); setSyncStatus('offline'); });
   }, 300);
 }
 window.addEventListener('pagehide', () => {
@@ -4724,7 +4726,8 @@ function saveShares() {
   shareSaveTimer = setTimeout(() => {
     shareSaveTimer = null;
     ref.set(Object.keys(shares).length ? shares : null)
-      .then(() => { pendingShareLocal = false; }).catch(() => {});
+      .then(() => { pendingShareLocal = false; _pendingCollections.delete('shares'); })
+      .catch(() => { _pendingCollections.add('shares'); });
   }, 300);
 }
 function initShareSync() {
@@ -4976,7 +4979,7 @@ function saveGoals() {
   const ref = goalsFbRef(); if (!ref) return;
   pendingGoalLocal = true;
   clearTimeout(goalSaveTimer);
-  goalSaveTimer = setTimeout(() => { goalSaveTimer = null; ref.set(goals).then(()=>{pendingGoalLocal=false;}).catch(()=>{}); }, 300);
+  goalSaveTimer = setTimeout(() => { goalSaveTimer = null; ref.set(goals).then(()=>{pendingGoalLocal=false;_pendingCollections.delete('goals');}).catch(()=>{_pendingCollections.add('goals');}); }, 300);
 }
 function initGoalSync() {
   const ref = goalsFbRef(); if (!ref) return;
@@ -5672,8 +5675,23 @@ registerUserDirectory();
 initGoalSync();
 rebuildIcsEvents();
 setInterval(()=>{ if(fbRef()) fbUpload(); }, 5*60*1000);
-window.addEventListener('online', ()=>{ if(pendingUpload && fbRef()){ pendingUpload=false; fbUpload(); } });
-window.addEventListener('offline', ()=>setSyncStatus('offline'));
+window.addEventListener('online', ()=>{
+  setSyncStatus('syncing');
+  if(pendingUpload && fbRef()){ pendingUpload=false; fbUpload(); }
+  if(_pendingCollections.size){
+    const retry=new Set(_pendingCollections);
+    _pendingCollections.clear();
+    if(retry.has('off')) saveOffDays();
+    if(retry.has('memos')) saveMemos();
+    if(retry.has('shares')) saveShares();
+    if(retry.has('goals')) saveGoals();
+  }
+  if(typeof showUndoToast==='function') showUndoToast('다시 연결됐어요. 저장하는 중...');
+});
+window.addEventListener('offline', ()=>{
+  setSyncStatus('offline');
+  if(typeof showUndoToast==='function') showUndoToast('오프라인 상태예요. 로컬에 저장돼요.');
+});
 
 // ── PWA 서비스워커 등록 (오프라인 지원 + 홈 화면 설치) ──
 if ('serviceWorker' in navigator) {
