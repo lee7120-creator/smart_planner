@@ -1395,6 +1395,7 @@
     .sync-dot.synced { background:var(--green); }
     .sync-dot.syncing { background:var(--orange); animation:pulse .8s infinite; }
     .sync-dot.offline { background:var(--red); }
+    .sync-dot.local { background:var(--yellow); }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
     /* ─── 당일 완료 축하 ─── */
