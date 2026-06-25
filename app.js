@@ -5693,9 +5693,49 @@ window.addEventListener('offline', ()=>{
   if(typeof showUndoToast==='function') showUndoToast('오프라인 상태예요. 로컬에 저장돼요.');
 });
 
-// ── PWA 서비스워커 등록 (오프라인 지원 + 홈 화면 설치) ──
+// ── PWA 서비스워커 등록 (오프라인 지원 + 홈 화면 설치 + 새 버전 자동 감지) ──
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  // 로드 시점에 이미 제어 중인 SW가 있었는지 — 최초 설치 때의 불필요한 새로고침 방지
+  const _hadController = !!navigator.serviceWorker.controller;
+  let _swReloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!_hadController || _swReloading) return;   // 최초 설치면 새로고침 안 함
+    _swReloading = true;
+    window.location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // 30분마다 + 탭 복귀 시 업데이트 확인 (앱을 계속 열어두는 PWA 대비)
+    setInterval(() => reg.update().catch(()=>{}), 30 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(()=>{}); });
+    const _watch = sw => { if (!sw) return; sw.addEventListener('statechange', () => {
+      if (sw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner();
+    }); };
+    if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner();
+    reg.addEventListener('updatefound', () => _watch(reg.installing));
+  }).catch(()=>{});
+}
+// 새 버전 안내 배너 (HTML/CSS 의존 없이 자체 주입 — 추가 위험 최소화)
+function showUpdateBanner(){
+  if (document.getElementById('updateBanner')) return;
+  const bar = document.createElement('div');
+  bar.id = 'updateBanner';
+  bar.setAttribute('role', 'status');
+  bar.setAttribute('aria-live', 'polite');
+  bar.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:12px;background:var(--primary,#5b6cf0);color:#fff;padding:11px 16px;border-radius:14px;box-shadow:0 10px 28px rgba(0,0,0,.28);font-size:14px;font-weight:600;max-width:92vw;animation:none';
+  const msg = document.createElement('span');
+  msg.textContent = '🆕 새 버전이 있어요';
+  const btn = document.createElement('button');
+  btn.textContent = '새로고침';
+  btn.style.cssText = 'background:#fff;color:var(--primary,#5b6cf0);border:none;border-radius:9px;padding:6px 14px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px';
+  btn.onclick = () => {
+    btn.disabled = true; btn.textContent = '적용 중…';
+    navigator.serviceWorker.getRegistration().then(r => {
+      if (r && r.waiting) r.waiting.postMessage('SKIP_WAITING');   // 대기 SW 즉시 활성화 → controllerchange가 새로고침
+    }).catch(()=>{});
+    setTimeout(() => window.location.reload(), 1500);              // 안전장치
+  };
+  bar.appendChild(msg); bar.appendChild(btn);
+  document.body.appendChild(bar);
 }
 
 // ── Dashboard ──
