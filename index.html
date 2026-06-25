@@ -1223,10 +1223,9 @@ function buildDayCol(date,dayIdx){
   if(holiday) hdr.appendChild(el('div','holiday-label',{textContent:'🎌 '+holiday}));
   // task count + mini progress
   const dayTasks=tasks[dk]||[];
-  const allTasks=[...dayTasks];
-  getRepeatTasksForDate(date,dayIdx).forEach(r=>allTasks.push(r.task));
-  const total=allTasks.length;
-  const done=allTasks.filter(t=>t.checked).length;
+  const repeatEntries=getRepeatTasksForDate(date,dayIdx);
+  const total=dayTasks.length+repeatEntries.length;
+  const done=dayTasks.filter(t=>t.checked).length+repeatEntries.filter(r=>isRepeatChecked(r.task,r.instanceDk)).length;
   if(total>0){
     const meta=el('div','day-meta');
     meta.appendChild(el('span','task-count-badge',{textContent:`${total}개`}));
@@ -1297,14 +1296,17 @@ function buildMonthCell(date,curMonth){
   if(isToday){const c=el('div','month-today-circle',{textContent:date.getDate()});cell.appendChild(c);}
   else cell.appendChild(el('div','month-date-num',{textContent:date.getDate()}));
   if(holiday) cell.appendChild(el('div','month-holiday-label',{textContent:'🎌 '+holiday}));
-  const list=tasks[dk]||[];
-  list.slice(0,3).forEach(t=>{
-    const pill=el('div',`month-pill${t.checked?' done':''}${t.color?' colored':''}`);
-    if(t.color){pill.style.background=t.color;pill.style.opacity=t.checked?'.5':'1';}
+  const directList=tasks[dk]||[];
+  const repeatList=getRepeatTasksForDate(date,dateToDayIdx(date)).map(r=>r.task);
+  const allTasks=[...directList,...repeatList];
+  allTasks.slice(0,3).forEach(t=>{
+    const checked=repeatList.includes(t)?isRepeatChecked(t,dk):t.checked;
+    const pill=el('div',`month-pill${checked?' done':''}${t.color?' colored':''}`);
+    if(t.color){pill.style.background=t.color;pill.style.opacity=checked?'.5':'1';}
     pill.textContent=(t.starred?'★ ':'')+t.text;
     cell.appendChild(pill);
   });
-  if(list.length>3) cell.appendChild(el('div','month-more',{textContent:`+${list.length-3}개 더`}));
+  if(allTasks.length>3) cell.appendChild(el('div','month-more',{textContent:`+${allTasks.length-3}개 더`}));
   cell.onclick=()=>{currentView='week';weekStart=getMonday(date);document.getElementById('btnWeek').classList.add('active');document.getElementById('btnMonth').classList.remove('active');render();};
   return cell;
 }
@@ -1350,7 +1352,9 @@ function calcProgress(){
   for(let i=0;i<7;i++){
     const d=new Date(weekStart);d.setDate(d.getDate()+i);
     const dk=dateKey(d);
+    const dayIdx=dateToDayIdx(d);
     (tasks[dk]||[]).forEach(t=>{total++;if(t.checked)done++;(t.subs||[]).forEach(s=>{total++;if(s.checked)done++;});});
+    getRepeatTasksForDate(d,dayIdx).forEach(({task,instanceDk})=>{total++;if(isRepeatChecked(task,instanceDk))done++;});
   }
   return {total,done};
 }
