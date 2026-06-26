@@ -343,6 +343,8 @@ function loadTasks() {
 let pendingUpload = false;
 let pendingTasksLocal = false;
 let _pendingCollections = new Set();
+let _pendingSaveDks = new Set();   // 디바운스 대기 중인 날짜들 (여러 dk 저장 시 마지막 것만 쓰이는 버그 방지)
+let _pendingSaveFull = false;      // 전체 저장 요청(인자 없는 saveTasks)이 대기 중인지
 
 function saveTasks(dk) {
   if (READ_ONLY) return;
@@ -350,15 +352,28 @@ function saveTasks(dk) {
   const ref = fbRef();
   if (!ref) return;
   pendingTasksLocal = true;
+  // 대기 중인 저장 대상 누적 — clearTimeout으로 이전 예약이 취소돼도 대상은 보존됨
+  if (dk) _pendingSaveDks.add(dk); else _pendingSaveFull = true;
   if (!navigator.onLine) { pendingUpload = true; setSyncStatus('offline'); return; }
   setSyncStatus('syncing');
   clearTimeout(fbSaveTimer);
   fbSaveTimer = setTimeout(() => {
-    const saveRef = dk ? ref.child(dk) : ref;
-    const saveData = dk ? (tasks[dk] || null) : tasks;
-    saveRef.set(saveData)
-      .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
-      .catch(() => { pendingUpload = true; setSyncStatus('offline'); });
+    const full = _pendingSaveFull;
+    const dks = [..._pendingSaveDks];
+    _pendingSaveFull = false; _pendingSaveDks.clear();
+    let p;
+    if (full || !dks.length) {
+      p = ref.set(tasks);
+    } else if (dks.length === 1) {
+      p = ref.child(dks[0]).set(tasks[dks[0]] || null);
+    } else {
+      // 여러 날짜를 한 번에 — 멀티패스 업데이트 (각 날짜 노드만 갱신)
+      const updates = {};
+      dks.forEach(d => { updates[d] = tasks[d] || null; });
+      p = ref.update(updates);
+    }
+    p.then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
+     .catch(() => { pendingUpload = true; setSyncStatus('offline'); });
   }, 300);
 }
 
@@ -368,6 +383,9 @@ function fbUpload() {
   if (!ref) return Promise.reject('no ref');
   pendingTasksLocal = true;
   setSyncStatus('syncing');
+  // 전체 업로드이므로 개별 dk 대기열은 비움 (디바운스 예약도 취소)
+  clearTimeout(fbSaveTimer); fbSaveTimer = null;
+  _pendingSaveFull = false; _pendingSaveDks.clear();
   return ref.set(tasks)
     .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
     .catch(e => { setSyncStatus('offline'); throw e; });
@@ -987,7 +1005,7 @@ function renderTrashModal(){
     const row=el('div','trash-item');
     const info=el('div','trash-info');
     info.appendChild(el('div',`trash-text${item.task.checked?' done':''}`,{textContent:(item.task.starred?'★ ':'')+item.task.text}));
-    const d=new Date(item.dk);
+    const d=parseDk(item.dk);
     const daysLeft=30-Math.floor((Date.now()-item.deletedAt)/86400000);
     info.appendChild(el('div','trash-meta',{textContent:`${d.getMonth()+1}/${d.getDate()} 삭제 · ${daysLeft}일 후 사라져요`}));
     row.appendChild(info);
@@ -1018,8 +1036,8 @@ function moveTask(fromDk, taskId, toDk, silent){
   tasks[toDk].push(task);
   saveTasks(fromDk); saveTasks(toDk); render();
   if(!silent){
-    const d=new Date(toDk);
-    showUndoToast(`"${task.text.slice(0,16)}" → ${d.getMonth()+1}/${d.getDate()} 이동됨`,()=>moveTask(toDk,taskId,fromDk,true));
+    const d=parseDk(toDk);
+    showUndoToast(`"${task.text.slice(0,16)}" → ${d.getMonth()+1}/${d.getDate()}로 옮겼어요`,()=>moveTask(toDk,taskId,fromDk,true));
   }
 }
 // 반복 일정의 '이 회차만' 이동: 해당 회차는 건너뛰고, 대상일에 단발 복사본 생성
@@ -1608,7 +1626,7 @@ function renderMemoAllModal(){
     if(!Array.isArray(tList))return;
     tList.forEach(t=>{
       if(t&&((t.memo&&t.memo.trim())||(Array.isArray(t.memoImages)&&t.memoImages.length)))
-        items.push({dk,task:t,ts:t.memoUpdated||new Date(dk).getTime()});
+        items.push({dk,task:t,ts:t.memoUpdated||parseDk(dk).getTime()});
     });
   });
   items.sort((a,b)=>b.ts-a.ts);
@@ -1618,7 +1636,7 @@ function renderMemoAllModal(){
   }
   items.forEach(({dk,task})=>{
     const row=el('div','memo-all-item');
-    const d=new Date(dk);
+    const d=parseDk(dk);
     const head=el('div','memo-all-head');
     head.appendChild(el('span','memo-all-task',{textContent:(task.starred?'★ ':'')+task.text}));
     head.appendChild(el('span','memo-all-date',{textContent:`${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[dateToDayIdx(d)]})`}));
@@ -2063,6 +2081,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     // 하위 항목: 인라인 삭제 버튼만 (기능 버튼 없음 → 텍스트 폭 확보)
     const actions=el('div','task-actions');
     const delBtn=el('button','task-act-btn del',{textContent:'✕',title:'삭제'});
+    delBtn.setAttribute('aria-label',(task.text||'하위 항목')+' 삭제');
     delBtn.onclick=e=>{
       e.stopPropagation();
       if(confirm('삭제할까요?')){ deleteTask(isRepeatInst?originDk:dk,parentId,task.id); }
@@ -2376,7 +2395,12 @@ function buildDayCol(date,dayIdx){
   if(total===0&&sharedRows.length===0&&icsEventsFor(dk).length===0){
     const empty=el('div','day-empty');
     empty.appendChild(el('div','day-empty-icon',{textContent:'○'}));
-    empty.appendChild(el('div','day-empty-text',{textContent:'아직 할 일이 없어요'}));
+    empty.appendChild(el('div','day-empty-text',{textContent:READ_ONLY?'아직 할 일이 없어요':'여기를 눌러 할 일을 추가해요'}));
+    if(!READ_ONLY){
+      empty.setAttribute('role','button'); empty.tabIndex=0; empty.style.cursor='pointer';
+      const openInput=()=>{activeInput={dateKey:dk,parentId:null};render();};
+      empty.onclick=openInput; if(typeof addKbd==='function') addKbd(empty,openInput);
+    }
     list.appendChild(empty);
   }
   const ai=activeInput;
@@ -2855,7 +2879,7 @@ function buildSearchView(query){
   results.forEach(({dk,task})=>{if(!groups[dk])groups[dk]=[];groups[dk].push(task);});
   Object.entries(groups).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([dk,list])=>{
     const grp=el('div','search-result-group');
-    const d=new Date(dk);
+    const d=parseDk(dk);
     grp.appendChild(el('div','search-result-date',{textContent:`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${DAY_NAMES[dateToDayIdx(d)]})`}));
     list.forEach(t=>{
       const item=el('div','search-result-item');
@@ -2864,7 +2888,7 @@ function buildSearchView(query){
       cb.onclick=e=>{e.stopPropagation();toggleTask(dk,t.id,null);};
       item.appendChild(cb);
       item.appendChild(el('span','search-result-text',{textContent:(t.starred?'★ ':'')+t.text}));
-      item.onclick=()=>{weekStart=getMonday(new Date(dk));searchQuery='';document.getElementById('searchInput').value='';setView('week');};
+      item.onclick=()=>{weekStart=getMonday(parseDk(dk));searchQuery='';document.getElementById('searchInput').value='';setView('week');};
       grp.appendChild(item);
     });
     wrap.appendChild(grp);
@@ -3069,6 +3093,8 @@ function render(){
   }
   // 당일 할 일 전부 완료 시 축하 (미완료→완료 전환 순간에만)
   if(!READ_ONLY) maybeCelebrate();
+  // 완료 애니메이션 플래그는 이번 렌더에서 소비됨 — 화면 밖이라 안 그려졌어도 여기서 정리
+  _justDoneId=null;
 }
 
 // ── Nav ──
@@ -3487,7 +3513,7 @@ function closeLightbox() { document.getElementById('imgLightbox').classList.add(
 // 스탠드얼론 메모장 v2 — 노션식 하위 뎁스 + 마크다운 + 슬래시 명령 + 이미지(로컬)
 // ═══════════════════════════════════════
 const MEMOS_KEY = USER_ID ? `calMemos_${USER_ID}` : 'calMemos';
-let memoSaveTimer2 = null, pendingMemoLocal = false;
+let memoSaveTimer2 = null, pendingMemoLocal = false, _noteTitleTimer = null;
 const NOTE_Z_BASE = 410; // 모달(500)·태스크메모(450)보다 아래
 const NOTE_COLORS = [null, '#f9a825', '#1a73e8', '#43a047', '#e91e63', '#8e24aa'];
 const noteEditState = {}; // memoId → true(편집 모드)
@@ -3540,6 +3566,16 @@ window.addEventListener('pagehide', () => {
   if (memoSaveTimer2) {
     clearTimeout(memoSaveTimer2); memoSaveTimer2 = null;
     const ref = memosFbRef(); if (ref) ref.set(memos);
+  }
+  // 할 일도 디바운스 대기 중이면 닫기 직전에 즉시 반영 (300ms 내 편집 손실 방지)
+  if (fbSaveTimer) {
+    clearTimeout(fbSaveTimer); fbSaveTimer = null;
+    const ref = fbRef();
+    if (ref) {
+      if (_pendingSaveFull || !_pendingSaveDks.size) { ref.set(tasks); }
+      else { const u={}; _pendingSaveDks.forEach(d=>{u[d]=tasks[d]||null;}); ref.update(u); }
+      _pendingSaveFull=false; _pendingSaveDks.clear();
+    }
   }
 });
 
@@ -4098,7 +4134,7 @@ function buildNoteWin(m) {
   }
   const title = el('input', 'note-title-input');
   title.type = 'text'; title.placeholder = '제목'; title.value = m.title; title.readOnly = READ_ONLY;
-  title.addEventListener('input', () => { m.title = title.value; saveMemos(); });
+  title.addEventListener('input', () => { m.title = title.value; clearTimeout(_noteTitleTimer); _noteTitleTimer = setTimeout(saveMemos, 400); });
   head.appendChild(title);
   if (!READ_ONLY) {
     const colorBtn = el('button', 'note-btn', {textContent: '🎨', title: '색상 변경'});
@@ -5744,7 +5780,7 @@ function getImportantUpcoming(){
   const items = [];
   Object.entries(tasks).forEach(([dk,list])=>{
     if(!Array.isArray(list)) return;
-    const d = new Date(dk); d.setHours(0,0,0,0);
+    const d = parseDk(dk); d.setHours(0,0,0,0);
     if(d < now) return;
     list.forEach(t=>{
       if(!t||t.checked) return;
@@ -5774,7 +5810,7 @@ function buildDashStats(){
       totalAll++; if(t.checked) doneAll++;
       // 반복 태스크는 아래 루프에서 인스턴스로 집계하므로 주간 버킷에서 제외(이중집계 방지)
       if(t.repeat && t.repeat!=='none') return;
-      const d = new Date(dk); d.setHours(0,0,0,0);
+      const d = parseDk(dk); d.setHours(0,0,0,0);
       const diff = Math.round((d-monday)/86400000);
       if(diff>=0 && diff<7){ weekTotal++; if(t.checked) weekDone++; dayTotals[diff]+=1; }
     });
@@ -5859,7 +5895,7 @@ function getSheetEvents(){
     if(!Array.isArray(list)) return;
     list.forEach(t=>{
       if(!t||t.color!=='#1677ff'||!t.text.includes('[전관행사]')) return;
-      const date=new Date(dk); date.setHours(0,0,0,0);
+      const date=parseDk(dk); date.setHours(0,0,0,0);
       const dday=Math.round((date-today)/86400000);
       if(dday<0) return; // 지난 행사 제외
       const key=t.text+'|'+dk;

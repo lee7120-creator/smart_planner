@@ -195,6 +195,11 @@
     .task-act-btn:hover { background:var(--border); color:var(--text); }
     .task-act-btn.del:hover { background:var(--red); color:#fff; }
     .task-act-btn.move:hover { background:var(--primary-l); color:var(--primary); }
+    /* 터치 탭 피드백 — :hover가 안 먹는 모바일에서 누른 느낌 제공 */
+    .task-act-btn:active, .task-more-btn:active, .task-cb:active, .task-star:active,
+    .memo-icon-btn:active, .carryover-banner:active, .tag-chip:active,
+    .btn-primary:active, .btn-secondary:active, .btn-danger:active,
+    .more-menu-item:active, .landing-btn:active { transform:scale(.94); opacity:.8; }
 
     /* ─── 상위 태스크 작업 메뉴 트레이 (⋯) ─── */
     .task-actions-wrap { position:relative; flex-shrink:0; display:flex; align-items:flex-start; }
@@ -708,9 +713,9 @@
 
       /* Always show action buttons on mobile (no hover) */
       .task-actions { opacity:1; }
-      .task-act-btn { width:36px; height:36px; font-size:15px; }
+      .task-act-btn { width:40px; height:40px; font-size:15px; }
       /* 모바일: ⋯ 트레이 버튼 항상 노출 + 터치 영역 확대 */
-      .task-more-btn { opacity:1; width:36px; height:36px; font-size:18px; }
+      .task-more-btn { opacity:1; width:40px; height:40px; font-size:18px; }
       /* 하위 항목 들여쓰기 축소로 텍스트 폭 확보 */
       .task-item.sub { margin-left:12px; }
       .tray-item { padding:9px 12px; font-size:13px; }
