@@ -140,13 +140,21 @@
     .task-item.touch-dragging { opacity:.9; box-shadow:0 8px 24px rgba(0,0,0,.22); transform:scale(1.03); background:var(--surface); position:relative; z-index:30; }
     .task-item:hover .task-actions { opacity:1; }
 
-    /* 중요도(우선순위)에 따른 배경색 — 높음:빨강 / 보통:노랑 / 낮음:초록 */
-    .task-item.prio-high { background:color-mix(in srgb, var(--red) 9%, transparent); }
-    .task-item.prio-mid  { background:color-mix(in srgb, var(--yellow) 13%, transparent); }
-    .task-item.prio-low  { background:color-mix(in srgb, var(--green) 9%, transparent); }
+    /* 중요도(우선순위)에 따른 배경색 — 높음:빨강 / 보통:노랑 / 낮음:초록
+       + 좌측 컬러 바: 틴트가 안 보이는 환경(다크모드·색약)에서도 우선순위 식별 */
+    .task-item.prio-high { background:color-mix(in srgb, var(--red) 9%, transparent); box-shadow:inset 3px 0 0 color-mix(in srgb, var(--red) 55%, transparent); }
+    .task-item.prio-mid  { background:color-mix(in srgb, var(--yellow) 13%, transparent); box-shadow:inset 3px 0 0 color-mix(in srgb, var(--yellow) 55%, transparent); }
+    .task-item.prio-low  { background:color-mix(in srgb, var(--green) 9%, transparent); box-shadow:inset 3px 0 0 color-mix(in srgb, var(--green) 55%, transparent); }
     .task-item.prio-high:hover { background:color-mix(in srgb, var(--red) 16%, transparent); }
     .task-item.prio-mid:hover  { background:color-mix(in srgb, var(--yellow) 20%, transparent); }
     .task-item.prio-low:hover  { background:color-mix(in srgb, var(--green) 16%, transparent); }
+    /* 다크모드: 틴트 강화 — 9%로는 hover 배경과 구분이 안 됨 */
+    [data-theme="dark"] .task-item.prio-high { background:color-mix(in srgb, var(--red) 16%, transparent); }
+    [data-theme="dark"] .task-item.prio-mid  { background:color-mix(in srgb, var(--yellow) 17%, transparent); }
+    [data-theme="dark"] .task-item.prio-low  { background:color-mix(in srgb, var(--green) 16%, transparent); }
+    [data-theme="dark"] .task-item.prio-high:hover { background:color-mix(in srgb, var(--red) 24%, transparent); }
+    [data-theme="dark"] .task-item.prio-mid:hover  { background:color-mix(in srgb, var(--yellow) 25%, transparent); }
+    [data-theme="dark"] .task-item.prio-low:hover  { background:color-mix(in srgb, var(--green) 24%, transparent); }
 
     .task-star { font-size:13px; cursor:pointer; color:var(--border); flex-shrink:0; margin-top:2px; transition:color .15s,transform .15s; user-select:none; }
     .task-star.on { color:var(--yellow); }
@@ -520,10 +528,12 @@
     .pomodoro-ctrl-btn { flex:1; border:1px solid var(--border); background:var(--surface2); border-radius:8px; padding:5px; font-size:11px; cursor:pointer; color:var(--text2); font-family:inherit; transition:all .12s; }
     .pomodoro-ctrl-btn:hover { background:var(--primary-l); color:var(--primary); border-color:var(--primary); }
     .form-actions { display:flex; gap:5px; }
-    .btn-add { background:var(--primary); color:#fff; border:none; border-radius:7px; padding:5px 14px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:600; }
+    /* 인라인 폼 버튼 — 모달 버튼(.btn-primary/.btn-secondary)과 같은 규격의 컴팩트판 */
+    .btn-add { background:var(--primary); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
     .btn-add:hover { background:var(--primary-h); }
-    .btn-cancel { background:var(--surface); color:var(--text2); border:1px solid var(--border); border-radius:7px; padding:5px 10px; font-size:12px; cursor:pointer; font-family:inherit; }
-    .btn-cancel:hover { background:var(--surface2); }
+    .btn-cancel { background:var(--surface2); color:var(--text2); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer; font-family:inherit; }
+    .btn-cancel:hover { background:var(--surface3); }
+    .btn-add:active, .btn-cancel:active { transform:scale(.96); }
 
     /* ─── Weather bar ─── */
     .weather-bar {
@@ -629,6 +639,7 @@
     .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
     .btn-primary { background:var(--primary); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
     .btn-primary:hover { background:var(--primary-h); }
+    .btn-primary:disabled, .btn-secondary:disabled { opacity:.5; cursor:default; transform:none; }
     .btn-secondary { background:var(--surface2); color:var(--text2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
     .btn-secondary:hover { background:var(--border); }
 
@@ -665,6 +676,33 @@
     .week-bar { width:100%; border-radius:4px 4px 0 0; background:var(--primary); opacity:.7; min-height:4px; transition:height .3s; }
     .week-bar.today { opacity:1; }
     .week-bar-day { font-size:10px; color:var(--text3); white-space:nowrap; }
+
+    /* 첫 로딩 스켈레톤 — 클라우드 첫 응답 전 빈 화면 대신 시머 바 표시 */
+    .skeleton-loading .day-empty { display:none; }
+    .skeleton-loading .tasks-list::before {
+      content:''; display:block; height:52px; margin:4px 2px; border-radius:10px;
+      background:linear-gradient(90deg, var(--surface2) 25%, var(--surface3) 40%, var(--surface2) 60%);
+      background-size:300% 100%; animation:shimmer 1.1s linear infinite;
+    }
+    @keyframes shimmer { 0% { background-position:100% 0; } 100% { background-position:-100% 0; } }
+
+    /* 모바일 주간뷰 요일 인디케이터 (데스크톱은 숨김) */
+    .week-ind { display:none; }
+    @media (max-width:768px){
+      .week-ind { display:flex; justify-content:center; gap:5px; padding:6px 0 2px; }
+      .week-ind-dot {
+        width:26px; height:26px; border-radius:50%; border:none; background:none;
+        font-size:11px; font-weight:600; color:var(--text3); cursor:pointer;
+        display:flex; align-items:center; justify-content:center; font-family:inherit;
+        transition:background .15s, color .15s;
+      }
+      .week-ind-dot.today { color:var(--red); }
+      .week-ind-dot.on { background:var(--primary); color:#fff; }
+    }
+
+    /* 뷰 전환 등장 애니메이션 (뷰 종류가 바뀔 때만 JS에서 부여) */
+    .view-enter { animation:viewIn .18s ease; }
+    @keyframes viewIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 
     /* ─── Mobile bottom nav ─── */
     .mobile-nav { display:none; }

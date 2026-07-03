@@ -307,6 +307,7 @@ let tasks = loadTasks();
 let activeInput = null;
 let justToggledCb = null;   // 방금 토글한 체크박스만 팝 애니메이션 (재렌더 시 전체 팝 버그 방지)
 let _justDoneId = null;
+let _lastRenderedView = null;  // 뷰 종류가 바뀔 때만 전환 애니메이션 (체크 토글 재렌더엔 미적용)
 let weatherByDate = {};
 let weatherStatus = 'loading';  // 'loading' | 'ok' | 'error'
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
@@ -423,8 +424,13 @@ function initFirebaseSync() {
   const dot = document.getElementById('syncDot');
   if (dot) dot.style.display = 'block';
   setSyncStatus('syncing');
+  // 첫 방문(로컬 데이터 없음): 클라우드 첫 응답까지 스켈레톤 표시 — 빈 화면 방지
+  const _mv=document.getElementById('mainView');
+  if(_mv && !Object.keys(tasks).length) _mv.classList.add('skeleton-loading');
+  const _clearSkeleton=()=>{ if(_mv) _mv.classList.remove('skeleton-loading'); };
   // 1) 먼저 한 번 읽어서 Firebase 데이터 유무 확인
   ref.once('value').then(snapshot => {
+    _clearSkeleton();
     const remote = snapshot.val();
     if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
       // Firebase에 데이터 있음 → 로컬에 덮어쓰기 (실시간 리스너와 동일하게 정규화)
@@ -452,7 +458,7 @@ function initFirebaseSync() {
     // 3) 개인 트리 로드 후에 구독 팀 동기화 시작 (먼저 실행되면 복사본이 덮어쓰기로 사라질 수 있음)
     if (typeof loadTeamDataFromFb === 'function') loadTeamDataFromFb();
     if (typeof syncSubscribedTeams === 'function') syncSubscribedTeams();
-  }).catch(() => { setSyncStatus('offline'); if (typeof syncSubscribedTeams === 'function') syncSubscribedTeams(); });
+  }).catch(() => { _clearSkeleton(); setSyncStatus('offline'); if (typeof syncSubscribedTeams === 'function') syncSubscribedTeams(); });
 }
 
 // ── Date helpers ──
@@ -3094,6 +3100,25 @@ function render(){
     [5,6].forEach(i=>{const d=new Date(weekStart);d.setDate(d.getDate()+i);wkndCol.appendChild(buildDayCol(d,i));});
     grid.appendChild(wkndCol);
     wrap.appendChild(grid); view.appendChild(wrap);
+    // 모바일: 지금 어느 요일 칸을 보고 있는지 표시하는 인디케이터 (탭하면 그 요일로 이동)
+    if(window.innerWidth<=768){
+      const ind=el('div','week-ind');
+      const cols=[...wrap.querySelectorAll('.day-col')];
+      const todayIdx0=(()=>{const t=today();for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);if(d.getTime()===t.getTime())return i;}return -1;})();
+      const dots=DAY_NAMES.map((nm,i)=>{
+        const d=el('button','week-ind-dot'+(i===todayIdx0?' today':''),{type:'button',textContent:nm});
+        d.setAttribute('aria-label',nm+'요일로 이동');
+        d.onclick=()=>{ if(cols[i]) cols[i].scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'}); };
+        ind.appendChild(d); return d;
+      });
+      view.insertBefore(ind,wrap);
+      if('IntersectionObserver' in window){
+        const io=new IntersectionObserver(es=>{
+          es.forEach(en=>{ if(en.isIntersecting){ const idx=cols.indexOf(en.target); if(idx>=0) dots.forEach((d,i)=>d.classList.toggle('on',i===idx)); } });
+        },{root:wrap,threshold:.6});
+        cols.forEach(c=>io.observe(c));
+      }
+    }
     const wk=dateKey(weekStart);
     if(window.innerWidth<=768){
       if(_weekScroll.key===wk){
@@ -3125,6 +3150,13 @@ function render(){
   // focus
   if(activeInput){
     setTimeout(()=>{const inp=document.getElementById(`inp-${activeInput.dataKey||activeInput.dateKey}-${activeInput.parentId||'main'}`);if(inp)inp.focus();},30);
+  }
+  // 뷰 전환 시에만 부드러운 등장 애니메이션 (같은 뷰 재렌더는 그대로)
+  if(_lastRenderedView!==currentView){
+    view.classList.remove('view-enter');
+    void view.offsetWidth;
+    view.classList.add('view-enter');
+    _lastRenderedView=currentView;
   }
   // 당일 할 일 전부 완료 시 축하 (미완료→완료 전환 순간에만)
   if(!READ_ONLY) maybeCelebrate();
