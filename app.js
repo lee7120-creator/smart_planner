@@ -1966,7 +1966,11 @@ memoPopupEl.addEventListener('drop', e=>{
 });
 
 // ── Weather ──
-async function fetchWeather(lat,lon) {
+// 일시 오류에 강하게: 실패 시 6초 뒤 1회 자동 재시도 → 그래도 실패면
+// 최근 성공 데이터(6시간 내 캐시)로 표시 → 10분 뒤 백그라운드 재시도
+let _wxRetryTimer=null;
+async function fetchWeather(lat,lon,attempt) {
+  attempt=attempt||0;
   weatherStatus='loading';
   try {
     const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto&forecast_days=16`);
@@ -1978,8 +1982,26 @@ async function fetchWeather(lat,lon) {
       weatherByDate[dt]={emoji:WMO[code]||'🌡️',desc:WMO_D[code]||'',max:Math.round(d.daily.temperature_2m_max[i]),min:Math.round(d.daily.temperature_2m_min[i]),rain:d.daily.precipitation_probability_max[i]??0};
     });
     weatherStatus='ok';
+    try{ localStorage.setItem('wxCache', JSON.stringify({ts:Date.now(), data:weatherByDate})); }catch{}
     render();
-  } catch(e){ console.warn('날씨 로드 실패',e); weatherStatus='error'; render(); }
+  } catch(e){
+    console.warn('날씨 로드 실패',e);
+    if(attempt<1){ setTimeout(()=>fetchWeather(lat,lon,attempt+1), 6000); return; }
+    // 최근 캐시로 폴백 (6시간 내)
+    try{
+      const c=JSON.parse(localStorage.getItem('wxCache')||'null');
+      if(c && c.data && Date.now()-c.ts < 6*60*60*1000){
+        Object.assign(weatherByDate, c.data);
+        weatherStatus='ok'; render();
+        clearTimeout(_wxRetryTimer);
+        _wxRetryTimer=setTimeout(()=>fetchWeather(lat,lon), 10*60*1000);
+        return;
+      }
+    }catch{}
+    weatherStatus='error'; render();
+    clearTimeout(_wxRetryTimer);
+    _wxRetryTimer=setTimeout(()=>fetchWeather(lat,lon), 10*60*1000);
+  }
 }
 document.getElementById('locationBtn').onclick=()=>{
   if(!navigator.geolocation)return;
