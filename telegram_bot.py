@@ -210,7 +210,7 @@ def handle_ai_agent(message):
     try:
         # Initialize Gemini Model with tools
         model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
+            model_name="gemini-2.5-flash",
             tools=[read_file, write_file, run_terminal_command, list_project_files],
             system_instruction=(
                 "당신은 사용자의 컴퓨터 로컬 환경에서 코드를 개발하는 자율 AI 코딩 에이전트입니다. "
