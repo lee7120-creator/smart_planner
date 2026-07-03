@@ -634,18 +634,46 @@
     .modal-overlay {
       position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:500;
       display:flex; align-items:center; justify-content:center;
-      backdrop-filter:blur(2px); animation:fadeIn .15s;
+      backdrop-filter:blur(3px); animation:fadeIn .2s ease-out;
     }
     .modal-overlay.hidden { display:none; }
     @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-    @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    
     .modal-box {
-      background:var(--surface); border-radius:20px; padding:24px;
-      width:340px; box-shadow:var(--shadow-lg);
-      animation:modalIn .28s cubic-bezier(.34,1.56,.64,1);
-      border:1px solid var(--border);
+      background:var(--surface); border-radius:24px; padding:28px 24px;
+      width:360px; max-width:90vw; max-height:90vh; overflow-y:auto;
+      box-shadow:var(--shadow-xl); border:1px solid var(--border);
+      animation:modalInDesktop .3s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
-    @keyframes modalIn { from { opacity:0; transform:translateY(16px) scale(.95); } to { opacity:1; transform:none; } }
+    
+    @keyframes modalInDesktop { 
+      from { opacity:0; transform:translateY(20px) scale(0.96); } 
+      to { opacity:1; transform:none; } 
+    }
+
+    @media (max-width: 768px) {
+      .modal-overlay {
+        align-items: flex-end; /* Bottom sheet align */
+      }
+      .modal-box {
+        width: 100%; max-width: 100vw; max-height: 90vh;
+        border-radius: 28px 28px 0 0;
+        padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
+        margin: 0;
+        animation: slideUpMobile .35s cubic-bezier(0.2, 0.8, 0.2, 1);
+        box-shadow: 0 -4px 24px rgba(0,0,0,0.1);
+        border: none;
+      }
+      .modal-box::before {
+        content: ''; display:block; width:40px; height:4px; 
+        background:var(--border); border-radius:2px; 
+        margin: 0 auto 16px auto; opacity: 0.6;
+      }
+    }
+    @keyframes slideUpMobile { 
+      from { transform: translateY(100%); } 
+      to { transform: translateY(0); } 
+    }
     .modal-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:16px; }
     .modal-input {
       width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 12px;

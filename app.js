@@ -583,7 +583,8 @@ function isRepeatChecked(task, instanceDk) {
 }
 function toggleRepeatInst(originDk, taskId, instanceDk) {
   if(READ_ONLY)return;
-  const t=(tasks[originDk]||[]).find(x=>x.id===taskId); if(!t)return;
+  const ctx = findTaskContext(tasks[originDk]||[], taskId); if(!ctx)return;
+  const t = ctx.node;
   if(!t.completions) t.completions={};
   t.completions[instanceDk]=!isRepeatChecked(t,instanceDk);
   saveTasks(originDk); render();
@@ -814,13 +815,28 @@ document.getElementById('undoBtn').onclick=()=>{
 };
 
 // ── Task mutations ──
+// ── Recursive Task Find Helper ──
+function findTaskContext(list, id, parentNode = null) {
+  if (!Array.isArray(list)) return null;
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].id === id) return { list, parentNode, index: i, node: list[i] };
+    if (list[i].subs) {
+      const found = findTaskContext(list[i].subs, id, list[i]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function addTask(dk,text,color,starred,repeat,parentId,priority,time) {
   if(READ_ONLY)return;
   if(!tasks[dk]) tasks[dk]=[];
   const t={id:uid(),text,checked:false,starred:!!starred,color:color||null,repeat:repeat||'none',priority:priority||null,time:time||null,completions:{},subs:[]};
-  if(parentId){const p=tasks[dk].find(x=>x.id===parentId);if(p){if(!Array.isArray(p.subs))p.subs=[];p.subs.push(t);}}
-  else tasks[dk].push(t);
+  if(parentId){
+    const ctx = findTaskContext(tasks[dk], parentId);
+    if(ctx){ if(!Array.isArray(ctx.node.subs)) ctx.node.subs=[]; ctx.node.subs.push(t); }
+  } else tasks[dk].push(t);
   saveTasks(dk); activeInput=null; render();
 }
 
@@ -977,10 +993,12 @@ function parseQuickDate(text){
 function toggleTask(dk,id,subId) {
   if(READ_ONLY)return;
   const list=tasks[dk]||[];
-  if(subId){const p=list.find(x=>x.id===id);if(p){const s=p.subs.find(x=>x.id===subId);if(s)s.checked=!s.checked;}}
-  else{
-    const t=list.find(x=>x.id===id);
-    if(t){t.checked=!t.checked; if(t.checked){t.completedAt=Date.now();_justDoneId=t.id;} else delete t.completedAt;}
+  const targetId = subId || id;
+  const ctx = findTaskContext(list, targetId);
+  if(ctx){
+    const t = ctx.node;
+    t.checked = !t.checked;
+    if(t.checked){t.completedAt=Date.now();_justDoneId=t.id;} else delete t.completedAt;
   }
   saveTasks(dk); render();
 }
@@ -1249,8 +1267,11 @@ document.getElementById('editSaveBtn').onclick=()=>{
   if(!editCtx)return;
   const text=document.getElementById('editInput').value.trim();
   if(!text)return;
-  const t=(tasks[editCtx.dk]||[]).find(x=>x.id===editCtx.taskId);
-  if(t){t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;t.priority=_editPriority;t.time=document.getElementById('editTimeInput').value||null;t.duration=document.getElementById('editDuration').value||null;t.repeatEnd=_editRepeat!=='none'?(document.getElementById('editRepeatEnd').value||null):null;if(!t.completions)t.completions={};}
+  const ctx = findTaskContext(tasks[editCtx.dk]||[], editCtx.taskId);
+  if(ctx){
+    const t=ctx.node;
+    t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;t.priority=_editPriority;t.time=document.getElementById('editTimeInput').value||null;t.duration=document.getElementById('editDuration').value||null;t.repeatEnd=_editRepeat!=='none'?(document.getElementById('editRepeatEnd').value||null):null;if(!t.completions)t.completions={};
+  }
   saveTasks(editCtx.dk); closeEdit(); render();
 };
 document.getElementById('editTimeClear').onclick=()=>{document.getElementById('editTimeInput').value='';};
@@ -2061,7 +2082,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       }catch(err){}
     };
   }
-  if(!isSub&&!READ_ONLY&&!selectMode){
+  if(!READ_ONLY&&!selectMode){
     item.draggable=true;
     item.ondragstart=e=>{
       e.dataTransfer.setData('application/json',JSON.stringify({dk:isRepeatInst?originDk:dk,id:task.id,isRepeat:!!isRepeatInst,instanceDk:isRepeatInst?instanceDk:null}));
@@ -2090,7 +2111,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       };
     }
   }
-  if(!isSub){
+  if(true){
     const star=el('span',`task-star${task.starred?' on':''}`,{textContent:'★',title:'중요 표시'});
     const starToggle=e=>{if(selectable){toggleSel(e);return;}e.stopPropagation();toggleStar(isRepeatInst?originDk:dk,task.id);};
     star.onclick=starToggle; addKbd(star,starToggle);
@@ -2143,11 +2164,11 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   const body=el('div','task-body');
   // text + memo dot (clickable to open memo)
   const textWrap=el('div','task-text-wrap');
-  if(!isSub&&task.priority){
+  if(task.priority){
     const flagMap={high:'🔴',mid:'🟡',low:'🟢'};
     textWrap.appendChild(el('span','priority-flag',{textContent:flagMap[task.priority]||''}));
   }
-  if(!isSub&&task.time){
+  if(task.time){
     const now=new Date();
     const nowHM=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     const todayDk=dateKey(today());
@@ -2156,7 +2177,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   }
   const txt=el('div',`task-text${checked?' done':''}`,{textContent:task.text});
   textWrap.appendChild(txt);
-  if(!isSub){
+  if(true){
     const hasMemo=!!(task.memo&&task.memo.trim());
     const memoBtn=el('span',`memo-icon-btn${hasMemo?' has':''}`,{title:hasMemo?'메모 보기/편집':'메모 추가'}); memoBtn.innerHTML='<svg class="ic" width="13" height="13"><use href="#i-note"/></svg>';
     memoBtn.setAttribute('role','button'); memoBtn.tabIndex=0;
@@ -2170,13 +2191,13 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     textWrap.setAttribute('aria-label',(task.text||'할 일')+' — 수정');
   }
   body.appendChild(textWrap);
-  if(!isSub && (task.by || task.fromTeam)){
+  if(task.by || task.fromTeam){
     const metaWrap=el('div','task-meta');
     if(task.by){ metaWrap.appendChild(el('span','task-by',{textContent:'👤'+task.by,title:'등록: '+task.by})); }
     if(task.fromTeam){ metaWrap.appendChild(el('span','task-fromteam',{textContent:'🤝'+((teamSubs&&teamSubs[task.fromTeam]&&teamSubs[task.fromTeam].name)||task.fromTeam),title:'팀 일정(복사본)'})); }
     body.appendChild(metaWrap);
   }
-  if(!isSub){
+  if(true){
     const tags=task.text.match(/#[\w가-힣]+/g);
     if(tags&&tags.length){
       const tagWrap=el('div','tag-chips');
@@ -2188,14 +2209,14 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       body.appendChild(tagWrap);
     }
   }
-  if(!isSub&&((task.memo&&task.memo.trim())||(Array.isArray(task.memoImages)&&task.memoImages.length))){
+  if(((task.memo&&task.memo.trim())||(Array.isArray(task.memoImages)&&task.memoImages.length))){
     const firstLine=memoPlainText(task.memo).split('\n')[0];
     const imgCnt=Array.isArray(task.memoImages)?task.memoImages.length:0;
     const prev=el('div','memo-preview',{textContent:'📝 '+(imgCnt?`📷${imgCnt} `:'')+firstLine,title:'메모 열기'});
     prev.onclick=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,prev);};
     body.appendChild(prev);
   }
-  if(!isSub&&task.repeat&&task.repeat!=='none'){
+  if(task.repeat&&task.repeat!=='none'){
     const repeatLabels={daily:'🔄 매일',weekdays:'🔄 평일',weekly:'🔄 매주',biweekly:'🔄 격주',monthly:'🔄 매월',monthlyNth:'🔄 N째 요일',monthlyFirstBiz:'🔄 월초 영업일',monthlyLastBiz:'🔄 월말 영업일'};
     let repLabel=repeatLabels[task.repeat]||'🔄';
     if(task.repeat==='monthlyNth'){
@@ -2237,7 +2258,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     task.subs.forEach(s=>sl.appendChild(buildTaskItem(isRepeatInst?originDk:dk,s,true,task.id,isRepeatInst,originDk,instanceDk)));
     body.appendChild(sl);
   }
-  if(!isSub){
+  if(true){
     const addSub=el('button','add-sub-btn',{textContent:'+ 하위 항목'});
     addSub.onclick=e=>{e.stopPropagation();activeInput={dateKey:dk,dataKey:isRepeatInst?originDk:dk,parentId:task.id};render();};
     body.appendChild(addSub);
