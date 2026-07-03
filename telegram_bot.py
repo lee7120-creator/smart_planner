@@ -54,7 +54,9 @@ def get_main_keyboard():
     btn_test = types.KeyboardButton("🧪 E2E 테스트")
     btn_status = types.KeyboardButton("📊 로컬 상태")
     btn_deploy = types.KeyboardButton("🚀 파이어베이스 배포")
-    markup.add(btn_screen, btn_test, btn_status, btn_deploy)
+    btn_sleep = types.KeyboardButton("💤 PC 절전")
+    btn_shutdown = types.KeyboardButton("🔌 PC 종료")
+    markup.add(btn_screen, btn_test, btn_status, btn_deploy, btn_sleep, btn_shutdown)
     return markup
 
 def get_last_step_index():
@@ -121,7 +123,6 @@ def capture_screen_local(message):
 def run_e2e_test(message):
     status_msg = bot.reply_to(message, "🧪 Playwright E2E 자동 테스트 스크립트를 실행하는 중입니다...")
     try:
-        # Run qa_test.py
         result = subprocess.run(
             [PYTHON_EXE, QA_TEST_PATH],
             capture_output=True,
@@ -134,7 +135,6 @@ def run_e2e_test(message):
         test_log = result.stdout
         bot.reply_to(message, f"📋 **테스트 로그:**\n```\n{test_log[-1500:]}\n```")
         
-        # Check if error screenshots were generated
         chk_err_img = os.path.join(ARTIFACTS_DIR, "qa_test_checkbox_error.png")
         del_err_img = os.path.join(ARTIFACTS_DIR, "qa_test_delete_error.png")
         
@@ -142,7 +142,6 @@ def run_e2e_test(message):
             bot.send_message(message.chat.id, "✅ **E2E 테스트 성공! 모든 시나리오가 올바르게 작동합니다.**")
         else:
             bot.send_message(message.chat.id, "❌ **E2E 테스트 실패! 오류 캡처 이미지를 확인합니다...**")
-            # Send screenshot if exists
             if os.path.exists(chk_err_img):
                 with open(chk_err_img, 'rb') as photo:
                     bot.send_photo(message.chat.id, photo, caption="⚠️ 체크박스 테스트 실패 시점 스크린샷")
@@ -156,9 +155,7 @@ def run_e2e_test(message):
 def check_local_status(message):
     status_msg = bot.reply_to(message, "📊 로컬 서버 및 프로젝트 상태를 진해하는 중입니다...")
     try:
-        # Run git status
         git_res = subprocess.run(["git", "status", "-s"], capture_output=True, text=True, cwd="d:\\Project_1")
-        # Check if server is listening on port 8080 (Windows netstat)
         netstat_res = subprocess.run(["netstat", "-ano"], capture_output=True, text=True)
         server_running = "127.0.0.1:8080" in netstat_res.stdout or "0.0.0.0:8080" in netstat_res.stdout or "[::]:8080" in netstat_res.stdout
         
@@ -198,6 +195,36 @@ def deploy_firebase_hosting(message):
     except Exception as e:
         bot.reply_to(message, f"❌ 배포 중 에러 발생: {str(e)}")
 
+def trigger_pc_sleep(message):
+    bot.reply_to(message, "💤 컴퓨터를 즉시 절전 모드로 진입시킵니다...")
+    try:
+        # Put Windows to sleep (using rundll32 powrprof.dll)
+        subprocess.run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], shell=True)
+    except Exception as e:
+        bot.reply_to(message, f"❌ 절전 모드 진입 실패: {str(e)}")
+
+def trigger_pc_shutdown(message):
+    bot.reply_to(
+        message,
+        "🔌 **15초 후에 컴퓨터가 완전히 종료됩니다!**\n\n"
+        "실수를 방지하기 위해 15초의 대기 시간이 주어집니다.\n"
+        "취소하려면 텔레그램 채팅창에 `/abort` 를 보내주세요!"
+    )
+    try:
+        subprocess.run(["shutdown", "/s", "/t", "15"], shell=True)
+    except Exception as e:
+        bot.reply_to(message, f"❌ 전원 종료 실패: {str(e)}")
+
+@bot.message_handler(commands=['abort'])
+def abort_shutdown(message):
+    if not is_authorized(message):
+        return
+    try:
+        subprocess.run(["shutdown", "/a"], shell=True)
+        bot.reply_to(message, "✅ **컴퓨터 전원 종료 명령이 취소되었습니다.**")
+    except Exception as e:
+        bot.reply_to(message, f"❌ 취소 실패 (진행 중인 종료 명령이 없을 수 있습니다): {str(e)}")
+
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     if not is_authorized(message):
@@ -213,7 +240,9 @@ def send_welcome(message):
         "- `🖥️ 실시간 화면`: 로컬 앱 모바일 프리뷰 캡처 전송\n"
         "- `🧪 E2E 테스트`: Playwright 자동 테스트 실행 및 에러 확인\n"
         "- `📊 로컬 상태`: 서버 구동 및 파일 변경점 확인\n"
-        "- `🚀 파이어베이스 배포`: Firebase Hosting 즉시 실시간 배포"
+        "- `🚀 파이어베이스 배포`: Firebase Hosting 즉시 실시간 배포\n"
+        "- `💤 PC 절전`: 컴퓨터 절전 모드 진입\n"
+        "- `🔌 PC 종료`: 15초 카운트다운 후 컴퓨터 완전 종료 (취소는 `/abort`)"
     )
     bot.reply_to(message, help_text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
@@ -236,6 +265,12 @@ def handle_telegram_command(message):
         return
     elif user_query == "🚀 파이어베이스 배포":
         deploy_firebase_hosting(message)
+        return
+    elif user_query == "💤 PC 절전":
+        trigger_pc_sleep(message)
+        return
+    elif user_query == "🔌 PC 종료":
+        trigger_pc_shutdown(message)
         return
         
     # Otherwise forward to Antigravity IDE agent queue
