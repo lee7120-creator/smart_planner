@@ -1490,6 +1490,73 @@
     .note-pal-dot:hover { transform:scale(1.2); }
     .note-pal-dot.on { border-color:var(--text); }
     .note-pal-custom { width:24px; height:24px; border:none; padding:0; background:none; cursor:pointer; }
+    /* 음성 입력 중 표시 */
+    #quickVoiceBtn.listening { background:var(--red); border-color:var(--red); color:#fff; animation:pulse .9s infinite; }
+
+    /* ─── 커맨드 팔레트 ─── */
+    .cmdk-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:600;
+      display:flex; align-items:flex-start; justify-content:center;
+      padding:14vh 16px 0; backdrop-filter:blur(2px); animation:fadeIn .12s;
+    }
+    .cmdk-overlay.hidden { display:none; }
+    .cmdk-box {
+      width:min(480px, 100%); background:var(--surface); border:1px solid var(--border);
+      border-radius:16px; box-shadow:var(--shadow-lg); overflow:hidden;
+      animation:modalIn .22s cubic-bezier(.34,1.56,.64,1);
+    }
+    .cmdk-input {
+      width:100%; border:none; outline:none; padding:16px 18px; font-size:15px;
+      background:transparent; color:var(--text); font-family:inherit;
+      border-bottom:1px solid var(--border2);
+    }
+    .cmdk-input::placeholder { color:var(--text3); }
+    .cmdk-list { max-height:46vh; overflow-y:auto; padding:6px; }
+    .cmdk-item {
+      display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+      padding:10px 12px; border:none; background:none; border-radius:8px;
+      font-size:13px; color:var(--text); cursor:pointer; font-family:inherit;
+    }
+    .cmdk-item.sel, .cmdk-item:hover { background:var(--primary-l); color:var(--primary); }
+    .cmdk-item .ic { color:var(--text3); flex-shrink:0; }
+    .cmdk-item.sel .ic, .cmdk-item:hover .ic { color:var(--primary); }
+
+    /* ─── 완료 히트맵 (GitHub 잔디) ─── */
+    .heatmap { display:flex; gap:3px; }
+    .heatmap-col { display:flex; flex-direction:column; gap:3px; flex:1; }
+    .heatmap-cell { aspect-ratio:1; border-radius:3px; background:var(--surface3); min-width:0; }
+    .heatmap-cell.lv1 { background:color-mix(in srgb, var(--green) 30%, var(--surface3)); }
+    .heatmap-cell.lv2 { background:color-mix(in srgb, var(--green) 55%, var(--surface3)); }
+    .heatmap-cell.lv3 { background:color-mix(in srgb, var(--green) 80%, var(--surface3)); }
+    .heatmap-cell.lv4 { background:var(--green); }
+    .heatmap-cell.future { opacity:.25; }
+
+    /* ─── 스와이프 제스처 (일간·포커스) ─── */
+    .task-item.swipeable { touch-action:pan-y; transition:transform .15s ease, background .12s; }
+    .task-item.swipe-right { background:color-mix(in srgb, var(--green) 26%, transparent) !important; }
+    .task-item.swipe-left { background:color-mix(in srgb, var(--orange) 26%, transparent) !important; }
+
+    /* ─── 아이젠하워 매트릭스 뷰 ─── */
+    .matrix-wrap { padding:16px; }
+    .matrix-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:920px; margin:0 auto; }
+    .matrix-quad {
+      background:var(--surface); border:1px solid var(--border); border-radius:12px;
+      padding:12px; min-height:170px; box-shadow:var(--shadow);
+    }
+    .matrix-quad-head { display:flex; align-items:baseline; gap:8px; margin-bottom:8px; }
+    .matrix-quad-name { font-size:14px; font-weight:700; color:var(--text); }
+    .matrix-quad-sub { font-size:11px; color:var(--text3); }
+    .matrix-list { display:flex; flex-direction:column; gap:4px; }
+    .matrix-item {
+      display:flex; align-items:center; gap:8px; padding:7px 8px;
+      background:var(--surface2); border-radius:8px; cursor:pointer;
+    }
+    .matrix-item:hover { background:var(--primary-l); }
+    .matrix-item-text { flex:1; font-size:12px; color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .matrix-item-date { font-size:10px; color:var(--text3); flex-shrink:0; }
+    .matrix-item-date.overdue { color:var(--red); font-weight:700; }
+    .matrix-empty { font-size:11px; color:var(--text3); text-align:center; padding:16px 0; }
+    @media (max-width:768px) { .matrix-grid { grid-template-columns:1fr; } .matrix-wrap { padding:10px; } }
     .canvas-line { stroke:var(--border); stroke-width:1.5; }
     .canvas-card {
       position:absolute; width:190px; background:var(--surface); border:1px solid var(--border);

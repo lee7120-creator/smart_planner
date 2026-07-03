@@ -11,5 +11,15 @@
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
-  ]
+  ],
+  "shortcuts": [
+    { "name": "빠른 추가", "short_name": "추가", "url": "./?go=quick", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "오늘 보기", "short_name": "오늘", "url": "./?go=today", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "포커스 모드", "short_name": "포커스", "url": "./?go=focus", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": { "title": "share_title", "text": "share_text", "url": "share_url" }
+  }
 }
