@@ -209,7 +209,10 @@ if (!USER_ID) {
   // Auto-redirect to last used user if they've been here before
   const lastUser = localStorage.getItem('lastUser');
   if (lastUser) {
-    window.location.replace(`?u=${encodeURIComponent(lastUser)}`);
+    // 앱 바로가기(?go=)·공유 수신(share_*) 파라미터를 보존한 채 내 캘린더로
+    const p = new URLSearchParams(window.location.search);
+    p.set('u', lastUser);
+    window.location.replace('?' + p.toString());
   } else {
     document.getElementById('landingOverlay').style.display = 'flex';
     document.getElementById('landingInput').addEventListener('keydown', e => {
@@ -2084,6 +2087,37 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   cb.setAttribute('aria-checked',checked?'true':'false');
   cb.setAttribute('aria-label',(task.text||'할 일')+' 완료');
   item.appendChild(cb);
+  // 스와이프 제스처(일간·포커스 뷰 전용 — 주간뷰는 가로 스와이프가 날짜 이동이라 제외)
+  // 오른쪽 → 완료 토글, 왼쪽 → 다음 영업일로 미루기
+  if(!isSub && !READ_ONLY && !selectMode && (currentView==='day'||currentView==='focus') && 'ontouchstart' in window){
+    item.classList.add('swipeable');
+    let _swx=0,_swy=0,_swdx=0,_swiping=false;
+    item.addEventListener('touchstart',e=>{
+      if(e.touches.length!==1) return;
+      _swx=e.touches[0].clientX; _swy=e.touches[0].clientY; _swdx=0; _swiping=false;
+    },{passive:true});
+    item.addEventListener('touchmove',e=>{
+      const t=e.touches[0], ddx=t.clientX-_swx, ddy=t.clientY-_swy;
+      if(!_swiping && Math.abs(ddx)>18 && Math.abs(ddx)>Math.abs(ddy)*1.4) _swiping=true;
+      if(_swiping){
+        e.preventDefault();
+        _swdx=Math.max(-120,Math.min(120,ddx));
+        item.style.transform=`translateX(${_swdx}px)`;
+        item.classList.toggle('swipe-right',_swdx>60);
+        item.classList.toggle('swipe-left',_swdx<-60);
+      }
+    },{passive:false});
+    item.addEventListener('touchend',()=>{
+      item.style.transform='';
+      item.classList.remove('swipe-right','swipe-left');
+      if(!_swiping) return;
+      if(_swdx>70){ cbToggle({stopPropagation(){}}); }
+      else if(_swdx<-70){
+        if(!isRepeatInst && (!task.repeat||task.repeat==='none')) postponeTask(dk,task.id);
+        else showUndoToast('반복 일정은 ⋯ 메뉴에서 옮길 수 있어요');
+      }
+    });
+  }
   const body=el('div','task-body');
   // text + memo dot (clickable to open memo)
   const textWrap=el('div','task-text-wrap');
@@ -2223,6 +2257,10 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   });
   if(!isRepeatInst) trayItem('skip','다음 영업일로 미루기',null,()=>postponeTask(dk,task.id));
   trayItem('msg','댓글',null,()=>openComments(dk,task.id,isRepeatInst,originDk));
+  if(navigator.share) trayItem('share','공유하기',null,()=>{
+    const d=parseDk(dk);
+    navigator.share({title:'마이플래너',text:`[${d.getMonth()+1}/${d.getDate()}]${task.time?' '+task.time:''} ${task.text}`}).catch(()=>{});
+  });
   if(!IS_TEAM && fbDb) trayItem('users','팀에 등록',null,()=>registerTaskToTeam(dk,task,isRepeatInst,originDk));
   trayItem('x','삭제','del',()=>{
     if(isRepeatInst||(task.repeat&&task.repeat!=='none')){
@@ -3152,6 +3190,8 @@ function render(){
   // main content
   if(currentView==='focus'){
     view.appendChild(buildFocusView());
+  } else if(currentView==='matrix'){
+    view.appendChild(buildMatrixView());
   } else if(currentView==='day'){
     view.appendChild(buildDayView());
   } else if(currentView==='year'){
@@ -3266,7 +3306,59 @@ document.getElementById('todayBtn').onclick=()=>{
   weekStart=getMonday(new Date()); monthDate=new Date(); monthDate.setDate(1);
   dayDate=today(); yearNum=new Date().getFullYear(); render();
 };
-const VIEW_BTNS={day:'btnDay',week:'btnWeek',month:'btnMonth',timeblock:'btnTimeblock',year:'btnYear',timeline:'btnTimeline',focus:'btnFocus'};
+const VIEW_BTNS={day:'btnDay',week:'btnWeek',month:'btnMonth',timeblock:'btnTimeblock',year:'btnYear',timeline:'btnTimeline',focus:'btnFocus',matrix:'btnMatrix'};
+
+// ── 아이젠하워 매트릭스 뷰 — 중요×긴급 4분면 (긴급=오늘까지/지연, 중요=별표·높음) ──
+function buildMatrixView(){
+  const wrap=el('div','matrix-wrap');
+  const todayDk=dateKey(today());
+  const soon=new Date(today()); soon.setDate(soon.getDate()+14);
+  const soonDk=dateKey(soon);
+  const buckets={q1:[],q2:[],q3:[],q4:[]};
+  Object.entries(tasks).forEach(([dk,list])=>{
+    if(!Array.isArray(list)||dk>soonDk) return;
+    list.forEach(t=>{
+      if(!t||t.checked||t.pending) return;
+      if(t.repeat&&t.repeat!=='none') return; // 반복은 회차 개념이라 매트릭스에서 제외
+      const urgent=dk<=todayDk;
+      const important=!!t.starred||t.priority==='high';
+      buckets[urgent&&important?'q1':important?'q2':urgent?'q3':'q4'].push({dk,t});
+    });
+  });
+  const Q=[
+    ['q1','지금 하기','긴급 · 중요','var(--red)'],
+    ['q2','계획하기','중요','var(--primary)'],
+    ['q3','빨리 처리','긴급','var(--orange)'],
+    ['q4','나중에','여유','var(--text3)'],
+  ];
+  const grid=el('div','matrix-grid');
+  Q.forEach(([k,name,subtitle,color])=>{
+    const box=el('div','matrix-quad');
+    box.style.borderTop=`3px solid ${color}`;
+    const head=el('div','matrix-quad-head');
+    head.appendChild(el('span','matrix-quad-name',{textContent:name}));
+    head.appendChild(el('span','matrix-quad-sub',{textContent:`${subtitle} · ${buckets[k].length}개`}));
+    box.appendChild(head);
+    const listEl=el('div','matrix-list');
+    buckets[k].sort((a,b)=>a.dk.localeCompare(b.dk)).slice(0,30).forEach(({dk,t})=>{
+      const row=el('div','matrix-item');
+      const cb=el('span','task-cb');
+      cb.setAttribute('role','checkbox'); cb.setAttribute('aria-checked','false');
+      cb.onclick=e=>{e.stopPropagation();toggleTask(dk,t.id,null);};
+      row.appendChild(cb);
+      row.appendChild(el('span','matrix-item-text',{textContent:(t.starred?'★ ':'')+t.text}));
+      const d=parseDk(dk);
+      row.appendChild(el('span',`matrix-item-date${dk<todayDk?' overdue':''}`,{textContent:`${d.getMonth()+1}/${d.getDate()}`}));
+      row.onclick=()=>{ weekStart=getMonday(parseDk(dk)); setView('week'); };
+      listEl.appendChild(row);
+    });
+    if(!buckets[k].length) listEl.appendChild(el('div','matrix-empty',{textContent:'비어 있어요'}));
+    box.appendChild(listEl);
+    grid.appendChild(box);
+  });
+  wrap.appendChild(grid);
+  return wrap;
+}
 function setView(v){
   currentView=v;
   Object.entries(VIEW_BTNS).forEach(([view,id])=>document.getElementById(id).classList.toggle('active',v===view));
@@ -3279,7 +3371,7 @@ Object.entries(VIEW_BTNS).forEach(([view,id])=>{document.getElementById(id).oncl
   const nav=document.getElementById('mobileNav'); if(!nav) return;
   const sheet=document.getElementById('mnavSheet');
   const moreBtn=document.getElementById('mnavMore');
-  const SHEET_VIEWS=['year','timeblock','timeline'];
+  const SHEET_VIEWS=['year','timeblock','timeline','matrix'];
   const syncActive=()=>{
     nav.querySelectorAll('.mnav-item[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===currentView));
     moreBtn.classList.toggle('active',SHEET_VIEWS.includes(currentView));
@@ -3311,7 +3403,14 @@ document.getElementById('darkBtn').onclick=()=>{
   document.getElementById('darkBtn').innerHTML=`<svg class="ic" width="16" height="16"><use href="#i-${isDark?'moon':'sun'}"/></svg>`;
   localStorage.setItem('theme',html.dataset.theme);
 };
-(()=>{const t=localStorage.getItem('theme')||'light';document.documentElement.dataset.theme=t;document.getElementById('darkBtn').innerHTML=`<svg class="ic" width="16" height="16"><use href="#i-${t==='dark'?'sun':'moon'}"/></svg>`;})();
+(()=>{
+  const applyTheme=t=>{document.documentElement.dataset.theme=t;document.getElementById('darkBtn').innerHTML=`<svg class="ic" width="16" height="16"><use href="#i-${t==='dark'?'sun':'moon'}"/></svg>`;};
+  const stored=localStorage.getItem('theme');
+  const sysDark=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)');
+  // 수동 설정이 없으면 시스템 테마를 따르고, 시스템이 바뀌면 실시간 반영
+  applyTheme(stored||(sysDark&&sysDark.matches?'dark':'light'));
+  if(sysDark&&sysDark.addEventListener) sysDark.addEventListener('change',e=>{ if(!localStorage.getItem('theme')) applyTheme(e.matches?'dark':'light'); });
+})();
 
 // ── More menu dropdown ──
 document.getElementById('moreBtn').onclick=e=>{
@@ -3514,11 +3613,17 @@ function checkHighPriorityAlert(){
   notify(`🔴 중요(높음) 태스크 ${reds.length}건`,{body:names+(reds.length>3?` 외 ${reds.length-3}건`:'')});
 }
 
-// 받은 일정(pending) 도착 알림 + 제목 배지
+// 받은 일정(pending) 도착 알림 + 제목 배지 + 앱 아이콘 뱃지(오늘 남은 할 일)
 function updatePendingBadge(){
   let cnt=0;
   Object.values(tasks).forEach(list=>{ if(Array.isArray(list)) list.forEach(t=>{ if(t&&t.pending) cnt++; }); });
   document.title = (cnt>0 ? `(${cnt}) ` : '') + '마이플래너';
+  if('setAppBadge' in navigator){
+    try{
+      const n=getTodayIncomplete().length;
+      if(n>0) navigator.setAppBadge(n); else navigator.clearAppBadge();
+    }catch{}
+  }
 }
 function checkPendingNotifications(){
   if(READ_ONLY) return;
@@ -6201,6 +6306,39 @@ function buildDashStats(){
   });
   panel.appendChild(barWrap);
 
+  // 완료 히트맵 — 최근 12주, 하루 완료 수를 초록 농도로 (GitHub 잔디 스타일)
+  {
+    const hmTitle=document.createElement('div'); hmTitle.className='dash-panel-title';
+    hmTitle.style.cssText='margin-top:14px;margin-bottom:6px'; hmTitle.textContent='최근 12주 완료 기록';
+    panel.appendChild(hmTitle);
+    const doneMap={};
+    Object.entries(tasks).forEach(([dk,list])=>{
+      if(!Array.isArray(list)) return;
+      list.forEach(t=>{
+        if(!t) return;
+        if(t.checked && (!t.repeat||t.repeat==='none')) doneMap[dk]=(doneMap[dk]||0)+1;
+        if(t.completions) Object.entries(t.completions).forEach(([idk,v])=>{ if(v) doneMap[idk]=(doneMap[idk]||0)+1; });
+      });
+    });
+    const hm=document.createElement('div'); hm.className='heatmap';
+    const start=new Date(monday); start.setDate(start.getDate()-77); // 11주 전 월요일부터 이번 주까지
+    for(let w=0;w<12;w++){
+      const col=document.createElement('div'); col.className='heatmap-col';
+      for(let d=0;d<7;d++){
+        const day=new Date(start); day.setDate(start.getDate()+w*7+d);
+        const dk=dateKey(day);
+        const n=doneMap[dk]||0;
+        const lv=n===0?0:n<2?1:n<4?2:n<7?3:4;
+        const cell=document.createElement('div'); cell.className='heatmap-cell lv'+lv;
+        if(day>now) cell.classList.add('future');
+        cell.title=`${day.getMonth()+1}/${day.getDate()} · ${n}개 완료`;
+        col.appendChild(cell);
+      }
+      hm.appendChild(col);
+    }
+    panel.appendChild(hm);
+  }
+
   // important upcoming (D-day)
   const important=getImportantUpcoming();
   if(important.length){
@@ -6711,4 +6849,128 @@ function bulkForEach(fn) {
   if (undone) undone.onclick = () => { if (!bulkSelected.size) return; bulkForEach((l, i) => { if (l[i].checked) { l[i].checked = false; } }); saveTasks(); exitSelectMode(); };
   const del = document.getElementById('bulkDeleteBtn');
   if (del) del.onclick = () => { if (!bulkSelected.size) return; if (!confirm(`선택한 ${bulkSelected.size}개를 삭제할까요? (휴지통에 30일 보관)`)) return; bulkForEach((l, i, dk) => { const removed = l.splice(i, 1)[0]; addToTrash(dk, removed, null); }); saveTasks(); exitSelectMode(); };
+})();
+
+// ── 앱 바로가기(?go=) & 공유 수신(share_target) 처리 ──
+(function(){
+  if(!USER_ID || READ_ONLY) return;
+  const go=URL_PARAMS.get('go');
+  const sharedText=[URL_PARAMS.get('share_title'),URL_PARAMS.get('share_text'),URL_PARAMS.get('share_url')].filter(Boolean).join(' ').trim();
+  if(!go && !sharedText) return;
+  setTimeout(()=>{
+    if(sharedText){
+      // 다른 앱에서 공유받은 텍스트 → 빠른 추가에 미리 채워서 열기
+      openQuickAdd();
+      const inp=document.getElementById('quickInput');
+      if(inp){ inp.value=sharedText.slice(0,200); inp.dispatchEvent(new Event('input')); }
+    } else if(go==='quick') openQuickAdd();
+    else if(go==='focus') setView('focus');
+    else if(go==='today'){ weekStart=getMonday(new Date()); setView('week'); }
+    // 재실행 시 반복 실행 방지: 주소에서 처리한 파라미터 제거
+    const p=new URLSearchParams(window.location.search);
+    ['go','share_title','share_text','share_url'].forEach(k=>p.delete(k));
+    history.replaceState(null,'',window.location.pathname+'?'+p.toString());
+  },350);
+})();
+
+// ── 빠른 추가 음성 입력 (Web Speech API) ──
+(function(){
+  const btn=document.getElementById('quickVoiceBtn'); if(!btn) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ btn.style.display='none'; return; }
+  let rec=null, active=false;
+  btn.onclick=()=>{
+    if(active){ try{rec.stop();}catch{} return; }
+    rec=new SR(); rec.lang='ko-KR'; rec.interimResults=true;
+    const inp=document.getElementById('quickInput');
+    active=true; btn.classList.add('listening');
+    rec.onresult=e=>{ inp.value=[...e.results].map(r=>r[0].transcript).join(''); inp.dispatchEvent(new Event('input')); };
+    rec.onend=()=>{ active=false; btn.classList.remove('listening'); inp.focus(); };
+    rec.onerror=()=>{ active=false; btn.classList.remove('listening'); };
+    try{ rec.start(); }catch{ active=false; btn.classList.remove('listening'); }
+  };
+})();
+
+// ── 커맨드 팔레트 (Ctrl/Cmd+K) — 검색·명령·빠른 추가를 한 입력창으로 ──
+(function(){
+  if(!USER_ID) return;
+  let ov=null, inp=null, listEl=null, sel=0, items=[];
+  const ACTIONS=[
+    {k:'빠른 추가', ic:'zap', fn:()=>openQuickAdd()},
+    {k:'오늘로 이동', ic:'calendar', fn:()=>document.getElementById('todayBtn').click()},
+    {k:'일간 보기', ic:'calendar', fn:()=>setView('day')},
+    {k:'주간 보기', ic:'columns', fn:()=>setView('week')},
+    {k:'월간 보기', ic:'grid', fn:()=>setView('month')},
+    {k:'연간 보기', ic:'grid9', fn:()=>setView('year')},
+    {k:'시간표 보기', ic:'rows', fn:()=>setView('timeblock')},
+    {k:'타임라인 보기', ic:'gantt', fn:()=>setView('timeline')},
+    {k:'포커스 모드', ic:'target', fn:()=>setView('focus')},
+    {k:'다크모드 전환', ic:'moon', fn:()=>document.getElementById('darkBtn').click()},
+    {k:'템플릿', ic:'clipboard', fn:()=>document.getElementById('templateBtn').click()},
+    {k:'목표 관리', ic:'flag', fn:()=>document.getElementById('goalsBtn').click()},
+    {k:'이번 주 돌아보기', ic:'history', fn:()=>document.getElementById('reviewBtn').click()},
+    {k:'메모 전체보기', ic:'note', fn:()=>document.getElementById('memoAllBtn').click()},
+    {k:'휴지통', ic:'trash', fn:()=>document.getElementById('trashBtn').click()},
+    {k:'백업하기', ic:'save', fn:()=>document.getElementById('backupBtn').click()},
+    {k:'팀 캘린더', ic:'users', fn:()=>document.getElementById('teamBtn').click()},
+    {k:'사용 가이드', ic:'help', fn:()=>document.getElementById('guideBtn').click()},
+    {k:'인쇄하기', ic:'printer', fn:()=>document.getElementById('printBtn').click()},
+  ];
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const close=()=>{ if(ov) ov.classList.add('hidden'); };
+  const exec=i=>{ const a=items[i]; if(!a) return; close(); a.fn(); };
+  const paint=()=>{
+    listEl.innerHTML='';
+    items.forEach((a,i)=>{
+      const row=el('button',`cmdk-item${i===sel?' sel':''}`,{type:'button'});
+      row.innerHTML=`<svg class="ic" width="14" height="14"><use href="#i-${a.ic}"/></svg> <span>${esc(a.k)}</span>`;
+      row.onclick=()=>exec(i);
+      listEl.appendChild(row);
+    });
+  };
+  const renderList=()=>{
+    const q=inp.value.trim();
+    const ql=q.toLowerCase();
+    items=ACTIONS.filter(a=>!ql||a.k.toLowerCase().includes(ql));
+    if(q){
+      items=items.slice(0,6);
+      if(!READ_ONLY) items.push({k:`"${q}" 할 일로 추가`, ic:'plus', fn:()=>{
+        openQuickAdd();
+        const qi=document.getElementById('quickInput');
+        if(qi){ qi.value=q; qi.dispatchEvent(new Event('input')); }
+      }});
+      items.push({k:`"${q}" 검색`, ic:'search', fn:()=>{
+        searchQuery=q;
+        const si=document.getElementById('searchInput'); if(si) si.value=q;
+        render();
+      }});
+    }
+    sel=0; paint();
+  };
+  const build=()=>{
+    ov=el('div','cmdk-overlay hidden');
+    const box=el('div','cmdk-box');
+    inp=el('input','cmdk-input',{type:'text',placeholder:'명령 또는 할 일 입력...'});
+    listEl=el('div','cmdk-list');
+    box.appendChild(inp); box.appendChild(listEl); ov.appendChild(box);
+    ov.onclick=e=>{ if(e.target===ov) close(); };
+    inp.addEventListener('input',renderList);
+    inp.addEventListener('keydown',e=>{
+      if(e.key==='ArrowDown'){ e.preventDefault(); sel=Math.min(sel+1,items.length-1); paint(); }
+      else if(e.key==='ArrowUp'){ e.preventDefault(); sel=Math.max(sel-1,0); paint(); }
+      else if(e.key==='Enter'){ e.preventDefault(); exec(sel); }
+      else if(e.key==='Escape'){ close(); }
+    });
+    document.body.appendChild(ov);
+  };
+  const open=()=>{ if(!ov) build(); ov.classList.remove('hidden'); inp.value=''; renderList(); setTimeout(()=>inp.focus(),30); };
+  window.openCmdk=open;
+  document.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){
+      e.preventDefault();
+      if(ov&&!ov.classList.contains('hidden')) close(); else open();
+    }
+  });
+  const menuBtn=document.getElementById('cmdkBtn');
+  if(menuBtn) menuBtn.onclick=()=>open();
 })();

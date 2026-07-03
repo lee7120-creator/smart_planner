@@ -90,6 +90,8 @@
     <symbol id="i-skip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 4 10 8-10 8V4z"/><path d="M19 5v14"/></symbol>
     <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="m3 3 18 18"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+    <symbol id="i-command" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></symbol>
   </defs>
 </svg>
 
@@ -128,6 +130,7 @@
     <button class="view-btn" id="btnTimeblock">시간표</button>
     <button class="view-btn" id="btnTimeline">타임라인</button>
     <button class="view-btn" id="btnFocus">포커스</button>
+    <button class="view-btn" id="btnMatrix">매트릭스</button>
   </div>
   <div class="nav-group">
     <button class="nav-btn" id="prevBtn">‹</button>
@@ -162,6 +165,7 @@
         <button class="more-menu-item" id="renameBtn" style="display:none"><svg class="ic" width="16" height="16"><use href="#i-pencil"/></svg> <span>이름 변경</span></button>
         <div class="more-menu-divider"></div>
         <div class="more-menu-label">도구</div>
+        <button class="more-menu-item" id="cmdkBtn"><svg class="ic" width="16" height="16"><use href="#i-command"/></svg> <span>커맨드 팔레트</span> <span style="margin-left:auto;font-size:10px;color:var(--text3)">Ctrl K</span></button>
         <button class="more-menu-item" id="templateBtn"><svg class="ic" width="16" height="16"><use href="#i-clipboard"/></svg> <span>템플릿</span></button>
         <button class="more-menu-item" id="selectModeBtn"><svg class="ic" width="16" height="16"><use href="#i-check-sq"/></svg> <span>여러 개 선택</span></button>
         <button class="more-menu-item" id="pomodoroBtn"><svg class="ic" width="16" height="16"><use href="#i-timer"/></svg> <span>포모도로 타이머</span></button>
@@ -201,6 +205,7 @@
     <button class="mnav-sheet-item" data-view="year"><svg class="ic" width="16" height="16"><use href="#i-grid9"/></svg>연간</button>
     <button class="mnav-sheet-item" data-view="timeblock"><svg class="ic" width="16" height="16"><use href="#i-rows"/></svg>시간표</button>
     <button class="mnav-sheet-item" data-view="timeline"><svg class="ic" width="16" height="16"><use href="#i-gantt"/></svg>타임라인</button>
+    <button class="mnav-sheet-item" data-view="matrix"><svg class="ic" width="16" height="16"><use href="#i-target"/></svg>매트릭스</button>
   </div>
 </nav>
 
@@ -211,7 +216,10 @@
     <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">
       한 줄로 입력해 보세요 — <b>내일 오후 3시 팀미팅 #업무</b>
     </p>
-    <input class="modal-input" id="quickInput" type="text" placeholder="무엇을 해야 하나요?" style="margin-bottom:6px">
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input class="modal-input" id="quickInput" type="text" placeholder="무엇을 해야 하나요?" style="margin-bottom:0;flex:1">
+      <button class="btn-secondary" id="quickVoiceBtn" type="button" title="음성으로 입력" aria-label="음성으로 입력" style="padding:8px 12px;flex-shrink:0"><svg class="ic" width="15" height="15"><use href="#i-mic"/></svg></button>
+    </div>
     <div id="quickPreview" style="font-size:12px;color:var(--text3);min-height:18px;margin-bottom:10px"></div>
     <div class="modal-actions">
       <button class="btn-secondary" id="quickCancel">취소</button>
