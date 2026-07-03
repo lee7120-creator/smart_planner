@@ -1315,8 +1315,10 @@ if(_memoSubBtn) _memoSubBtn.onclick=insertMemoSubmemo;
 function positionMemo(anchor) {
   const pop = document.getElementById('memoPopup');
   if (window.innerWidth <= 768) return; // mobile: CSS handles it (bottom sheet)
+  // 사용자가 리사이즈한 크기 복원 (데스크톱 전용 — 모바일은 바텀시트)
+  try{ const sz=JSON.parse(localStorage.getItem('memoPopSize')||'null'); if(sz&&sz.w>240&&sz.h>160){ pop.style.width=sz.w+'px'; pop.style.height=sz.h+'px'; } }catch{}
   const rect = anchor.getBoundingClientRect();
-  const popW = 330, popH = 280;
+  const popW = pop.offsetWidth || 330, popH = pop.offsetHeight || 280;
   let left = rect.right + 14;
   let top  = rect.top - 8;
   if (left + popW > window.innerWidth - 12) left = rect.left - popW - 14;
@@ -1906,6 +1908,29 @@ document.getElementById('memoHeader').addEventListener('mousedown', e=>{
 
 // 이미지 드래그앤드롭 첨부
 const memoPopupEl = document.getElementById('memoPopup');
+// 리사이즈한 크기 저장 (다음에 열 때 복원)
+if(window.ResizeObserver){
+  let _szTimer=null;
+  new ResizeObserver(()=>{
+    if(window.innerWidth<=768) return;
+    clearTimeout(_szTimer);
+    _szTimer=setTimeout(()=>{
+      if(memoPopupEl.offsetWidth>240 && memoPopupEl.offsetHeight>160)
+        localStorage.setItem('memoPopSize', JSON.stringify({w:memoPopupEl.offsetWidth, h:memoPopupEl.offsetHeight}));
+    },300);
+  }).observe(memoPopupEl);
+}
+// 서식 툴바 활성 상태 — 커서 위치의 굵게/기울임 등이 버튼에 표시되도록
+document.addEventListener('selectionchange', ()=>{
+  const ov=document.getElementById('memoOverlay');
+  if(!ov || ov.classList.contains('hidden')) return;
+  const ed=document.getElementById('memoEditable');
+  const sel=document.getSelection();
+  if(!ed || !sel || !sel.anchorNode || !ed.contains(sel.anchorNode)) return;
+  document.querySelectorAll('#memoToolbar .mt-btn[data-cmd]').forEach(b=>{
+    try{ b.classList.toggle('active', document.queryCommandState(b.dataset.cmd)); }catch{}
+  });
+});
 memoPopupEl.addEventListener('dragover', e=>{
   if ([...(e.dataTransfer&&e.dataTransfer.types||[])].includes('Files')) {
     e.preventDefault();
@@ -4778,7 +4803,24 @@ function renderCanvas() {
     if (preview) card.appendChild(el('div', 'canvas-card-preview', {textContent: preview}));
     const tags = extractTags(m);
     if (tags.length) card.appendChild(el('div', 'canvas-card-tags', {textContent: tags.map(t=>'#'+t).join(' ')}));
+    // 카드 바로가기: 고정 / 색상 / 열기 (창 안 열고 캔버스에서 바로)
+    if (!READ_ONLY) {
+      const acts = el('div', 'canvas-card-acts');
+      const mkAct = (icon, title, fn) => {
+        const b = el('button', 'cc-act', { type: 'button', title });
+        b.innerHTML = `<svg class="ic" width="11" height="11"><use href="#i-${icon}"/></svg>`;
+        b.addEventListener('pointerdown', e => e.stopPropagation());
+        b.onclick = e => { e.stopPropagation(); fn(); };
+        acts.appendChild(b);
+      };
+      mkAct('pin', m.pinned ? '고정 해제' : '고정', () => { m.pinned = !m.pinned; saveMemos(); renderCanvas(); });
+      mkAct('palette', '색상 변경', () => { const i = NOTE_COLORS.indexOf(m.color); m.color = NOTE_COLORS[(i + 1) % NOTE_COLORS.length]; saveMemos(); renderCanvas(); });
+      mkAct('pencil', '열어서 편집', () => { m.open = true; bringNoteToFront(m.id); saveMemos(); closeCanvas(); renderNoteWins(); });
+      card.appendChild(acts);
+    }
     // 드래그 재배치 (PC: 즉시, 모바일: 꾹 눌러서) — 이동량은 줌 배율로 보정
+    // 다른 카드 위에 겹쳐 놓으면 그 메모의 하위로 연결 (실행 취소 가능)
+    const isDescOf = (id, ancestorId) => { let cur = memos[id], g = 0; while (cur && cur.parentId && g++ < 50) { if (cur.parentId === ancestorId) return true; cur = memos[cur.parentId]; } return false; };
     let _csx, _csy, _cox, _coy;
     attachDrag(card, {
       longPressMs: 180, stopPropagation: true,
@@ -4790,7 +4832,25 @@ function renderCanvas() {
         card.style.top = m.cy + 'px';
         drawLines();
       },
-      onEnd: () => { card.classList.remove('dragging'); if (!READ_ONLY) saveMemos(); }
+      onEnd: () => {
+        card.classList.remove('dragging');
+        if (READ_ONLY) return;
+        const moved = Math.abs(m.cx - _cox) + Math.abs(m.cy - _coy) > 8;
+        if (moved) {
+          const ccx = m.cx + CARD_W / 2, ccy = m.cy + 16;
+          const target = Object.values(memos).find(o =>
+            o.id !== m.id && o.cx != null &&
+            ccx > o.cx && ccx < o.cx + CARD_W && ccy > o.cy && ccy < o.cy + 70);
+          if (target && target.id !== m.parentId && !isDescOf(target.id, m.id)) {
+            const prev = m.parentId || null, mid = m.id;
+            m.parentId = target.id;
+            showUndoToast(`"${memoLabel(m).slice(0,12)}"를 "${memoLabel(target).slice(0,12)}" 하위로 연결했어요`,
+              () => { const mm = memos[mid]; if (mm) { mm.parentId = prev; saveMemos(); renderCanvas(); } });
+            renderCanvas();
+          }
+        }
+        saveMemos();
+      }
     });
     card.addEventListener('dblclick', e => {
       e.stopPropagation();
