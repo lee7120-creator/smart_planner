@@ -284,7 +284,7 @@ if (!USER_ID) {
     fbUpload()
       .then(() => { btn.innerHTML = '✅ <span>저장 완료</span>'; })
       .catch(() => { btn.innerHTML = '❌ <span>저장 실패</span>'; })
-      .finally(() => setTimeout(() => { btn.innerHTML = '<svg class="ic"><use href="#i-cloud-up"/></svg> <span>저장</span>'; btn.disabled = false; }, 2000));
+      .finally(() => setTimeout(() => { btn.innerHTML = '<svg class="ic" width="16" height="16"><use href="#i-cloud-up"/></svg> <span>저장</span>'; btn.disabled = false; }, 2000));
   };
   document.getElementById('renameBtn').style.display = 'flex';
   document.getElementById('renameBtn').onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); renameAccount(); };
@@ -3234,10 +3234,10 @@ document.getElementById('darkBtn').onclick=()=>{
   const html=document.documentElement;
   const isDark=html.dataset.theme==='dark';
   html.dataset.theme=isDark?'light':'dark';
-  document.getElementById('darkBtn').innerHTML=`<svg class="ic"><use href="#i-${isDark?'moon':'sun'}"/></svg>`;
+  document.getElementById('darkBtn').innerHTML=`<svg class="ic" width="16" height="16"><use href="#i-${isDark?'moon':'sun'}"/></svg>`;
   localStorage.setItem('theme',html.dataset.theme);
 };
-(()=>{const t=localStorage.getItem('theme')||'light';document.documentElement.dataset.theme=t;document.getElementById('darkBtn').innerHTML=`<svg class="ic"><use href="#i-${t==='dark'?'sun':'moon'}"/></svg>`;})();
+(()=>{const t=localStorage.getItem('theme')||'light';document.documentElement.dataset.theme=t;document.getElementById('darkBtn').innerHTML=`<svg class="ic" width="16" height="16"><use href="#i-${t==='dark'?'sun':'moon'}"/></svg>`;})();
 
 // ── More menu dropdown ──
 document.getElementById('moreBtn').onclick=e=>{
@@ -3374,7 +3374,7 @@ function checkEveningReminder() {
 function updateNotifyBtn() {
   const enabled = localStorage.getItem('notifyEnabled')==='true' && 'Notification' in window && Notification.permission==='granted';
   const btn = document.getElementById('notifyBtn');
-  document.getElementById('notifyIcon').innerHTML = `<svg class="ic"><use href="#i-${enabled?'bell':'bell-off'}"/></svg>`;
+  document.getElementById('notifyIcon').innerHTML = `<svg class="ic" width="16" height="16"><use href="#i-${enabled?'bell':'bell-off'}"/></svg>`;
   btn.title = enabled?`알림 켜짐 (${NOTIFY_HOUR}시 오늘할일·🔴중요 · 시간 ${NOTIFY_LEAD}분 전 · ${NOTIFY_EVENING}시 미완료)`:'알림 꺼짐 (클릭하여 켜기)';
 }
 document.getElementById('notifyBtn').onclick=()=>{
