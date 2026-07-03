@@ -3,6 +3,7 @@ import time
 import json
 import uuid
 import datetime
+import re
 import telebot
 from dotenv import load_dotenv
 
@@ -62,6 +63,22 @@ def get_last_step_index():
         print(f"Error reading transcript: {e}")
     return last_idx
 
+def find_own_task_id():
+    """Finds the active task ID of this running telegram_bot.py from transcript.jsonl."""
+    if not os.path.exists(TRANSCRIPT_PATH):
+        return "0e76dfce-b538-44cd-b55b-aa38b7a0ce01/task-telegram"
+    last_task = None
+    try:
+        with open(TRANSCRIPT_PATH, 'r', encoding='utf-8') as f:
+            for line in f:
+                if "telegram_bot.py" in line and "task-" in line:
+                    match = re.search(r'task-\d+', line)
+                    if match:
+                        last_task = f"0e76dfce-b538-44cd-b55b-aa38b7a0ce01/{match.group(0)}"
+    except Exception as e:
+        print(f"Error finding task ID: {e}")
+    return last_task or "0e76dfce-b538-44cd-b55b-aa38b7a0ce01/task-telegram"
+
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     if not is_authorized(message):
@@ -88,7 +105,11 @@ def handle_telegram_command(message):
     start_step_idx = get_last_step_index()
     print(f"Current last step index: {start_step_idx}")
     
-    # 2. Generate message file to queue it
+    # 2. Find active task ID to use as sender for wakeup trigger
+    active_task_id = find_own_task_id()
+    print(f"Found own active task ID: {active_task_id}")
+    
+    # 3. Generate message file to queue it
     msg_id = str(uuid.uuid4())
     msg_filename = f"{msg_id}.json"
     msg_filepath = os.path.join(MESSAGES_DIR, msg_filename)
@@ -96,7 +117,7 @@ def handle_telegram_command(message):
     msg_data = {
         "id": msg_id,
         "recipient": "0e76dfce-b538-44cd-b55b-aa38b7a0ce01",
-        "sender": "0e76dfce-b538-44cd-b55b-aa38b7a0ce01/task-telegram",
+        "sender": active_task_id,
         "priority": "MESSAGE_PRIORITY_HIGH",
         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
         "renderDetails": {
@@ -117,7 +138,7 @@ def handle_telegram_command(message):
             json.dump(msg_data, f, ensure_ascii=False, indent=2)
         print(f"Message file created: {msg_filepath}")
         
-        # 3. Poll transcript.jsonl for my response
+        # 4. Poll transcript.jsonl for my response
         timeout = 300 # 5 minutes timeout
         poll_interval = 2
         elapsed = 0
@@ -146,9 +167,6 @@ def handle_telegram_command(message):
                                     ):
                                         content = data.get("content", "").strip()
                                         if content:
-                                            # Clean content if it contains system tags
-                                            # (Optionally filter/clean here if needed)
-                                            
                                             # Send response back to user
                                             bot.reply_to(message, f"💡 **안티그래비티 실행 완료:**\n\n{content}")
                                             response_sent = True
