@@ -7038,7 +7038,9 @@ if (fbAuth) {
   fbAuth.onAuthStateChanged(async user => {
     authUser = user || null;
     updateAuthUi();
-    if (!user) return;
+    if (!user) { setTimeout(maybeShowAuthNotice, 1500); return; }
+    localStorage.setItem('claimedNotice_done','1'); // 연결됨 → 공지 영구 종료
+    const _no=document.getElementById('authNoticeOv'); if(_no) _no.remove();
     if (USER_ID && !IS_TEAM && !READ_ONLY) {
       linkNameToAccount(user);
     } else if (!USER_ID && !localStorage.getItem('lastUser')) {
@@ -7062,3 +7064,31 @@ if (fbAuth) {
   const lb = document.getElementById('landingGoogleBtn');
   if (lb) lb.onclick = googleLogin;
 })();
+
+// ── 보안 업데이트 공지 팝업 — 계정 미연결 사용자에게만, '나중에'는 3일 뒤 재안내 ──
+function maybeShowAuthNotice(){
+  if(!fbAuth || !USER_ID || IS_TEAM || READ_ONLY || authUser) return;
+  if(localStorage.getItem('claimedNotice_done')) return;
+  const KEY='authNoticeDismissedAt';
+  const last=+(localStorage.getItem(KEY)||0);
+  if(Date.now()-last < 3*24*60*60*1000) return;
+  if(document.getElementById('authNoticeOv')) return;
+  const ov=el('div','modal-overlay'); ov.id='authNoticeOv';
+  const box=el('div','modal-box');
+  box.innerHTML=`
+    <div class="modal-title"><svg class="ic" width="15" height="15" style="color:var(--primary);vertical-align:-0.12em"><use href="#i-user"/></svg> 보안 업데이트 안내</div>
+    <p style="font-size:13px;line-height:1.8;color:var(--text2);margin-bottom:14px">
+      본인 <b>구글 계정을 한 번만 연결</b>해 주세요. 1분이면 끝나요.<br><br>
+      · 데이터는 그대로예요 — 바뀌는 것 없음<br>
+      · 연결해 두면 새 폰에서도 로그인만 하면 내 캘린더가 자동으로 열려요<br>
+      · 나중에 보안 잠금이 적용되면 <b>연결 안 된 캘린더는 수정이 제한</b>될 수 있어요
+    </p>`;
+  const acts=el('div','modal-actions');
+  const later=el('button','btn-secondary',{type:'button',textContent:'나중에'});
+  later.onclick=()=>{ localStorage.setItem(KEY,String(Date.now())); ov.remove(); };
+  const go=el('button','btn-primary',{type:'button',textContent:'지금 연결하기'});
+  go.onclick=()=>{ ov.remove(); googleLogin(); };
+  acts.appendChild(later); acts.appendChild(go);
+  box.appendChild(acts); ov.appendChild(box);
+  document.body.appendChild(ov);
+}
