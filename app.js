@@ -23,7 +23,7 @@ function setSyncStatus(s) {
 }
 
 function fbRef() {
-  return fbDb && USER_ID && USER_ID !== 'demo' ? fbDb.ref(`users/${USER_ID}/tasks`) : null;
+  return fbDb && FB_UID && USER_ID !== 'demo' ? fbDb.ref(`users/${FB_UID}/tasks`) : null;
 }
 
 // ── Constants ──
@@ -166,13 +166,17 @@ const URL_PARAMS = new URLSearchParams(window.location.search);
 const _rawTeam = URL_PARAMS.get('team');
 const IS_TEAM = !!_rawTeam;
 const USER_ID = IS_TEAM ? ('team-' + _rawTeam.replace(/[.#$\[\]\/]/g,'').trim().slice(0,40)) : (URL_PARAMS.get('u') || '');
+// Firebase 경로용 ID — . # $ [ ] / 는 Firebase 키 금지 문자라 제거.
+// 보내기/공유(sanitizeId)와 같은 규칙이라 서로 경로가 항상 일치한다.
+// (localStorage 키는 기존 데이터 보존을 위해 원래 USER_ID 유지)
+const FB_UID = IS_TEAM ? USER_ID : USER_ID.replace(/[.#$\[\]\/]/g,'').trim().slice(0,40);
 const STORAGE_KEY = USER_ID ? `calTasks_${USER_ID}` : 'calTasks';
 
 // ── 사용자 지정 휴무일 (할 일 입력하듯 날짜별 지정, 기기 간 동기화) ──
 const OFF_KEY = USER_ID ? `calOffDays_${USER_ID}` : 'calOffDays';
 let offDays = (() => { try { return JSON.parse(localStorage.getItem(OFF_KEY) || '{}') || {}; } catch { return {}; } })();
 let offSaveTimer = null, pendingOffLocal = false;
-function offFbRef() { return USER_ID && USER_ID !== 'demo' && fbDb ? fbDb.ref(`users/${USER_ID}/offdays`) : null; }
+function offFbRef() { return FB_UID && USER_ID !== 'demo' && fbDb ? fbDb.ref(`users/${FB_UID}/offdays`) : null; }
 function saveOffDays() {
   if (READ_ONLY) return;
   localStorage.setItem(OFF_KEY, JSON.stringify(offDays));
@@ -318,8 +322,10 @@ function normalizeTasks(raw) {
   const out = {};
   Object.entries(raw || {}).forEach(([dk, list]) => {
     const arr = Array.isArray(list) ? list : Object.values(list || {});
-    const clean = arr.filter(t => t && t.text != null).map(t => Object.assign({}, t, {
-      subs: (Array.isArray(t.subs) ? t.subs : Object.values(t.subs || {})).filter(Boolean),
+    const clean = arr.filter(t => t && typeof t === 'object' && t.text != null).map(t => Object.assign({}, t, {
+      // 문자열 등 손상된 subs는 통째로 버리고, 요소도 객체+text 있는 것만 (문자열이면 글자별로 쪼개지는 사고 방지)
+      subs: (Array.isArray(t.subs) ? t.subs : (t.subs && typeof t.subs === 'object' ? Object.values(t.subs) : []))
+        .filter(s => s && typeof s === 'object' && s.text != null),
       completions: t.completions || {},
       skips: t.skips || {},
       memoImages: Array.isArray(t.memoImages) ? t.memoImages : [],
@@ -346,6 +352,37 @@ let _pendingCollections = new Set();
 let _pendingSaveDks = new Set();   // 디바운스 대기 중인 날짜들 (여러 dk 저장 시 마지막 것만 쓰이는 버그 방지)
 let _pendingSaveFull = false;      // 전체 저장 요청(인자 없는 saveTasks)이 대기 중인지
 
+let _taskSaveRetryTimer = null;
+function _flushTaskSave() {
+  const ref = fbRef();
+  if (!ref) return;
+  const full = _pendingSaveFull;
+  const dks = [..._pendingSaveDks];
+  _pendingSaveFull = false; _pendingSaveDks.clear();
+  let p;
+  if (full || !dks.length) {
+    p = ref.set(fbClean(tasks));
+  } else if (dks.length === 1) {
+    p = ref.child(dks[0]).set(fbClean(tasks[dks[0]]));
+  } else {
+    // 여러 날짜를 한 번에 — 멀티패스 업데이트 (각 날짜 노드만 갱신)
+    const updates = {};
+    dks.forEach(d => { updates[d] = fbClean(tasks[d]); });
+    p = ref.update(updates);
+  }
+  p.then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
+   .catch((e) => {
+     console.warn('Firebase 저장 실패:', e);
+     // 저장 대상을 되살리고 15초 후 자동 재시도.
+     // (온라인 상태에서 난 일시 오류는 'online' 이벤트가 안 오므로 자체 재시도 필요 —
+     //  이게 없으면 pendingTasksLocal이 영원히 true로 남아 원격 수신이 전부 무시됨)
+     if (full) _pendingSaveFull = true;
+     dks.forEach(d => _pendingSaveDks.add(d));
+     pendingUpload = true; setSyncStatus('offline');
+     clearTimeout(_taskSaveRetryTimer);
+     _taskSaveRetryTimer = setTimeout(_flushTaskSave, 15000);
+   });
+}
 function saveTasks(dk) {
   if (READ_ONLY) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
@@ -357,24 +394,7 @@ function saveTasks(dk) {
   if (!navigator.onLine) { pendingUpload = true; setSyncStatus('offline'); return; }
   setSyncStatus('syncing');
   clearTimeout(fbSaveTimer);
-  fbSaveTimer = setTimeout(() => {
-    const full = _pendingSaveFull;
-    const dks = [..._pendingSaveDks];
-    _pendingSaveFull = false; _pendingSaveDks.clear();
-    let p;
-    if (full || !dks.length) {
-      p = ref.set(fbClean(tasks));
-    } else if (dks.length === 1) {
-      p = ref.child(dks[0]).set(fbClean(tasks[dks[0]]));
-    } else {
-      // 여러 날짜를 한 번에 — 멀티패스 업데이트 (각 날짜 노드만 갱신)
-      const updates = {};
-      dks.forEach(d => { updates[d] = fbClean(tasks[d]); });
-      p = ref.update(updates);
-    }
-    p.then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
-     .catch((e) => { console.warn('Firebase 저장 실패:', e); pendingUpload = true; setSyncStatus('offline'); });
-  }, 300);
+  fbSaveTimer = setTimeout(_flushTaskSave, 300);
 }
 
 // Firebase는 데이터에 undefined가 하나라도 있으면 저장을 거부한다.
@@ -388,8 +408,9 @@ function fbUpload() {
   if (!ref) return Promise.reject('no ref');
   pendingTasksLocal = true;
   setSyncStatus('syncing');
-  // 전체 업로드이므로 개별 dk 대기열은 비움 (디바운스 예약도 취소)
+  // 전체 업로드이므로 개별 dk 대기열은 비움 (디바운스·재시도 예약도 취소)
   clearTimeout(fbSaveTimer); fbSaveTimer = null;
+  clearTimeout(_taskSaveRetryTimer); _taskSaveRetryTimer = null;
   _pendingSaveFull = false; _pendingSaveDks.clear();
   return ref.set(fbClean(tasks))
     .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
@@ -489,31 +510,39 @@ function getRepeatTasksForDate(date, dayIdx) {
     if (!Array.isArray(list)) return;
     list.forEach(t => {
       if (!t || !t.repeat || t.repeat==='none') return;
-      if (t.repeatEnd && dk > t.repeatEnd) return;   // 반복 종료일
+      // 반복 종료일: 자연 발생일(휴일 이동 전) 기준으로 판정해야 하므로 각 분기에서 검사.
+      // 여기서는 이동 최대폭(14일)을 더한 상한으로만 빠르게 걸러냄 — 마지막 회차가
+      // 공휴일에 걸려 뒤로 밀린 경우에도 표시되도록.
+      if (t.repeatEnd) {
+        const endLimit = parseDk(t.repeatEnd); endLimit.setDate(endLimit.getDate()+14);
+        if (date > endLimit) return;
+      }
+      const rEnd = t.repeatEnd || null;
       if (t.skips && t.skips[dk]) return;            // "이 날짜만 삭제"(표시일 기준)
       const originDate = parseDk(oDk);
       const limitDate = parseDk(oDk); limitDate.setFullYear(limitDate.getFullYear() + 1);
       if (date > limitDate) return; // 생성일로부터 1년 초과 시 반복 종료
       if (t.repeat==='daily') {
-        if (dk > oDk) out.push({task:t, originDk:oDk, instanceDk:dk});
+        if (dk > oDk && (!rEnd || dk <= rEnd)) out.push({task:t, originDk:oDk, instanceDk:dk});
         return;
       }
       if (t.repeat==='weekdays') {
-        if (dk > oDk && !dateIsRest) out.push({task:t, originDk:oDk, instanceDk:dk}); // 영업일에만
+        if (dk > oDk && !dateIsRest && (!rEnd || dk <= rEnd)) out.push({task:t, originDk:oDk, instanceDk:dk}); // 영업일에만
         return;
       }
       // 주간/격주: 지정 요일은 의도된 선택 → 주말엔 그대로, '공휴일/수동휴무'에 걸리면 다음 영업일로 이동
       if (t.repeat==='weekly' || t.repeat==='biweekly') {
         if (dk <= oDk) return; // 원본일은 저장(원본)으로 표시
         // 1) 자연 발생일이고 공휴일/휴무일이 아니면 그대로(주말이어도) 표시
-        if (repeatNaturalOccurs(t, originDate, date) && !isHolidayShift(date)) { out.push({task:t, originDk:oDk, instanceDk:dk}); return; }
-        // 2) 공휴일/휴무일에 걸린 자연 발생일 → 다음 영업일로 1회 밀어 표시
+        if ((!rEnd || dk <= rEnd) && repeatNaturalOccurs(t, originDate, date) && !isHolidayShift(date)) { out.push({task:t, originDk:oDk, instanceDk:dk}); return; }
+        // 2) 공휴일/휴무일에 걸린 자연 발생일 → 다음 영업일로 1회 밀어 표시 (종료일은 자연 발생일 기준)
         if (!isRestDay(date)) {
           const probe = new Date(date);
           for (let k=0; k<14; k++) {
             probe.setDate(probe.getDate()-1);
             if (!isRestDay(probe)) break;
-            if (isHolidayShift(probe) && dateKey(probe) >= oDk && repeatNaturalOccurs(t, originDate, probe)) { out.push({task:t, originDk:oDk, instanceDk:dk, adjusted:true}); break; }
+            const pdk = dateKey(probe);
+            if (isHolidayShift(probe) && pdk >= oDk && (!rEnd || pdk <= rEnd) && repeatNaturalOccurs(t, originDate, probe)) { out.push({task:t, originDk:oDk, instanceDk:dk, adjusted:true}); break; }
           }
         }
         return;
@@ -527,6 +556,7 @@ function getRepeatTasksForDate(date, dayIdx) {
         if (cdk < oDk) continue;
         if (cdk === oDk && !isRestDay(cand)) continue; // origin이 영업일이면 저장(원본)으로 표시
         if (cand > limitDate) continue;
+        if (rEnd && cdk > rEnd) continue; // 종료일은 자연 발생일 기준 (밀린 표시일 아님)
         if (repeatNaturalOccurs(t, originDate, cand)) {
           out.push({task:t, originDk:oDk, instanceDk:dk, adjusted: cdk !== dk});
           break;
@@ -3252,14 +3282,17 @@ function getTodayIncomplete(){
   }catch(e){}
   return out;
 }
+// 알림 중복 방지 기록은 사용자별로 분리 — 같은 브라우저에서 캘린더를 오가도
+// 서로의 알림 기록을 덮어쓰거나(중복 발송) 가로채지(누락) 않도록
+const NKEY = k => `${k}_${USER_ID||'local'}`;
 // 1) 매일 오전 9시: 오늘 할 일 요약
 function checkNotificationSchedule() {
   if(!notifyAllowed()) return;
   const now = new Date();
   if(now.getHours() < NOTIFY_HOUR) return;
   const todayDk = dateKey(now);
-  if(localStorage.getItem('lastNotifyDate')===todayDk) return;
-  localStorage.setItem('lastNotifyDate', todayDk);
+  if(localStorage.getItem(NKEY('lastNotifyDate'))===todayDk) return;
+  localStorage.setItem(NKEY('lastNotifyDate'), todayDk);
   const list=getTodayIncomplete();
   if(!list.length) return;
   notify(`🗓 오늘의 할 일 ${list.length}건`, {body: summarizeTasks(list)});
@@ -3270,8 +3303,8 @@ function checkEveningReminder() {
   const now = new Date();
   if(now.getHours() < NOTIFY_EVENING) return;
   const todayDk = dateKey(now);
-  if(localStorage.getItem('lastNotify5pm')===todayDk) return;
-  localStorage.setItem('lastNotify5pm', todayDk);
+  if(localStorage.getItem(NKEY('lastNotify5pm'))===todayDk) return;
+  localStorage.setItem(NKEY('lastNotify5pm'), todayDk);
   const list=getTodayIncomplete();
   if(!list.length) return;
   notify(`🔔 미완료 태스크 ${list.length}건`, {body: summarizeTasks(list)});
@@ -3309,7 +3342,7 @@ function checkTimeNotifications(){
   const dk=dateKey(now);
   const nowMin=now.getHours()*60+now.getMinutes();
   let state={};
-  try{state=JSON.parse(localStorage.getItem('timeNotified')||'{}');}catch{}
+  try{state=JSON.parse(localStorage.getItem(NKEY('timeNotified'))||'{}');}catch{}
   if(state.dk!==dk)state={dk,ids:[]};
   const candidates=[];
   visibleStored(dk).forEach(t=>{ if(t&&t.time&&!t.checked)candidates.push({id:t.id,time:t.time,text:t.text}); });
@@ -3328,7 +3361,7 @@ function checkTimeNotifications(){
       state.ids.push(c.id);
     }
   });
-  localStorage.setItem('timeNotified',JSON.stringify(state));
+  localStorage.setItem(NKEY('timeNotified'),JSON.stringify(state));
 }
 
 // 2-b) 빨강(높음) 중요 태스크 일일 알림 — 오전 NOTIFY_HOUR 이후 1회
@@ -3337,8 +3370,8 @@ function checkHighPriorityAlert(){
   const now=new Date();
   if(now.getHours()<NOTIFY_HOUR)return;
   const todayDk=dateKey(now);
-  if(localStorage.getItem('lastNotifyHigh')===todayDk)return;
-  localStorage.setItem('lastNotifyHigh',todayDk);
+  if(localStorage.getItem(NKEY('lastNotifyHigh'))===todayDk)return;
+  localStorage.setItem(NKEY('lastNotifyHigh'),todayDk);
   const reds=getTodayIncomplete().filter(t=>t.priority==='high');
   if(!reds.length)return;
   const names=reds.slice(0,3).map(t=>(t.time?t.time+' ':'')+t.text).join(', ');
@@ -3353,7 +3386,7 @@ function updatePendingBadge(){
 }
 function checkPendingNotifications(){
   if(READ_ONLY) return;
-  let seen=[]; try{ seen=JSON.parse(localStorage.getItem('pendingNotified')||'[]'); }catch{}
+  let seen=[]; try{ seen=JSON.parse(localStorage.getItem(NKEY('pendingNotified'))||'[]'); }catch{}
   const seenSet=new Set(seen);
   const current=[], fresh=[];
   Object.entries(tasks).forEach(([dk,list])=>{
@@ -3363,7 +3396,7 @@ function checkPendingNotifications(){
   if(fresh.length && notifyAllowed()){
     try{ notify('👤 받은 일정 '+fresh.length+'건', {body: fresh.map(x=>`· ${x.from||'누군가'}: ${x.text}`).join('\n').slice(0,180)}); }catch(e){}
   }
-  localStorage.setItem('pendingNotified', JSON.stringify(current));
+  localStorage.setItem(NKEY('pendingNotified'), JSON.stringify(current));
   updatePendingBadge();
 }
 
@@ -3524,7 +3557,7 @@ const NOTE_COLORS = [null, '#f9a825', '#1a73e8', '#43a047', '#e91e63', '#8e24aa'
 const noteEditState = {}; // memoId → true(편집 모드)
 
 function memosFbRef() {
-  return USER_ID && USER_ID !== 'demo' && fbDb ? fbDb.ref(`users/${USER_ID}/memos`) : null;
+  return FB_UID && USER_ID !== 'demo' && fbDb ? fbDb.ref(`users/${FB_UID}/memos`) : null;
 }
 
 function normalizeMemos(raw) {
@@ -4757,7 +4790,7 @@ let sharedTasks = {};        // ownerId → 정규화된 tasks
 const shareHandles = {};     // ownerId → {ref, cb}
 let pendingShareLocal = false, shareSaveTimer = null;
 
-function sharesFbRef() { return USER_ID && USER_ID !== 'demo' && fbDb ? fbDb.ref(`users/${USER_ID}/shares`) : null; }
+function sharesFbRef() { return FB_UID && USER_ID !== 'demo' && fbDb ? fbDb.ref(`users/${FB_UID}/shares`) : null; }
 function saveShares() {
   if (READ_ONLY) return;
   localStorage.setItem(SHARES_KEY, JSON.stringify(shares));
@@ -4989,11 +5022,11 @@ function confirmSend(){
       from: USER_ID, pending: true,
     };
     const ref = fbDb.ref(`users/${to}/tasks/${dk}`);
-    return ref.once('value').then(snap => {
-      const raw = snap.val();
+    // transaction: 읽기→쓰기 사이에 상대방(또는 다른 발신자)이 쓴 데이터를 덮어쓰지 않음
+    return ref.transaction(raw => {
       const list = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw || {});
-      list.push(copy);
-      return ref.set(list);
+      list.push(fbClean(copy));
+      return list;
     }).then(() => { done++; }).catch(() => { fail++; });
   })).then(() => {
     closeSendModal();
@@ -5005,7 +5038,21 @@ document.getElementById('sendCancelBtn').onclick = closeSendModal;
 document.getElementById('sendConfirmBtn').onclick = confirmSend;
 document.getElementById('sendModal').onclick = e => { if (e.target === document.getElementById('sendModal')) closeSendModal(); };
 document.getElementById('sendSearchInput').addEventListener('input', renderSendResults);
-document.getElementById('sendSearchInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); confirmSend(); } });
+document.getElementById('sendSearchInput').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const inp = document.getElementById('sendSearchInput');
+  const typed = sanitizeId(inp.value);
+  if (typed) {
+    // 입력 중 Enter → 바로 보내지 않고 받는 사람 목록에 추가만.
+    // (부분 입력이 그대로 전송돼 존재하지 않는 사용자에게 가는 사고 방지)
+    if (typed !== USER_ID && !sendSelected.includes(typed)) sendSelected.push(typed);
+    inp.value = '';
+    renderSendResults();
+  } else {
+    confirmSend();
+  }
+});
 
 // ═══════════════════════════════════════
 // 🎯 목표 & 연속달성(streak)
@@ -5013,7 +5060,7 @@ document.getElementById('sendSearchInput').addEventListener('keydown', e => { if
 const GOALS_KEY = USER_ID ? `calGoals_${USER_ID}` : 'calGoals';
 let goals = (() => { try { return JSON.parse(localStorage.getItem(GOALS_KEY) || '[]') || []; } catch { return []; } })();
 let goalSaveTimer = null, pendingGoalLocal = false;
-function goalsFbRef() { return fbDb && USER_ID && USER_ID !== 'demo' ? fbDb.ref(`users/${USER_ID}/goals`) : null; }
+function goalsFbRef() { return fbDb && FB_UID && USER_ID !== 'demo' ? fbDb.ref(`users/${FB_UID}/goals`) : null; }
 function saveGoals() {
   if (READ_ONLY) return;
   localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
@@ -5384,6 +5431,10 @@ function applyTeamSnapshot(id, data){
         const c=ex.task;
         if(!c.selfRegistered){
           MIRROR.forEach(f=>{ const nv=(t[f]!==undefined?t[f]:null), cv=(c[f]!==undefined?c[f]:null); if(cv!==nv){ c[f]=(t[f]!==undefined?t[f]:null); changed=true; } });
+          // 팀에서 '이 날짜만 삭제'(skips)한 회차는 미러에도 반영 — 단, 내가 로컬에서
+          // 지운 회차는 보존해야 하므로 합집합으로 병합 (객체라 MIRROR 루프론 비교 불가)
+          const merged=Object.assign({}, c.skips||{}, t.skips||{});
+          if(JSON.stringify(merged)!==JSON.stringify(c.skips||{})){ c.skips=merged; changed=true; }
         }
       } else if(!teamCopied[ref]){ // 신규(한 번도 복사 안 한 것만)
         teamCopied[ref]=Date.now();
@@ -5499,23 +5550,24 @@ function registerTaskToTeam(dk, task, isRepeatInst, originDk){
     };
     registerTeamDirectory(tid, teamId); rememberTeam(tid, teamId);
     const ref=fbDb.ref(`users/team-${tid}/tasks/${srcDk}`);
-    ref.once('value').then(snap=>{
-      const v=snap.val(); const arr=Array.isArray(v)?v:(v?Object.values(v):[]);
-      arr.push(copy);
-      ref.set(arr)
-        .then(()=>{
-          const refKey=`${tid}|${srcDk}|${copyId}`;
-          // 별도 복사본을 만들지 않고 '원본 태스크'에 팀 등록 태그만 부착(중복 방지)
-          const orig=(tasks[srcDk]||[]).find(x=>x.id===task.id);
-          if(orig){ orig.fromTeam=tid; orig.teamRef=refKey; orig.selfRegistered=true; }
-          teamCopied[refKey]=Date.now(); saveTeamCopied();
-          // 자동 구독하지 않음 — 등록만으로 팀 전체 일정이 내 캘린더로 흘러오지 않게.
-          // (팀 전체를 함께 보려면 팀 캘린더 메뉴에서 직접 '구독')
-          saveTasks(srcDk); render();
-          showUndoToast(`🤝 '${teamId}' 팀에 등록했어요${(t.repeat&&t.repeat!=='none')?' (반복 포함)':''}`);
-        })
-        .catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
-    }).catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
+    // transaction: 두 멤버가 같은 날짜에 동시에 등록해도 서로의 항목을 덮어쓰지 않음
+    ref.transaction(v=>{
+      const arr=Array.isArray(v)?v.filter(Boolean):(v?Object.values(v):[]);
+      arr.push(fbClean(copy));
+      return arr;
+    })
+      .then(()=>{
+        const refKey=`${tid}|${srcDk}|${copyId}`;
+        // 별도 복사본을 만들지 않고 '원본 태스크'에 팀 등록 태그만 부착(중복 방지)
+        const orig=(tasks[srcDk]||[]).find(x=>x.id===task.id);
+        if(orig){ orig.fromTeam=tid; orig.teamRef=refKey; orig.selfRegistered=true; }
+        teamCopied[refKey]=Date.now(); saveTeamCopied();
+        // 자동 구독하지 않음 — 등록만으로 팀 전체 일정이 내 캘린더로 흘러오지 않게.
+        // (팀 전체를 함께 보려면 팀 캘린더 메뉴에서 직접 '구독')
+        saveTasks(srcDk); render();
+        showUndoToast(`🤝 '${teamId}' 팀에 등록했어요${(t.repeat&&t.repeat!=='none')?' (반복 포함)':''}`);
+      })
+      .catch(()=>showUndoToast('⚠️ 팀 등록 실패'));
   });
 }
 function openTeamPicker(){
@@ -5715,7 +5767,9 @@ initShareSync();
 registerUserDirectory();
 initGoalSync();
 rebuildIcsEvents();
-setInterval(()=>{ if(fbRef()) fbUpload(); }, 5*60*1000);
+// 주기 백업 업로드는 '보낼 로컬 변경이 있을 때만' — 아무 변경 없는 기기가
+// 5분마다 전체 트리를 덮어쓰면 다른 기기의 편집이 지워질 수 있음
+setInterval(()=>{ if(fbRef() && (pendingUpload || pendingTasksLocal)) fbUpload(); }, 5*60*1000);
 window.addEventListener('online', ()=>{
   setSyncStatus('syncing');
   if(pendingUpload && fbRef()){ pendingUpload=false; fbUpload(); }
