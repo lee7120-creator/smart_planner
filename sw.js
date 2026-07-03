@@ -1,7 +1,7 @@
 // 고정 캐시명 — 갱신은 network-first(아래)로 자동 처리되므로 버전 수동 bump 불필요
 const CACHE = 'myplanner';
 // 배포 스탬프: 이 값을 배포마다 바꾸면 sw.js 바이트가 달라져 브라우저가 새 버전을 감지 → 앱이 "새로고침" 배너를 띄움
-const SW_VERSION = '2026-07-03a';
+const SW_VERSION = '2026-07-03b';
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './styles.css', './app.js', './icon.svg', './icon-192.png', './icon-512.png', './icon-512-maskable.png', './manifest.webmanifest'])));
