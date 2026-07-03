@@ -4,7 +4,9 @@ import json
 import uuid
 import datetime
 import re
+import subprocess
 import telebot
+from telebot import types
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -17,6 +19,10 @@ ALLOWED_CHAT_ID = os.getenv("ALLOWED_CHAT_ID")
 CONV_DIR = "C:/Users/user/.gemini/antigravity-ide/brain/0e76dfce-b538-44cd-b55b-aa38b7a0ce01"
 MESSAGES_DIR = os.path.join(CONV_DIR, ".system_generated", "messages")
 TRANSCRIPT_PATH = os.path.join(CONV_DIR, ".system_generated", "logs", "transcript.jsonl")
+QA_TEST_PATH = os.path.join(CONV_DIR, "scratch", "qa_test.py")
+ARTIFACTS_DIR = os.path.join(CONV_DIR, "artifacts")
+
+PYTHON_EXE = r"d:\Project_1\.python\tools\python.exe"
 
 if not TOKEN:
     print("WARNING: TELEGRAM_BOT_TOKEN is not set in .env file.")
@@ -41,6 +47,15 @@ def is_authorized(message):
         bot.reply_to(message, "❌ 권한이 없습니다.")
         return False
     return True
+
+def get_main_keyboard():
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    btn_screen = types.KeyboardButton("🖥️ 실시간 화면")
+    btn_test = types.KeyboardButton("🧪 E2E 테스트")
+    btn_status = types.KeyboardButton("📊 로컬 상태")
+    btn_deploy = types.KeyboardButton("🚀 파이어베이스 배포")
+    markup.add(btn_screen, btn_test, btn_status, btn_deploy)
+    return markup
 
 def get_last_step_index():
     """Reads transcript.jsonl and returns the highest step_index currently recorded."""
@@ -79,20 +94,128 @@ def find_own_task_id():
         print(f"Error finding task ID: {e}")
     return last_task or "0e76dfce-b538-44cd-b55b-aa38b7a0ce01/task-telegram"
 
+def capture_screen_local(message):
+    status_msg = bot.reply_to(message, "📸 로컬 브라우저를 띄워 실시간 모바일 뷰를 캡처 중입니다...")
+    screenshot_path = "temp_screen.png"
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(viewport={"width": 400, "height": 850})
+            page = context.new_page()
+            page.goto('http://localhost:8080')
+            page.wait_for_load_state('networkidle')
+            page.wait_for_timeout(2000) # Wait for animation/transition
+            page.screenshot(path=screenshot_path)
+            browser.close()
+            
+        with open(screenshot_path, 'rb') as photo:
+            bot.send_photo(message.chat.id, photo, caption="🖥️ 실시간 로컬 앱 프리뷰 (모바일 뷰)")
+            
+        if os.path.exists(screenshot_path):
+            os.remove(screenshot_path)
+        bot.delete_message(message.chat.id, status_msg.message_id)
+    except Exception as e:
+        bot.reply_to(message, f"❌ 화면 캡처 실패: {str(e)}")
+
+def run_e2e_test(message):
+    status_msg = bot.reply_to(message, "🧪 Playwright E2E 자동 테스트 스크립트를 실행하는 중입니다...")
+    try:
+        # Run qa_test.py
+        result = subprocess.run(
+            [PYTHON_EXE, QA_TEST_PATH],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            cwd="d:\\Project_1"
+        )
+        
+        test_log = result.stdout
+        bot.reply_to(message, f"📋 **테스트 로그:**\n```\n{test_log[-1500:]}\n```")
+        
+        # Check if error screenshots were generated
+        chk_err_img = os.path.join(ARTIFACTS_DIR, "qa_test_checkbox_error.png")
+        del_err_img = os.path.join(ARTIFACTS_DIR, "qa_test_delete_error.png")
+        
+        if "SUCCESS" in test_log:
+            bot.send_message(message.chat.id, "✅ **E2E 테스트 성공! 모든 시나리오가 올바르게 작동합니다.**")
+        else:
+            bot.send_message(message.chat.id, "❌ **E2E 테스트 실패! 오류 캡처 이미지를 확인합니다...**")
+            # Send screenshot if exists
+            if os.path.exists(chk_err_img):
+                with open(chk_err_img, 'rb') as photo:
+                    bot.send_photo(message.chat.id, photo, caption="⚠️ 체크박스 테스트 실패 시점 스크린샷")
+            elif os.path.exists(del_err_img):
+                with open(del_err_img, 'rb') as photo:
+                    bot.send_photo(message.chat.id, photo, caption="⚠️ 삭제 테스트 실패 시점 스크린샷")
+        bot.delete_message(message.chat.id, status_msg.message_id)
+    except Exception as e:
+        bot.reply_to(message, f"❌ 테스트 실행 중 에러 발생: {str(e)}")
+
+def check_local_status(message):
+    status_msg = bot.reply_to(message, "📊 로컬 서버 및 프로젝트 상태를 진해하는 중입니다...")
+    try:
+        # Run git status
+        git_res = subprocess.run(["git", "status", "-s"], capture_output=True, text=True, cwd="d:\\Project_1")
+        # Check if server is listening on port 8080 (Windows netstat)
+        netstat_res = subprocess.run(["netstat", "-ano"], capture_output=True, text=True)
+        server_running = "127.0.0.1:8080" in netstat_res.stdout or "0.0.0.0:8080" in netstat_res.stdout or "[::]:8080" in netstat_res.stdout
+        
+        status_text = (
+            f"📊 **로컬 개발 환경 상태 리포트**\n\n"
+            f"💻 **로컬 서버 (port 8080)**: {'🟢 RUNNING' if server_running else '🔴 STOPPED'}\n"
+            f"📂 **Git 변경 상태**:\n```\n{git_res.stdout or '깨끗함 (No changes)'}\n```"
+        )
+        bot.reply_to(message, status_text, parse_mode="Markdown")
+        bot.delete_message(message.chat.id, status_msg.message_id)
+    except Exception as e:
+        bot.reply_to(message, f"❌ 상태 조회 실패: {str(e)}")
+
+def deploy_firebase_hosting(message):
+    status_msg = bot.reply_to(message, "🚀 Firebase Hosting 배포 명령을 실행 중입니다...")
+    try:
+        result = subprocess.run(
+            ["npx", "firebase", "deploy", "--only", "hosting"],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            cwd="d:\\Project_1",
+            shell=True
+        )
+        output = result.stdout
+        if result.returncode == 0:
+            bot.reply_to(
+                message,
+                f"✅ **Firebase Hosting 배포 성공!**\n\n"
+                f"🔗 라이브 URL: https://my-calendar-1a589.web.app\n"
+                f"```\n{output[-1000:]}\n```"
+            )
+        else:
+            bot.reply_to(message, f"❌ **배포 실패:**\n```\n{output[-1000:]}\n```")
+        bot.delete_message(message.chat.id, status_msg.message_id)
+    except Exception as e:
+        bot.reply_to(message, f"❌ 배포 중 에러 발생: {str(e)}")
+
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     if not is_authorized(message):
         return
         
     help_text = (
-        "🤖 **안티그래비티 원격제어 브릿지 봇**\n\n"
-        "현재 IDE 세션에 떠 있는 **안티그래비티 에이전트**와 다이렉트로 연결되었습니다!\n\n"
+        "🤖 **안티그래비티 원격제어 프로(PRO) 봇**\n\n"
+        "현재 IDE 세션에 떠 있는 **안티그래비티 에이전트**와 다이렉트로 연결되었습니다!\n"
+        "아래 퀵 메뉴를 통해 원격 제어 및 테스트를 즉시 수행할 수 있습니다.\n\n"
         "💡 **사용 방법**:\n"
-        "아무 명령어 없이 일반 메시지로 코딩 지시를 보내시면, 현재 실행 중인 에이전트가 로컬 파일을 직접 분석하고 수정합니다.\n"
-        "사용자님의 API 키나 요금을 전혀 쓰지 않으며 무제한으로 사용 가능합니다.\n\n"
-        "예: `app.js의 캘린더 색상 관련 코드 읽어서 어떤 색상들이 있는지 알려주고, 기본 색상을 연한 하늘색으로 바꿔줘`"
+        "1️⃣ **일반 자연어 지시**: 주석 달아줘, app.js에 기능 추가해줘 등 지시를 채팅으로 보내시면 안티그래비티가 백그라운드에서 실시간 코딩을 진행합니다.\n"
+        "2️⃣ **퀵 메뉴 버튼**:\n"
+        "- `🖥️ 실시간 화면`: 로컬 앱 모바일 프리뷰 캡처 전송\n"
+        "- `🧪 E2E 테스트`: Playwright 자동 테스트 실행 및 에러 확인\n"
+        "- `📊 로컬 상태`: 서버 구동 및 파일 변경점 확인\n"
+        "- `🚀 파이어베이스 배포`: Firebase Hosting 즉시 실시간 배포"
     )
-    bot.reply_to(message, help_text, parse_mode="Markdown")
+    bot.reply_to(message, help_text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
 @bot.message_handler(func=lambda message: True)
 def handle_telegram_command(message):
@@ -101,15 +224,27 @@ def handle_telegram_command(message):
         
     user_query = message.text
     
-    # 1. Get current last step index
+    # Check for keyboard commands
+    if user_query == "🖥️ 실시간 화면":
+        capture_screen_local(message)
+        return
+    elif user_query == "🧪 E2E 테스트":
+        run_e2e_test(message)
+        return
+    elif user_query == "📊 로컬 상태":
+        check_local_status(message)
+        return
+    elif user_query == "🚀 파이어베이스 배포":
+        deploy_firebase_hosting(message)
+        return
+        
+    # Otherwise forward to Antigravity IDE agent queue
     start_step_idx = get_last_step_index()
     print(f"Current last step index: {start_step_idx}")
     
-    # 2. Find active task ID to use as sender for wakeup trigger
     active_task_id = find_own_task_id()
     print(f"Found own active task ID: {active_task_id}")
     
-    # 3. Generate message file to queue it
     msg_id = str(uuid.uuid4())
     msg_filename = f"{msg_id}.json"
     msg_filepath = os.path.join(MESSAGES_DIR, msg_filename)
@@ -129,18 +264,16 @@ def handle_telegram_command(message):
     status_msg = bot.reply_to(
         message, 
         "🧠 안티그래비티 에이전트를 깨웠습니다. 지시사항을 분석하고 코드를 제어하는 중입니다...\n"
-        "*(수행하는 도구 수에 따라 30초~2분 정도 소요될 수 있습니다)*"
+        "*(수행하는 도구 수에 따라 5초~20초 소요됩니다)*"
     )
     
     try:
-        # Write the file to trigger the agent wakeup
         with open(msg_filepath, 'w', encoding='utf-8') as f:
             json.dump(msg_data, f, ensure_ascii=False, indent=2)
         print(f"Message file created: {msg_filepath}")
         
-        # 4. Poll transcript.jsonl for my response
-        timeout = 300 # 5 minutes timeout
-        poll_interval = 2
+        timeout = 300
+        poll_interval = 1
         elapsed = 0
         response_sent = False
         
@@ -148,7 +281,6 @@ def handle_telegram_command(message):
             time.sleep(poll_interval)
             elapsed += poll_interval
             
-            # Check for new line in transcript
             if os.path.exists(TRANSCRIPT_PATH):
                 try:
                     with open(TRANSCRIPT_PATH, 'r', encoding='utf-8') as f:
@@ -159,7 +291,6 @@ def handle_telegram_command(message):
                                 data = json.loads(line)
                                 idx = data.get("step_index", -1)
                                 if idx > start_step_idx:
-                                    # We found a new step! Check if it is a MODEL text response
                                     if (
                                         data.get("source") == "MODEL" 
                                         and data.get("type") == "PLANNER_RESPONSE" 
@@ -167,7 +298,6 @@ def handle_telegram_command(message):
                                     ):
                                         content = data.get("content", "").strip()
                                         if content:
-                                            # Send response back to user
                                             bot.reply_to(message, f"💡 **안티그래비티 실행 완료:**\n\n{content}")
                                             response_sent = True
                                             break
