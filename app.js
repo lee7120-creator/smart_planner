@@ -1442,7 +1442,28 @@ function scheduleMemoSave(){
   if(fore){ fore.onmousedown=e=>e.stopPropagation(); fore.onchange=()=>memoWrapStyle('color', fore.value); }
   const back=document.getElementById('mtBack');
   if(back){ back.onmousedown=e=>e.stopPropagation(); back.onchange=()=>memoWrapStyle('backgroundColor', back.value); }
+  // ☑ 체크리스트: 커서 위치에 체크 라인 삽입
+  const chk=document.getElementById('mtCheck');
+  if(chk){
+    chk.onmousedown=e=>e.preventDefault();
+    chk.onclick=()=>{
+      const ed=document.getElementById('memoEditable'); if(!ed) return;
+      ed.focus();
+      document.execCommand('insertHTML',false,'<div class="md-line md-check">☐ </div>');
+      scheduleMemoSave();
+    };
+  }
 })();
+// 메모 안 체크박스 클릭 → 완료 토글 (라인 앞쪽 26px만 반응해 텍스트 편집을 방해하지 않음)
+document.getElementById('memoEditable').addEventListener('click',e=>{
+  const line=e.target.closest('.md-check'); if(!line) return;
+  const r=line.getBoundingClientRect();
+  if(e.clientX - r.left > 26) return;
+  e.preventDefault();
+  const done=line.classList.toggle('done');
+  line.textContent=done ? line.textContent.replace(/^☐/,'☑') : line.textContent.replace(/^☑/,'☐');
+  saveMemoNow();
+});
 
 // ── 메모 버전 히스토리 (최근 5개) ──
 function renderMemoHistory(){
@@ -4697,7 +4718,10 @@ function attachDrag(handle, opts){
     if(isTouch){ if(longPressMs>0) lp=setTimeout(begin,longPressMs); } else begin();
   });
 }
-let canvasPan = {x: 0, y: 0};
+// 캔버스 팬/줌 상태 — 사용자별로 저장해 다시 열어도 보던 위치 유지
+let canvasPan = (()=>{ try{ const v=JSON.parse(localStorage.getItem(`canvasPan_${USER_ID||''}`)||'null'); return (v&&typeof v==='object')?v:{x:0,y:0,z:1}; }catch{ return {x:0,y:0,z:1}; } })();
+if(canvasPan.z==null||!(canvasPan.z>0)) canvasPan.z=1;
+function saveCanvasPan(){ try{ localStorage.setItem(`canvasPan_${USER_ID||''}`, JSON.stringify(canvasPan)); }catch{} }
 function ensureCanvasCoords() {
   let rootIdx = 0;
   const place = (m, depth, slot) => {
@@ -4719,10 +4743,15 @@ document.getElementById('canvasClose').onclick = closeCanvas;
 function renderCanvas() {
   const board = document.getElementById('canvasBoard');
   board.innerHTML = '';
+  // 팬/줌은 inner 컨테이너의 CSS transform으로만 처리 — 이동/확대 때 재렌더 없음(성능)
+  const inner = el('div', 'canvas-inner');
+  board.appendChild(inner);
+  const applyPan = () => { inner.style.transform = `translate(${canvasPan.x}px,${canvasPan.y}px) scale(${canvasPan.z})`; };
+  applyPan();
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('class', 'canvas-lines');
-  board.appendChild(svg);
+  inner.appendChild(svg);
   const CARD_W = 190, CARD_H = 40;
   const drawLines = () => {
     while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -4730,10 +4759,10 @@ function renderCanvas() {
       if (!m.parentId || !memos[m.parentId]) return;
       const p = memos[m.parentId];
       const line = document.createElementNS(svgNS, 'line');
-      line.setAttribute('x1', p.cx + CARD_W/2 + canvasPan.x);
-      line.setAttribute('y1', p.cy + CARD_H + canvasPan.y);
-      line.setAttribute('x2', m.cx + CARD_W/2 + canvasPan.x);
-      line.setAttribute('y2', m.cy + canvasPan.y);
+      line.setAttribute('x1', p.cx + CARD_W/2);
+      line.setAttribute('y1', p.cy + CARD_H);
+      line.setAttribute('x2', m.cx + CARD_W/2);
+      line.setAttribute('y2', m.cy);
       line.setAttribute('class', 'canvas-line');
       svg.appendChild(line);
     });
@@ -4741,23 +4770,24 @@ function renderCanvas() {
   drawLines();
   Object.values(memos).forEach(m => {
     const card = el('div', 'canvas-card');
-    card.style.left = (m.cx + canvasPan.x) + 'px';
-    card.style.top = (m.cy + canvasPan.y) + 'px';
+    card.style.left = m.cx + 'px';
+    card.style.top = m.cy + 'px';
     if (m.color) card.style.borderLeft = `4px solid ${m.color}`;
     card.appendChild(el('div', 'canvas-card-title', {textContent: (m.pinned?'📌 ':'') + memoLabel(m)}));
     const preview = memoPreviewText(m.text).slice(0, 36);
     if (preview) card.appendChild(el('div', 'canvas-card-preview', {textContent: preview}));
     const tags = extractTags(m);
     if (tags.length) card.appendChild(el('div', 'canvas-card-tags', {textContent: tags.map(t=>'#'+t).join(' ')}));
-    // 드래그 재배치 (PC: 즉시, 모바일: 꾹 눌러서)
+    // 드래그 재배치 (PC: 즉시, 모바일: 꾹 눌러서) — 이동량은 줌 배율로 보정
     let _csx, _csy, _cox, _coy;
     attachDrag(card, {
       longPressMs: 180, stopPropagation: true,
       onStart: e => { _csx=e.clientX; _csy=e.clientY; _cox=m.cx; _coy=m.cy; card.classList.add('dragging'); },
       onMove: ev => {
-        m.cx = _cox + ev.clientX - _csx; m.cy = _coy + ev.clientY - _csy;
-        card.style.left = (m.cx + canvasPan.x) + 'px';
-        card.style.top = (m.cy + canvasPan.y) + 'px';
+        m.cx = _cox + (ev.clientX - _csx) / canvasPan.z;
+        m.cy = _coy + (ev.clientY - _csy) / canvasPan.z;
+        card.style.left = m.cx + 'px';
+        card.style.top = m.cy + 'px';
         drawLines();
       },
       onEnd: () => { card.classList.remove('dragging'); if (!READ_ONLY) saveMemos(); }
@@ -4770,18 +4800,70 @@ function renderCanvas() {
       closeCanvas();
       renderNoteWins();
     });
-    board.appendChild(card);
+    inner.appendChild(card);
   });
   if (!Object.keys(memos).length) {
     board.appendChild(el('div', 'canvas-empty', {textContent: '메모가 없어요 — 빈 곳을 더블클릭해서 만들어 보세요'}));
   }
-  // 배경 드래그로 팬 (PC/모바일 즉시)
+  // 배경 드래그로 팬 — transform만 갱신 (재렌더 없음)
   let _psx, _psy, _pox, _poy;
   attachDrag(board, {
     longPressMs: 0,
     onStart: e => { _psx=e.clientX; _psy=e.clientY; _pox=canvasPan.x; _poy=canvasPan.y; },
-    onMove: ev => { canvasPan.x = _pox + ev.clientX - _psx; canvasPan.y = _poy + ev.clientY - _psy; renderCanvas(); }
+    onMove: ev => { canvasPan.x = _pox + ev.clientX - _psx; canvasPan.y = _poy + ev.clientY - _psy; applyPan(); },
+    onEnd: () => saveCanvasPan()
   });
+  // 휠 줌 (커서 위치 기준)
+  const zoomAt = (mx, my, nz) => {
+    nz = Math.min(2.5, Math.max(0.35, nz));
+    canvasPan.x = mx - (mx - canvasPan.x) * (nz / canvasPan.z);
+    canvasPan.y = my - (my - canvasPan.y) * (nz / canvasPan.z);
+    canvasPan.z = nz;
+    applyPan();
+  };
+  board.onwheel = e => {
+    e.preventDefault();
+    const r = board.getBoundingClientRect();
+    zoomAt(e.clientX - r.left, e.clientY - r.top, canvasPan.z * (e.deltaY < 0 ? 1.12 : 0.89));
+    saveCanvasPan();
+  };
+  // 핀치 줌 (모바일 두 손가락)
+  let _pinch = null;
+  const tDist = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  board.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) _pinch = { d: tDist(e), z: canvasPan.z,
+      cx: (e.touches[0].clientX + e.touches[1].clientX) / 2, cy: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+  }, { passive: true });
+  board.addEventListener('touchmove', e => {
+    if (_pinch && e.touches.length === 2) {
+      e.preventDefault();
+      const r = board.getBoundingClientRect();
+      zoomAt(_pinch.cx - r.left, _pinch.cy - r.top, _pinch.z * tDist(e) / _pinch.d);
+    }
+  }, { passive: false });
+  board.addEventListener('touchend', () => { if (_pinch) { _pinch = null; saveCanvasPan(); } });
+  // 빈 곳 더블클릭 → 그 자리에 새 메모 (안내 문구가 약속하던 동작)
+  board.addEventListener('dblclick', e => {
+    if (READ_ONLY) return;
+    if (e.target.closest('.canvas-card')) return;
+    const r = board.getBoundingClientRect();
+    const m = createMemo(null);
+    if (!m) return;
+    m.cx = (e.clientX - r.left - canvasPan.x) / canvasPan.z;
+    m.cy = (e.clientY - r.top - canvasPan.y) / canvasPan.z;
+    m.open = false;   // 캔버스에 카드로 먼저 표시 (더블클릭하면 열림)
+    saveMemos();
+    renderCanvas();
+    renderNoteWins();
+  });
+  // 줌 컨트롤 (＋ / － / 원래대로)
+  const ctl = el('div', 'canvas-zoomctl');
+  const mkZ = (label, fn) => { const b = el('button', 'canvas-zoom-btn', { type: 'button', textContent: label }); b.onclick = e => { e.stopPropagation(); fn(); saveCanvasPan(); }; ctl.appendChild(b); };
+  const center = () => { const r = board.getBoundingClientRect(); return [r.width / 2, r.height / 2]; };
+  mkZ('＋', () => { const [cx, cy] = center(); zoomAt(cx, cy, canvasPan.z * 1.2); });
+  mkZ('－', () => { const [cx, cy] = center(); zoomAt(cx, cy, canvasPan.z / 1.2); });
+  mkZ('⌂', () => { canvasPan = { x: 0, y: 0, z: 1 }; applyPan(); });
+  board.appendChild(ctl);
 }
 
 // ── 📝 메모 보관함 메뉴 ──

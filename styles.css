@@ -1129,12 +1129,7 @@
       display:flex; align-items:center; justify-content:center;
     }
     .memo-close:hover { background:rgba(244,67,54,.12); color:#f44336; }
-    .memo-textarea {
-      width:100%; min-height:150px; max-height:320px; resize:vertical;
-      border:none; outline:none; padding:13px 14px; font-size:13px;
-      font-family:inherit; line-height:1.65; background:transparent; color:var(--text);
-    }
-    .memo-textarea::placeholder { color:var(--text3); }
+    /* (구 .memo-textarea는 contenteditable .memo-editable로 대체되어 제거) */
     /* 서식 툴바 */
     .memo-toolbar {
       display:flex; flex-wrap:wrap; align-items:center; gap:3px;
@@ -1163,6 +1158,9 @@
     .memo-editable a { color:var(--primary); word-break:break-all; }
     .memo-editable img { max-width:100%; border-radius:8px; margin:4px 0; }
     .memo-editable .md-h { font-weight:700; font-size:15px; margin:4px 0 2px; }
+    /* 체크리스트 라인 — 앞쪽 글리프 클릭으로 완료 토글 */
+    .memo-editable .md-check { cursor:pointer; padding:1px 0; }
+    .memo-editable .md-check.done { color:var(--text3); text-decoration:line-through; }
     .memo-submemo {
       display:inline-flex; align-items:center; gap:2px; padding:1px 7px; margin:0 1px;
       border-radius:6px; background:var(--primary-l); color:var(--primary); font-size:12px;
@@ -1261,7 +1259,8 @@
         padding-bottom:env(safe-area-inset-bottom);
       }
       @keyframes memoUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
-      .memo-textarea { min-height:180px; font-size:15px; }
+      /* 16px: 모바일 가독성 + iOS 포커스 자동 확대 방지 */
+      .memo-editable { min-height:180px; font-size:16px; }
       .memo-header { cursor:default; }
     }
 
@@ -1456,7 +1455,16 @@
       touch-action:none;
     }
     .canvas-board:active { cursor:grabbing; }
-    .canvas-lines { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+    .canvas-inner { position:absolute; inset:0; transform-origin:0 0; }
+    .canvas-lines { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+    .canvas-zoomctl { position:absolute; right:14px; bottom:14px; display:flex; flex-direction:column; gap:6px; z-index:5; }
+    .canvas-zoom-btn {
+      width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
+      background:var(--surface); color:var(--text2); font-size:16px; cursor:pointer;
+      box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
+    }
+    .canvas-zoom-btn:hover { background:var(--surface2); color:var(--text); }
+    .canvas-zoom-btn:active { transform:scale(.92); }
     .canvas-line { stroke:var(--border); stroke-width:1.5; }
     .canvas-card {
       position:absolute; width:190px; background:var(--surface); border:1px solid var(--border);
