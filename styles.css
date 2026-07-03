@@ -786,14 +786,16 @@
       .nav-group { order:2; flex:1; justify-content:center; gap:4px; }
       .search-wrap { order:4; max-width:100%; flex:1 1 100%; }
       .header-actions { order:3; margin-left:0; gap:4px; }
-      /* 하단 탭바 표시 + 본문이 바에 가리지 않도록 여백 확보 */
+      /* 하단 탭바 표시 + 본문이 바에 가리지 않도록 여백 확보
+         z-index는 FAB(401)보다 위 — 더보기 시트가 + 버튼에 가리지 않게 */
       .mobile-nav {
-        display:flex; position:fixed; left:0; right:0; bottom:0; z-index:400;
+        display:flex; position:fixed; left:0; right:0; bottom:0; z-index:402;
         background:var(--surface); border-top:1px solid var(--border);
         padding:4px 6px calc(4px + env(safe-area-inset-bottom));
       }
       body { padding-bottom:calc(60px + env(safe-area-inset-bottom)); }
-      .fab-add { bottom:calc(74px + env(safe-area-inset-bottom)); }
+      /* FAB는 더보기 탭·시트와 겹치지 않게 왼쪽 아래로 + 시트 열림 영역 회피 */
+      .fab-add { bottom:calc(74px + env(safe-area-inset-bottom)); right:14px; }
       /* 기본 .user-chip(max-width:180px)가 소스 순서상 뒤에 와서 덮어쓰므로 명시도를 높여 모바일 캡 적용 */
       .header-actions .user-chip { max-width:96px; padding:4px 8px; gap:4px; }
       .header-actions .icon-btn { width:36px; height:36px; font-size:15px; }
