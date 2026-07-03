@@ -245,7 +245,7 @@ if (!USER_ID) {
     });
   };
   document.getElementById('switchUserBtn').style.display = 'flex';
-  document.getElementById('switchUserBtn').innerHTML = '↩ <span>내 캘린더로</span>';
+  document.getElementById('switchUserBtn').innerHTML = '<svg class="ic" width="14" height="14"><use href="#i-switch"/></svg> <span>내 캘린더로</span>';
   document.getElementById('switchUserBtn').onclick = () => {
     const last = localStorage.getItem('lastUser');
     window.location.href = window.location.pathname + (last ? `?u=${encodeURIComponent(last)}` : '');
@@ -1052,7 +1052,7 @@ function renderTrashModal(){
     info.appendChild(el('div','trash-meta',{textContent:`${d.getMonth()+1}/${d.getDate()} 삭제 · ${daysLeft}일 후 사라져요`}));
     row.appendChild(info);
     const actions=el('div','trash-actions');
-    const restoreBtn=el('button','trash-act-btn',{textContent:'↩ 복구'});
+    const restoreBtn=el('button','trash-act-btn',{innerHTML:'<svg class="ic" width="12" height="12"><use href="#i-switch"/></svg> 복구'});
     restoreBtn.onclick=()=>restoreFromTrash(item.id);
     const delBtn=el('button','trash-act-btn del',{textContent:'✕'});
     delBtn.onclick=()=>{ if(confirm('영구 삭제할까요?')) permanentDeleteTrash(item.id); };
@@ -1111,7 +1111,7 @@ function moveRepeatInstanceOne(originDk, taskId, instanceDk, toDk){
 // 반복 일정 이동 범위 묻기: 'one'(이 회차만) / 'all'(전체 시작일 변경) / null(취소)
 function askRepeatMoveScope(cb){
   const ov=el('div','modal-overlay'); const box=el('div','modal-box'); box.style.maxWidth='320px';
-  box.appendChild(el('div','modal-title',{textContent:'🔄 반복 일정 이동'}));
+  box.appendChild(el('div','modal-title',{innerHTML:'<svg class="ic" width="15" height="15"><use href="#i-repeat"/></svg> 반복 일정 이동'}));
   box.appendChild(el('div','',{textContent:'이 회차만 옮길까요, 반복 전체를 옮길까요?',style:'font-size:13px;color:var(--text2);margin-bottom:12px'}));
   const mk=(label,sub,fn,primary)=>{ const b=el('button',primary?'btn-primary':'btn-secondary',{type:'button'}); b.style.cssText='width:100%;margin-bottom:8px;text-align:left;padding:10px 12px'; b.appendChild(el('div','',{textContent:label,style:'font-weight:600'})); b.appendChild(el('div','',{textContent:sub,style:'font-size:11px;opacity:.8;margin-top:2px'})); b.onclick=()=>{ov.remove();fn();}; return b; };
   box.appendChild(mk('이 회차만 이동','선택한 날짜에 단발 일정으로 (반복은 유지)',()=>cb('one'),true));
@@ -1166,7 +1166,7 @@ function openMovePopup(anchor, fromDk, taskId, repCtx){
     if(!inp.value) return;
     commit(inp.value);
   };
-  pickBtn.appendChild(el('span',null,{textContent:'🗓'}));
+  const _pi=el('span'); _pi.innerHTML='<svg class="ic" width="13" height="13"><use href="#i-calendar"/></svg>'; pickBtn.appendChild(_pi);
   pickBtn.appendChild(el('span',null,{textContent:'날짜 선택'}));
   pickBtn.appendChild(inp);
   pickBtn.onclick=e=>{e.stopPropagation();inp.showPicker&&inp.showPicker();};
@@ -2040,7 +2040,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   textWrap.appendChild(txt);
   if(!isSub){
     const hasMemo=!!(task.memo&&task.memo.trim());
-    const memoBtn=el('span',`memo-icon-btn${hasMemo?' has':''}`,{textContent:'📝',title:hasMemo?'메모 보기/편집':'메모 추가'});
+    const memoBtn=el('span',`memo-icon-btn${hasMemo?' has':''}`,{title:hasMemo?'메모 보기/편집':'메모 추가'}); memoBtn.innerHTML='<svg class="ic" width="13" height="13"><use href="#i-note"/></svg>';
     memoBtn.setAttribute('role','button'); memoBtn.tabIndex=0;
     const openMemoH=e=>{e.stopPropagation();openMemo(isRepeatInst?originDk:dk,task.id,memoBtn);};
     memoBtn.onclick=openMemoH; addKbd(memoBtn,openMemoH);
@@ -2090,9 +2090,9 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     body.appendChild(el('div','from-badge',{textContent:'👤 '+task.from+'님이 보냄'}));
     if(task.pending&&!READ_ONLY){
       const ar=el('div','accept-row');
-      const ok=el('button','accept-btn',{textContent:'✅ 수락'});
+      const ok=el('button','accept-btn',{innerHTML:'<svg class="ic" width="12" height="12"><use href="#i-check"/></svg> 수락'});
       ok.onclick=e=>{e.stopPropagation();acceptTask(dk,task.id);};
-      const no=el('button','reject-btn',{textContent:'🚫 거절'});
+      const no=el('button','reject-btn',{innerHTML:'<svg class="ic" width="12" height="12"><use href="#i-x"/></svg> 거절'});
       no.onclick=e=>{e.stopPropagation();rejectTask(dk,task.id);};
       ar.appendChild(ok); ar.appendChild(no); body.appendChild(ar);
     }
@@ -2142,27 +2142,27 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
 
   // 상위 항목: 기능 아이콘들을 ⋯ 트레이(드롭다운)로 모아 가로 공간 확보
   const actionsWrap=el('div','task-actions-wrap');
-  const moreBtn=el('button','task-more-btn',{textContent:'⋯',title:'작업 메뉴'});
+  const moreBtn=el('button','task-more-btn',{title:'작업 메뉴'}); moreBtn.innerHTML='<svg class="ic" width="15" height="15"><use href="#i-more"/></svg>';
   moreBtn.setAttribute('aria-label','작업 메뉴 열기');
   const tray=el('div','task-actions-tray hidden');
   const closeTray=()=>tray.classList.add('hidden');
   const trayItem=(icon,label,extraCls,handler)=>{
     const b=el('button',`tray-item${extraCls?' '+extraCls:''}`,{type:'button'});
-    b.appendChild(el('span','tray-ico',{textContent:icon}));
+    const _ti=el('span','tray-ico'); _ti.innerHTML=`<svg class="ic" width="14" height="14"><use href="#i-${icon}"/></svg>`; b.appendChild(_ti);
     b.appendChild(el('span',null,{textContent:label}));
     b.onclick=e=>{e.stopPropagation();closeTray();handler(e);};
     tray.appendChild(b);
     return b;
   };
-  trayItem('🍅','포모도로 시작',null,()=>startPomodoroForTask(task.text));
-  trayItem('✏️','수정',null,()=>openEdit(dk,task,isRepeatInst,originDk));
-  trayItem('📅','다른 날짜로 이동',null,()=>{
+  trayItem('timer','포모도로 시작',null,()=>startPomodoroForTask(task.text));
+  trayItem('pencil','수정',null,()=>openEdit(dk,task,isRepeatInst,originDk));
+  trayItem('calendar','다른 날짜로 이동',null,()=>{
     openMovePopup(actionsWrap, dk, task.id, isRepeatInst?{isRepeatInst:true, originDk, instanceDk}:null);
   });
-  if(!isRepeatInst) trayItem('⏭','다음 영업일로 미루기',null,()=>postponeTask(dk,task.id));
-  trayItem('💬','댓글',null,()=>openComments(dk,task.id,isRepeatInst,originDk));
-  if(!IS_TEAM && fbDb) trayItem('🤝','팀에 등록',null,()=>registerTaskToTeam(dk,task,isRepeatInst,originDk));
-  trayItem('✕','삭제','del',()=>{
+  if(!isRepeatInst) trayItem('skip','다음 영업일로 미루기',null,()=>postponeTask(dk,task.id));
+  trayItem('msg','댓글',null,()=>openComments(dk,task.id,isRepeatInst,originDk));
+  if(!IS_TEAM && fbDb) trayItem('users','팀에 등록',null,()=>registerTaskToTeam(dk,task,isRepeatInst,originDk));
+  trayItem('x','삭제','del',()=>{
     if(isRepeatInst||(task.repeat&&task.repeat!=='none')){
       openRepeatDel(isRepeatInst?originDk:dk, task.id, dk);
     } else if(confirm('삭제할까요?')) {
@@ -2530,7 +2530,7 @@ function buildTimeblockView(){
   // 시간 미지정 항목
   if(untimed.length){
     const ut=el('div','tb-untimed');
-    ut.appendChild(el('div','tb-untimed-title',{textContent:'🕒 시간 미지정'}));
+    ut.appendChild(el('div','tb-untimed-title',{innerHTML:'<svg class="ic" width="12" height="12"><use href="#i-clock"/></svg> 시간 미지정'}));
     const ul=el('div','tasks-list');
     untimed.forEach(({t,isRepeat,originDk,instanceDk})=>ul.appendChild(buildTaskItem(dk,t,false,null,isRepeat,originDk,instanceDk)));
     ut.appendChild(ul);
@@ -2875,7 +2875,7 @@ function buildTagFilterBar(){
   }
   // 태그 칩 (태그가 있을 때만)
   if(tags.length){
-    bar.appendChild(el('span','',{textContent:'🏷',style:'font-size:12px;margin-left:6px'}));
+    const _tg=el('span','',{style:'margin-left:6px;color:var(--text3)'}); _tg.innerHTML='<svg class="ic" width="12" height="12"><use href="#i-tag"/></svg>'; bar.appendChild(_tg);
     const allChip = el('button', `tag-filter-chip${tagFilter ? '' : ' active'}`, {textContent: '전체'});
     allChip.onclick = () => { tagFilter = null; render(); };
     bar.appendChild(allChip);
@@ -4242,14 +4242,14 @@ function buildNoteWin(m) {
     crumb.onclick = e => { e.stopPropagation(); navigateNote(m.id, m.parentId); };
     head.appendChild(crumb);
   } else {
-    head.appendChild(el('span', 'memo-icon', {textContent: '📝'}));
+    const _mi=el('span','memo-icon'); _mi.innerHTML='<svg class="ic" width="15" height="15"><use href="#i-note"/></svg>'; head.appendChild(_mi);
   }
   const title = el('input', 'note-title-input');
   title.type = 'text'; title.placeholder = '제목'; title.value = m.title; title.readOnly = READ_ONLY;
   title.addEventListener('input', () => { m.title = title.value; clearTimeout(_noteTitleTimer); _noteTitleTimer = setTimeout(saveMemos, 400); });
   head.appendChild(title);
   if (!READ_ONLY) {
-    const colorBtn = el('button', 'note-btn', {textContent: '🎨', title: '색상 변경'});
+    const colorBtn = el('button','note-btn',{innerHTML:'<svg class="ic" width="13" height="13"><use href="#i-palette"/></svg>',title:'색상 변경'});
     colorBtn.onclick = e => {
       e.stopPropagation();
       const i = NOTE_COLORS.indexOf(m.color);
@@ -4258,7 +4258,7 @@ function buildNoteWin(m) {
       saveMemos();
     };
     head.appendChild(colorBtn);
-    const pinBtn = el('button', `note-btn${m.pinned?' pinned':''}`, {textContent: '📌', title: m.pinned?'고정 해제':'항상 위 고정'});
+    const pinBtn = el('button',`note-btn${m.pinned?' pinned':''}`,{innerHTML:'<svg class="ic" width="13" height="13"><use href="#i-pin"/></svg>',title:m.pinned?'고정 해제':'항상 위 고정'});
     pinBtn.onclick = e => {
       e.stopPropagation();
       m.pinned = !m.pinned;
@@ -4268,11 +4268,11 @@ function buildNoteWin(m) {
     };
     head.appendChild(pinBtn);
   }
-  const histBtn = el('button', 'note-btn', {textContent: '🕘', title: '버전 이력'});
+  const histBtn = el('button','note-btn',{innerHTML:'<svg class="ic" width="13" height="13"><use href="#i-history"/></svg>',title:'버전 이력'});
   histBtn.onclick = e => { e.stopPropagation(); openNoteHist(m); };
   head.appendChild(histBtn);
   if (!READ_ONLY) {
-    const delBtn = el('button', 'note-btn del', {textContent: '🗑', title: '메모 삭제 (하위 포함)'});
+    const delBtn = el('button','note-btn del',{innerHTML:'<svg class="ic" width="13" height="13"><use href="#i-trash"/></svg>',title:'메모 삭제 (하위 포함)'});
     delBtn.onclick = e => { e.stopPropagation(); deleteMemoTree(m.id); };
     head.appendChild(delBtn);
   }
@@ -4339,7 +4339,7 @@ function buildNoteWin(m) {
     }
     kids.forEach(c => {
       const row = el('div', 'note-child');
-      row.appendChild(el('span', '', {textContent: '📄'}));
+      const _di=el('span'); _di.innerHTML='<svg class="ic" width="12" height="12"><use href="#i-note"/></svg>'; row.appendChild(_di);
       row.appendChild(el('span', 'note-child-title', {textContent: memoLabel(c) + (memoChildren(c.id).length ? ` (${memoChildren(c.id).length})` : '')}));
       row.onclick = () => navigateNote(m.id, c.id);
       if (!READ_ONLY) {
@@ -4789,16 +4789,16 @@ const notesMenu = document.getElementById('notesMenu');
 function renderNotesMenu() {
   notesMenu.innerHTML = '';
   if (!READ_ONLY) {
-    const add = el('button', 'more-menu-item', {textContent: '➕ 새 메모'});
+    const add = el('button', 'more-menu-item', {innerHTML:'<svg class="ic" width="14" height="14"><use href="#i-plus"/></svg> 새 메모'});
     add.setAttribute('role', 'menuitem');
     add.onclick = () => { notesMenu.classList.add('hidden'); createMemo(null); };
     notesMenu.appendChild(add);
   }
-  const canvasBtn = el('button', 'more-menu-item', {textContent: '🗺 캔버스 보기 (전체 배치)'});
+  const canvasBtn = el('button', 'more-menu-item', {innerHTML:'<svg class="ic" width="14" height="14"><use href="#i-grid"/></svg> 캔버스 보기 (전체 배치)'});
   canvasBtn.setAttribute('role', 'menuitem');
   canvasBtn.onclick = () => { notesMenu.classList.add('hidden'); openCanvas(); };
   notesMenu.appendChild(canvasBtn);
-  const mdBtn = el('button', 'more-menu-item', {textContent: '📤 마크다운 내보내기'});
+  const mdBtn = el('button', 'more-menu-item', {innerHTML:'<svg class="ic" width="14" height="14"><use href="#i-upload"/></svg> 마크다운 내보내기'});
   mdBtn.setAttribute('role', 'menuitem');
   mdBtn.onclick = () => { notesMenu.classList.add('hidden'); exportNotesMd(); };
   notesMenu.appendChild(mdBtn);
@@ -4952,7 +4952,7 @@ function renderShareList() {
     };
     row.appendChild(dot);
     row.appendChild(el('span', 'share-name', {textContent: '👤 ' + id}));
-    const toggle = el('button', `share-toggle${s.on ? ' on' : ''}`, {textContent: s.on ? '👁 보는 중' : '🚫 숨김'});
+    const toggle = el('button', `share-toggle${s.on ? ' on' : ''}`, {innerHTML: s.on ? '<svg class="ic" width="12" height="12"><use href="#i-eye"/></svg> 보는 중' : '<svg class="ic" width="12" height="12"><use href="#i-eye-off"/></svg> 숨김'});
     toggle.onclick = () => { s.on = !s.on; saveShares(); attachShareListeners(); renderShareList(); render(); };
     row.appendChild(toggle);
     const del = el('button', 'task-act-btn del', {textContent: '✕', title: '공유 제거'});
@@ -5402,11 +5402,11 @@ function renderIcsList() {
     info.appendChild(el('div','share-name',{textContent:sub.name}));
     info.appendChild(el('div','goal-meta',{textContent:`${(sub.events||[]).length}개 일정`}));
     row.appendChild(info);
-    const toggle = el('button',`share-toggle${sub.on?' on':''}`,{textContent:sub.on?'👁 보는 중':'🚫 숨김'});
+    const toggle = el('button',`share-toggle${sub.on?' on':''}`,{innerHTML:sub.on?'<svg class="ic" width="12" height="12"><use href="#i-eye"/></svg> 보는 중':'<svg class="ic" width="12" height="12"><use href="#i-eye-off"/></svg> 숨김'});
     toggle.onclick=()=>{ sub.on=!sub.on; saveIcsSubs(); rebuildIcsEvents(); renderIcsList(); render(); };
     row.appendChild(toggle);
     if (sub.url) {
-      const refresh = el('button','task-act-btn',{textContent:'🔄',title:'새로고침'});
+      const refresh = el('button','task-act-btn',{innerHTML:'<svg class="ic" width="12" height="12"><use href="#i-repeat"/></svg>',title:'새로고침'});
       refresh.onclick=async()=>{ refresh.textContent='⏳'; const txt=await fetchIcsUrl(sub.url); if(txt){sub.events=parseICS(txt,sub.name);saveIcsSubs();rebuildIcsEvents();render();showUndoToast('🔄 캘린더를 새로고침했어요');} else showUndoToast('⚠️ 불러오기 실패'); renderIcsList(); };
       row.appendChild(refresh);
     }
@@ -5604,7 +5604,7 @@ function toggleTeamSub(id, name){
 function pickTeamForRegister(cb){
   const subs=Object.keys(teamSubs).map(id=>({id, name:(teamSubs[id].name||id)}));
   const ov=el('div','modal-overlay'); const box=el('div','modal-box'); box.style.maxWidth='320px';
-  box.appendChild(el('div','modal-title',{textContent:'🤝 어느 팀에 등록할까요?'}));
+  box.appendChild(el('div','modal-title',{innerHTML:'<svg class="ic" width="15" height="15"><use href="#i-users"/></svg> 어느 팀에 등록할까요?'}));
   const list=el('div',null); list.style.cssText='display:flex;flex-direction:column;gap:6px;margin:8px 0;max-height:40vh;overflow-y:auto';
   if(!subs.length) list.appendChild(el('div','',{textContent:'구독한 팀이 없어요. 아래에 팀 이름을 입력하세요.',style:'font-size:12px;color:var(--text3)'}));
   subs.forEach(t=>{ const b=el('button','team-pick-name',{type:'button',textContent:'🤝 '+t.name}); b.onclick=()=>{ ov.remove(); cb(t.id); }; list.appendChild(b); });
@@ -5661,7 +5661,7 @@ function openTeamPicker(){
   const old=document.getElementById('teamPickerOv'); if(old) old.remove();
   const ov=el('div','modal-overlay'); ov.id='teamPickerOv';
   const box=el('div','modal-box'); box.style.maxWidth='340px';
-  box.appendChild(el('div','modal-title',{textContent:'🤝 팀 캘린더'}));
+  box.appendChild(el('div','modal-title',{innerHTML:'<svg class="ic" width="15" height="15"><use href="#i-users"/></svg> 팀 캘린더'}));
   box.appendChild(el('div','',{textContent:'팀 이름을 눌러 들어가거나, 구독하면 내 캘린더에서 그 팀 일정을 함께 봐요.',style:'font-size:11px;color:var(--text3);margin-bottom:8px'}));
   const loading=el('div','',{textContent:'불러오는 중…',style:'font-size:12px;color:var(--text3)'});
   const listWrap=el('div',null); listWrap.style.cssText='max-height:42vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:10px';
@@ -5733,11 +5733,11 @@ if (IS_TEAM) {
   const tb=document.getElementById('teamBtn');
   if (tb && tb.parentNode) {
     const subItem=document.createElement('button'); subItem.className='more-menu-item'; subItem.id='teamSubBtn';
-    const refresh=()=>{ subItem.innerHTML = teamSubs[_tid] ? '🔕 <span>이 팀 구독취소</span>' : '🔔 <span>이 팀 구독</span>'; };
+    const refresh=()=>{ subItem.innerHTML = teamSubs[_tid] ? '<svg class="ic" width="14" height="14"><use href="#i-bell-off"/></svg> <span>이 팀 구독취소</span>' : '<svg class="ic" width="14" height="14"><use href="#i-bell"/></svg> <span>이 팀 구독</span>'; };
     refresh();
     subItem.onclick=()=>{ const on=toggleTeamSub(_tid,_rawTeam); refresh(); showUndoToast(on?'구독했어요 — 내 캘린더에서 이 팀 일정을 함께 봐요(곧 적용)':'구독을 취소했어요'); };
     tb.parentNode.insertBefore(subItem, tb);
-    tb.innerHTML = '↩ <span>내 캘린더로</span>';
+    tb.innerHTML = '<svg class="ic" width="14" height="14"><use href="#i-switch"/></svg> <span>내 캘린더로</span>';
   }
 }
 
@@ -5941,7 +5941,7 @@ function getImportantUpcoming(){
 function buildDashStats(){
   const panel = document.getElementById('dashStats');
   panel.innerHTML = '';
-  const title = document.createElement('div'); title.className='dash-panel-title'; title.textContent='📊 이번 주 업무 현황';
+  const title = document.createElement('div'); title.className='dash-panel-title'; title.innerHTML='<svg class="ic" width="13" height="13"><use href="#i-gantt"/></svg> 이번 주 업무 현황';
   panel.appendChild(title);
 
   // stat boxes
@@ -6010,7 +6010,7 @@ function buildDashStats(){
   if(important.length){
     const ddTitle=document.createElement('div'); ddTitle.className='dash-panel-title';
     ddTitle.style.cssText='margin-top:14px;margin-bottom:6px';
-    ddTitle.textContent='⭐ 다가오는 중요 일정';
+    ddTitle.innerHTML='<svg class="ic" width="13" height="13"><use href="#i-star"/></svg> 다가오는 중요 일정';
     panel.appendChild(ddTitle);
     const ddList=document.createElement('div'); ddList.className='upcoming-list';
     important.forEach(it=>{
@@ -6107,7 +6107,7 @@ function buildDashCalendar(){
   });
   upcomingTodo.sort((a,b)=>a.dk<b.dk?-1:a.dk>b.dk?1:0);
   const histTitle=document.createElement('div'); histTitle.className='dash-panel-title'; histTitle.style.marginBottom='6px';
-  histTitle.textContent='📋 앞으로 해야 할 일';
+  histTitle.innerHTML='<svg class="ic" width="13" height="13"><use href="#i-clipboard"/></svg> 앞으로 해야 할 일';
   panel.appendChild(histTitle);
   if(upcomingTodo.length){
     const list=document.createElement('div'); list.className='upcoming-list';
@@ -6142,7 +6142,7 @@ function buildDashCalendar(){
   if(sheetEvts.length){
     const sTitle=document.createElement('div'); sTitle.className='dash-panel-title';
     sTitle.style.cssText='margin-top:14px;margin-bottom:6px';
-    sTitle.textContent='🏬 전관행사 일정';
+    sTitle.innerHTML='<svg class="ic" width="13" height="13"><use href="#i-flag"/></svg> 전관행사 일정';
     panel.appendChild(sTitle);
     const list=document.createElement('div'); list.className='upcoming-list';
     sheetEvts.slice(0,8).forEach(e=>{
@@ -6318,7 +6318,7 @@ async function syncSheetEvents(manual=false){
   }catch(e){
     if(syncBtn){
       syncBtn.disabled=false; syncBtn.textContent=`⚠️ 실패`;
-      setTimeout(()=>{ if(syncBtn.isConnected) syncBtn.textContent='📥 지금 가져오기'; },4000);
+      setTimeout(()=>{ if(syncBtn.isConnected) syncBtn.innerHTML='<svg class="ic" width="12" height="12"><use href="#i-download"/></svg> 지금 가져오기'; },4000);
     }
     if(manual) alert('시트를 가져오지 못했어요.\n\n1) 구글시트가 "링크가 있는 모든 사용자"로 공개되어 있는지 확인해 주세요.\n2) 잠시 후 다시 시도해 주세요.');
     console.warn('Sheet sync error:',e);
