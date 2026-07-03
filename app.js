@@ -3159,6 +3159,27 @@ function setView(v){
 }
 Object.entries(VIEW_BTNS).forEach(([view,id])=>{document.getElementById(id).onclick=()=>setView(view);});
 
+// ── 모바일 하단 탭바 — setView와 활성 상태 동기화 ──
+(function(){
+  const nav=document.getElementById('mobileNav'); if(!nav) return;
+  const sheet=document.getElementById('mnavSheet');
+  const moreBtn=document.getElementById('mnavMore');
+  const SHEET_VIEWS=['year','timeblock','timeline'];
+  const syncActive=()=>{
+    nav.querySelectorAll('.mnav-item[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===currentView));
+    moreBtn.classList.toggle('active',SHEET_VIEWS.includes(currentView));
+  };
+  nav.querySelectorAll('[data-view]').forEach(b=>{
+    b.onclick=()=>{ sheet.classList.add('hidden'); setView(b.dataset.view); };
+  });
+  moreBtn.onclick=e=>{ e.stopPropagation(); sheet.classList.toggle('hidden'); };
+  document.addEventListener('click',e=>{ if(!nav.contains(e.target)) sheet.classList.add('hidden'); });
+  // 단축키 등 다른 경로로 setView가 불려도 탭바 상태 반영
+  const _origSetView=setView;
+  setView=function(v){ _origSetView(v); syncActive(); };
+  syncActive();
+})();
+
 // ── Search ──
 let _searchTimer=null;
 document.getElementById('searchInput').addEventListener('input',e=>{
