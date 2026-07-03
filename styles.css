@@ -1143,6 +1143,7 @@
       display:inline-flex; align-items:center; justify-content:center; font-family:inherit;
     }
     .mt-btn:hover { background:var(--primary-l); border-color:var(--primary); color:var(--primary); }
+    .mt-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; }
     .mt-color {
       position:relative; min-width:26px; height:26px; border:1px solid var(--border); border-radius:6px;
       background:var(--surface); cursor:pointer; font-size:12px; display:inline-flex; align-items:center; justify-content:center; overflow:hidden;
@@ -1465,6 +1466,15 @@
     }
     .canvas-zoom-btn:hover { background:var(--surface2); color:var(--text); }
     .canvas-zoom-btn:active { transform:scale(.92); }
+    .canvas-card-acts { position:absolute; top:4px; right:4px; display:flex; gap:2px; opacity:0; transition:opacity .12s; }
+    .canvas-card:hover .canvas-card-acts { opacity:1; }
+    .cc-act {
+      width:20px; height:20px; border:none; border-radius:6px; padding:0;
+      background:var(--surface2); color:var(--text2); cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .cc-act:hover { background:var(--primary-l); color:var(--primary); }
+    @media (max-width:768px) { .canvas-card-acts { opacity:.9; } }
     .canvas-line { stroke:var(--border); stroke-width:1.5; }
     .canvas-card {
       position:absolute; width:190px; background:var(--surface); border:1px solid var(--border);
