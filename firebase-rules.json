@@ -1,9 +1,9 @@
 {
-  "//": "Firebase Realtime Database 보안 규칙 — 팀/사용자 목록(디렉터리) 조회가 안 되는 문제 해결용.",
-  "//2": "증상: 개인 일정 동기화(users/{id})는 되는데, 팀 캘린더 목록과 공유용 사용자 목록이 비어 보임.",
-  "//3": "원인: 기존 규칙이 users/* 만 허용하고 teamDirectory · userDirectory(최상위 경로) 읽기/쓰기를 막기 때문.",
-  "//4": "적용: Firebase 콘솔 → Realtime Database → 규칙(Rules) 탭에 아래 rules 객체를 붙여넣고 게시(Publish).",
-  "//5": "주의: 이 앱은 로그인이 없어 누구나 접근 가능한 공개 데이터 모델입니다(기존과 동일한 보안 수준). 민감정보를 넣지 마세요.",
+  "//": "Firebase Realtime Database 보안 규칙 — 보안 1단계(Google 로그인 신원 연결)용.",
+  "//2": "적용: Firebase 콘솔 → Realtime Database → 규칙(Rules)에 아래 rules 객체를 붙여넣고 게시(Publish).",
+  "//3": "추가로 콘솔 → Authentication → Sign-in method 에서 Google 사용 설정,",
+  "//4": "Authentication → Settings → Authorized domains 에 앱 도메인(lee7120-creator.github.io) 추가 필요.",
+  "//5": "1단계에서는 users/*가 아직 공개(기존 팀원 흐름 유지). 전원 계정 연결 후 2단계에서 claims 기반으로 잠급니다.",
   "rules": {
     "users": {
       ".read": true,
@@ -16,6 +16,18 @@
     "userDirectory": {
       ".read": true,
       ".write": true
+    },
+    "claims": {
+      ".read": true,
+      "$name": {
+        ".write": "auth != null && (data.val() === null || data.val() === auth.uid)"
+      }
+    },
+    "accounts": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
     }
   }
 }
