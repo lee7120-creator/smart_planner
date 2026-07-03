@@ -1778,9 +1778,18 @@ function attachMemoImage(file){
   const task=memoTask(); if(!task||!memoCtx)return;
   const dk=memoCtx.dk;
   const id='img_'+uid();
-  idbPutImage(id,file).then(()=>{
+  idbPutImage(id,file).then(async ()=>{
     if(!Array.isArray(task.memoImages))task.memoImages=[];
     task.memoImages.push(id);
+    // 압축 후 충분히 작으면 태스크 데이터에 함께 실어 기기 간 동기화
+    // (큰 이미지는 이 기기 IndexedDB에만 — 다른 기기에선 자리표시로 표시)
+    try{
+      const dataUrl=await compressImage(file);
+      if(dataUrl && dataUrl.length<120000){
+        if(!task.memoImgData||typeof task.memoImgData!=='object') task.memoImgData={};
+        task.memoImgData[id]=dataUrl;
+      }
+    }catch{}
     saveTasks(dk);
     if(memoCtx && memoCtx.dk===dk) renderMemoImages(task);
     render();
@@ -1798,21 +1807,28 @@ function renderMemoImages(task){
       e.stopPropagation();
       const t=memoTask(); if(!t)return;
       t.memoImages=(t.memoImages||[]).filter(x=>x!==id);
+      if(t.memoImgData) delete t.memoImgData[id];
       idbDeleteImage(id);
       saveTasks(memoCtx.dk);
       renderMemoImages(t);
       render();
     };
     thumb.appendChild(delBtn);
+    const showImg=(url)=>{
+      const img=el('img',null,{src:url}); img.draggable=false;
+      thumb.insertBefore(img,delBtn);
+      thumb.onclick=()=>{
+        document.getElementById('imgLightboxImg').src=url;
+        document.getElementById('imgLightbox').classList.remove('hidden');
+      };
+    };
     idbGetImage(id).then(blob=>{
       if(blob){
-        const url=URL.createObjectURL(blob);
-        const img=el('img',null,{src:url}); img.draggable=false;
-        thumb.insertBefore(img,delBtn);
-        thumb.onclick=()=>{
-          document.getElementById('imgLightboxImg').src=url;
-          document.getElementById('imgLightbox').classList.remove('hidden');
-        };
+        showImg(typeof blob==='string'?blob:URL.createObjectURL(blob));
+      } else if(task.memoImgData && task.memoImgData[id]){
+        // 다른 기기에서 첨부된 작은 이미지: 동기화된 데이터로 표시 + 이 기기 캐시에 채워넣기
+        showImg(task.memoImgData[id]);
+        idbPutImage(id, task.memoImgData[id]).catch(()=>{});
       } else {
         thumb.classList.add('missing');
         thumb.insertBefore(el('span',null,{textContent:'📵',title:'이 기기에 없는 이미지'}),delBtn);
@@ -4292,16 +4308,28 @@ function buildNoteWin(m) {
   }
   const title = el('input', 'note-title-input');
   title.type = 'text'; title.placeholder = '제목'; title.value = m.title; title.readOnly = READ_ONLY;
-  title.addEventListener('input', () => { m.title = title.value; clearTimeout(_noteTitleTimer); _noteTitleTimer = setTimeout(saveMemos, 400); });
+  title.addEventListener('input', () => { m.title = title.value; m.updated = Date.now(); clearTimeout(_noteTitleTimer); _noteTitleTimer = setTimeout(saveMemos, 400); });
   head.appendChild(title);
   if (!READ_ONLY) {
     const colorBtn = el('button','note-btn',{innerHTML:'<svg class="ic" width="13" height="13"><use href="#i-palette"/></svg>',title:'색상 변경'});
+    // 색을 하나씩 순환하던 방식 → 전체 색을 한눈에 고르는 팔레트 팝오버 (+직접 선택)
     colorBtn.onclick = e => {
       e.stopPropagation();
-      const i = NOTE_COLORS.indexOf(m.color);
-      m.color = NOTE_COLORS[(i+1) % NOTE_COLORS.length];
-      applyNoteColor(win, head, m);
-      saveMemos();
+      const old = win.querySelector('.note-palette');
+      if (old) { old.remove(); return; }
+      const pal = el('div', 'note-palette');
+      pal.onclick = ev => ev.stopPropagation();
+      NOTE_COLORS.forEach(c => {
+        const d = el('button', `note-pal-dot${c===m.color?' on':''}`, { type:'button', title: c || '기본' });
+        d.style.background = c || 'var(--surface3)';
+        d.onclick = ev => { ev.stopPropagation(); m.color = c; m.updated = Date.now(); applyNoteColor(win, head, m); saveMemos(); pal.remove(); };
+        pal.appendChild(d);
+      });
+      const custom = el('input', 'note-pal-custom', { type:'color', value: m.color || '#f9a825', title:'직접 선택' });
+      custom.onchange = () => { m.color = custom.value; m.updated = Date.now(); applyNoteColor(win, head, m); saveMemos(); pal.remove(); };
+      pal.appendChild(custom);
+      win.appendChild(pal);
+      setTimeout(() => document.addEventListener('click', function h(){ pal.remove(); document.removeEventListener('click', h); }, { once:true }), 0);
     };
     head.appendChild(colorBtn);
     const pinBtn = el('button',`note-btn${m.pinned?' pinned':''}`,{innerHTML:'<svg class="ic" width="13" height="13"><use href="#i-pin"/></svg>',title:m.pinned?'고정 해제':'항상 위 고정'});
@@ -4534,7 +4562,7 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
     editor.setAttribute('data-ph', '메모를 입력하세요...  ( / 입력 → 블록, 이미지 붙여넣기 )');
     editor.innerHTML = m.text.trim() ? renderMarkdown(m.text) : '<div class="nv-p"><br></div>';
     hydrateNoteMedia(editor, true);
-    const serialize = () => { m.text = serializeNoteEditor(editor); if (!READ_ONLY) saveMemos(); };
+    const serialize = () => { m.text = serializeNoteEditor(editor); m.updated = Date.now(); if (!READ_ONLY) saveMemos(); };
     editor.addEventListener('input', () => { serialize(); detectSlashCE(m, editor, bodyWrap, win); });
     editor.addEventListener('keydown', e => {
       if (slashCtx) {
@@ -4544,6 +4572,30 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
         if (e.key === 'Escape') { e.stopPropagation(); closeSlashMenu(); return; }
       }
       if (e.key === 'Escape') { e.stopPropagation(); editor.blur(); }
+      // 노션식 마크다운 단축: 줄 첫머리에 '#'/'##'/'###'/'-'/'[]' 입력 후 스페이스 → 블록 변환
+      if (e.key === ' ' && !slashCtx) {
+        const sel = document.getSelection();
+        if (sel && sel.anchorNode) {
+          const host = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+          const blk = host && host.closest && host.closest('.nv-p');
+          if (blk && blk.parentElement === editor) {
+            const t = blk.textContent.trim();
+            const caretEnd = node => { const r = document.createRange(); r.selectNodeContents(node); r.collapse(false); const s = document.getSelection(); s.removeAllRanges(); s.addRange(r); };
+            const HMAP = { '#': 'nv-h1', '##': 'nv-h2', '###': 'nv-h3' };
+            if (HMAP[t]) { e.preventDefault(); blk.className = HMAP[t]; blk.innerHTML = '<br>'; caretEnd(blk); serialize(); return; }
+            if (t === '-') { e.preventDefault(); blk.className = 'nv-li'; blk.innerHTML = '• '; caretEnd(blk); serialize(); return; }
+            if (t === '[]' || t === '[ ]') {
+              e.preventDefault();
+              const btn = document.createElement('button');
+              btn.className = 'nv-check';
+              btn.innerHTML = '<span class="nv-cb"></span><span class="nv-check-text"><br></span>';
+              blk.replaceWith(btn);
+              caretEnd(btn.querySelector('.nv-check-text'));
+              serialize(); return;
+            }
+          }
+        }
+      }
     });
     editor.addEventListener('blur', () => {
       setTimeout(() => {
@@ -4963,7 +5015,9 @@ function renderNotesMenu() {
   }
   // 메모 목록 (태그 필터 적용: 본인 또는 자손이 태그 보유 시 표시)
   const hasTagDeep = (m, tag) => extractTags(m).includes(tag) || memoChildren(m.id).some(c => hasTagDeep(c, tag));
-  const roots = memoRoots().filter(m => !notesTagFilter || hasTagDeep(m, notesTagFilter));
+  // 고정 메모 먼저, 그다음 최근 수정순 (updated 없으면 생성순)
+  const roots = memoRoots().filter(m => !notesTagFilter || hasTagDeep(m, notesTagFilter))
+    .sort((a,b) => ((b.pinned?1:0)-(a.pinned?1:0)) || ((b.updated||b.created||0)-(a.updated||a.created||0)));
   if (!roots.length) {
     notesMenu.appendChild(el('div', 'more-menu-item', {textContent: notesTagFilter ? '이 태그의 메모 없음' : '메모 없음 — 빈 곳을 더블클릭해 만들 수 있어요', style: 'cursor:default;color:var(--text3);font-size:11px'}));
   }
