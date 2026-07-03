@@ -17,6 +17,8 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <!-- 본문 기본 서체: Wanted Sans (모던 그로테스크) — 로드 실패 시 Pretendard로 폴백 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css">
   <!-- 메모 서식용 무료 오픈소스 폰트 (Google Fonts / SIL OFL) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,6 +28,47 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+<!-- 공용 아이콘 세트 (스트로크 2px, currentColor) — 이모지 대신 쓰는 프로덕트 아이콘 -->
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+    <symbol id="i-cloud-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-switch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></symbol>
+    <symbol id="i-check-sq" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4"/><path d="m12 14 3-3"/><circle cx="12" cy="14" r="8"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-bell-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2Z"/><path d="M15 3v4a2 2 0 0 0 2 2h4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-grid9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-rows" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18"/></symbol>
+    <symbol id="i-gantt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h10M6 12h9M11 18h7"/></symbol>
+  </defs>
+</svg>
 
 <!-- Landing page (shown when no ?u= param) -->
 <div class="landing-overlay" id="landingOverlay" style="display:none">
@@ -70,51 +113,51 @@
     <button class="nav-btn today-btn" id="todayBtn">오늘</button>
   </div>
   <div class="search-wrap">
-    <span class="search-icon">🔍</span>
+    <span class="search-icon"><svg class="ic"><use href="#i-search"/></svg></span>
     <input class="search-input" id="searchInput" placeholder="찾기... (/)">
   </div>
   <div class="header-actions">
     <span class="user-chip" id="userChip" style="display:none">👤 <span id="userChipName"></span></span>
     <div class="sync-dot offline" id="syncDot" title="동기화 상태" role="status" aria-live="polite" aria-label="동기화 상태" style="display:none"></div>
-    <button class="icon-btn" id="guideBtn" title="사용 가이드" aria-label="사용 가이드">❓</button>
-    <button class="save-btn" id="forceSyncBtn" style="display:none" title="지금 바로 저장">☁️ <span>저장</span></button>
+    <button class="icon-btn" id="guideBtn" title="사용 가이드" aria-label="사용 가이드"><svg class="ic"><use href="#i-help"/></svg></button>
+    <button class="save-btn" id="forceSyncBtn" style="display:none" title="지금 바로 저장"><svg class="ic"><use href="#i-cloud-up"/></svg> <span>저장</span></button>
     <div class="more-menu-wrap">
       <button class="icon-btn" id="notesBtn" title="메모장 (빈 곳 더블클릭으로도 생성)" aria-label="메모장 열기">📝</button>
       <div class="more-menu hidden" id="notesMenu"></div>
     </div>
     <button class="icon-btn" id="taskMemoBtn" title="태스크 메모 모아보기" aria-label="태스크 메모 모아보기">🗒️</button>
-    <button class="icon-btn" id="darkBtn" title="다크 모드" aria-label="다크 모드 전환">🌙</button>
+    <button class="icon-btn" id="darkBtn" title="다크 모드" aria-label="다크 모드 전환"><svg class="ic"><use href="#i-moon"/></svg></button>
     <div class="more-menu-wrap">
-      <button class="icon-btn" id="moreBtn" title="더보기" aria-label="더보기 메뉴" aria-haspopup="true">⋯</button>
+      <button class="icon-btn" id="moreBtn" title="더보기" aria-label="더보기 메뉴" aria-haspopup="true"><svg class="ic"><use href="#i-more"/></svg></button>
       <div class="more-menu hidden" id="moreMenu">
         <div class="more-menu-label">공유 · 계정</div>
-        <button class="more-menu-item" id="copyUrlBtn" style="display:none">🔗 <span>내 URL 복사</span></button>
-        <button class="more-menu-item" id="shareRoBtn" style="display:none">👁 <span>읽기전용 링크 복사</span></button>
-        <button class="more-menu-item" id="shareCalBtn">👥 <span>일정 공유</span></button>
-        <button class="more-menu-item" id="teamBtn">🤝 <span>팀 캘린더</span></button>
-        <button class="more-menu-item" id="switchUserBtn" style="display:none">↩ <span>다른 캘린더로</span></button>
-        <button class="more-menu-item" id="renameBtn" style="display:none">✏️ <span>이름 변경</span></button>
+        <button class="more-menu-item" id="copyUrlBtn" style="display:none"><svg class="ic"><use href="#i-link"/></svg> <span>내 URL 복사</span></button>
+        <button class="more-menu-item" id="shareRoBtn" style="display:none"><svg class="ic"><use href="#i-eye"/></svg> <span>읽기전용 링크 복사</span></button>
+        <button class="more-menu-item" id="shareCalBtn"><svg class="ic"><use href="#i-share"/></svg> <span>일정 공유</span></button>
+        <button class="more-menu-item" id="teamBtn"><svg class="ic"><use href="#i-users"/></svg> <span>팀 캘린더</span></button>
+        <button class="more-menu-item" id="switchUserBtn" style="display:none"><svg class="ic"><use href="#i-switch"/></svg> <span>다른 캘린더로</span></button>
+        <button class="more-menu-item" id="renameBtn" style="display:none"><svg class="ic"><use href="#i-pencil"/></svg> <span>이름 변경</span></button>
         <div class="more-menu-divider"></div>
         <div class="more-menu-label">도구</div>
-        <button class="more-menu-item" id="templateBtn">📑 <span>템플릿</span></button>
-        <button class="more-menu-item" id="selectModeBtn">☑️ <span>여러 개 선택</span></button>
-        <button class="more-menu-item" id="pomodoroBtn">🍅 <span>포모도로 타이머</span></button>
-        <button class="more-menu-item" id="goalsBtn">🎯 <span>목표 관리</span></button>
-        <button class="more-menu-item" id="reviewBtn">📋 <span>이번 주 돌아보기</span></button>
+        <button class="more-menu-item" id="templateBtn"><svg class="ic"><use href="#i-clipboard"/></svg> <span>템플릿</span></button>
+        <button class="more-menu-item" id="selectModeBtn"><svg class="ic"><use href="#i-check-sq"/></svg> <span>여러 개 선택</span></button>
+        <button class="more-menu-item" id="pomodoroBtn"><svg class="ic"><use href="#i-timer"/></svg> <span>포모도로 타이머</span></button>
+        <button class="more-menu-item" id="goalsBtn"><svg class="ic"><use href="#i-flag"/></svg> <span>목표 관리</span></button>
+        <button class="more-menu-item" id="reviewBtn"><svg class="ic"><use href="#i-history"/></svg> <span>이번 주 돌아보기</span></button>
         <div class="more-menu-divider"></div>
         <div class="more-menu-label">알림 · 메모</div>
-        <button class="more-menu-item" id="notifyBtn"><span id="notifyIcon">🔕</span> <span>알림</span></button>
-        <button class="more-menu-item" id="notifySettingsBtn">⏰ <span>알림 설정</span></button>
-        <button class="more-menu-item" id="memoAllBtn">📝 <span>메모 전체보기</span></button>
-        <button class="more-menu-item" id="locationBtn">📍 <span>내 위치 날씨</span></button>
+        <button class="more-menu-item" id="notifyBtn"><span id="notifyIcon"><svg class="ic"><use href="#i-bell-off"/></svg></span> <span>알림</span></button>
+        <button class="more-menu-item" id="notifySettingsBtn"><svg class="ic"><use href="#i-sliders"/></svg> <span>알림 설정</span></button>
+        <button class="more-menu-item" id="memoAllBtn"><svg class="ic"><use href="#i-note"/></svg> <span>메모 전체보기</span></button>
+        <button class="more-menu-item" id="locationBtn"><svg class="ic"><use href="#i-pin"/></svg> <span>내 위치 날씨</span></button>
         <div class="more-menu-divider"></div>
         <div class="more-menu-label">데이터</div>
-        <button class="more-menu-item" id="icsImportBtn">📥 <span>외부 캘린더 연결</span></button>
-        <button class="more-menu-item" id="icsExportBtn">📤 <span>내보내기</span></button>
-        <button class="more-menu-item" id="backupBtn">💾 <span>백업하기</span></button>
-        <button class="more-menu-item" id="restoreBtn">📂 <span>백업 불러오기</span></button>
-        <button class="more-menu-item" id="printBtn">🖨 <span>인쇄하기</span></button>
-        <button class="more-menu-item" id="trashBtn">🗑 <span>휴지통</span></button>
+        <button class="more-menu-item" id="icsImportBtn"><svg class="ic"><use href="#i-download"/></svg> <span>외부 캘린더 연결</span></button>
+        <button class="more-menu-item" id="icsExportBtn"><svg class="ic"><use href="#i-upload"/></svg> <span>내보내기</span></button>
+        <button class="more-menu-item" id="backupBtn"><svg class="ic"><use href="#i-save"/></svg> <span>백업하기</span></button>
+        <button class="more-menu-item" id="restoreBtn"><svg class="ic"><use href="#i-folder"/></svg> <span>백업 불러오기</span></button>
+        <button class="more-menu-item" id="printBtn"><svg class="ic"><use href="#i-printer"/></svg> <span>인쇄하기</span></button>
+        <button class="more-menu-item" id="trashBtn"><svg class="ic"><use href="#i-trash"/></svg> <span>휴지통</span></button>
       </div>
       <input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none">
     </div>
@@ -126,15 +169,15 @@
 
 <!-- 모바일 하단 탭바 (≤768px에서만 표시 — 헤더의 뷰 전환을 대체) -->
 <nav class="mobile-nav" id="mobileNav" aria-label="화면 전환">
-  <button class="mnav-item" data-view="day"><span class="mnav-ico">📋</span><span>일간</span></button>
-  <button class="mnav-item active" data-view="week"><span class="mnav-ico">📅</span><span>주간</span></button>
-  <button class="mnav-item" data-view="month"><span class="mnav-ico">🗓</span><span>월간</span></button>
-  <button class="mnav-item" data-view="focus"><span class="mnav-ico">🎯</span><span>포커스</span></button>
-  <button class="mnav-item" id="mnavMore" aria-haspopup="true"><span class="mnav-ico">⋯</span><span>더보기</span></button>
+  <button class="mnav-item" data-view="day"><span class="mnav-ico"><svg class="ic"><use href="#i-calendar"/></svg></span><span>일간</span></button>
+  <button class="mnav-item active" data-view="week"><span class="mnav-ico"><svg class="ic"><use href="#i-columns"/></svg></span><span>주간</span></button>
+  <button class="mnav-item" data-view="month"><span class="mnav-ico"><svg class="ic"><use href="#i-grid"/></svg></span><span>월간</span></button>
+  <button class="mnav-item" data-view="focus"><span class="mnav-ico"><svg class="ic"><use href="#i-target"/></svg></span><span>포커스</span></button>
+  <button class="mnav-item" id="mnavMore" aria-haspopup="true"><span class="mnav-ico"><svg class="ic"><use href="#i-more"/></svg></span><span>더보기</span></button>
   <div class="mnav-sheet hidden" id="mnavSheet">
-    <button class="mnav-sheet-item" data-view="year">📆 연간</button>
-    <button class="mnav-sheet-item" data-view="timeblock">🕐 시간표</button>
-    <button class="mnav-sheet-item" data-view="timeline">📊 타임라인</button>
+    <button class="mnav-sheet-item" data-view="year"><svg class="ic"><use href="#i-grid9"/></svg>연간</button>
+    <button class="mnav-sheet-item" data-view="timeblock"><svg class="ic"><use href="#i-rows"/></svg>시간표</button>
+    <button class="mnav-sheet-item" data-view="timeline"><svg class="ic"><use href="#i-gantt"/></svg>타임라인</button>
   </div>
 </nav>
 

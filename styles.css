@@ -23,12 +23,21 @@
 
     *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
     body {
-      font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+      font-family:'Wanted Sans Variable','Wanted Sans','Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
       background:var(--bg); min-height:100vh; color:var(--text);
       transition:background .2s,color .2s;
       -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
       letter-spacing:-0.01em;
     }
+
+    /* ─── 공용 SVG 아이콘 ─── */
+    .ic { width:1.1em; height:1.1em; vertical-align:-0.2em; flex-shrink:0; }
+    .icon-btn .ic { width:18px; height:18px; vertical-align:middle; }
+    .more-menu-item .ic { width:16px; height:16px; color:var(--text2); }
+    .mnav-ico .ic { width:20px; height:20px; }
+    .mnav-sheet-item .ic { width:15px; height:15px; margin-right:6px; color:var(--text2); }
+    .search-icon .ic { width:14px; height:14px; color:var(--text3); }
+    .save-btn .ic { width:14px; height:14px; vertical-align:-0.15em; }
 
     /* ─── 모던 디테일: 스크롤바 / 포커스 링 / 선택 색 ─── */
     * { scrollbar-width:thin; scrollbar-color:var(--surface3) transparent; }
