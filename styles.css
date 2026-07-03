@@ -105,10 +105,10 @@
     /* ─── Week view ─── */
     .calendar-wrap { padding:16px; overflow-x:auto; }
     .calendar-grid { display:grid; grid-template-columns:repeat(6,minmax(150px,1fr)); gap:8px; min-width:940px; }
-    .day-col { background:var(--surface); border:1px solid var(--border); border-radius:16px; display:flex; flex-direction:column; min-height:560px; overflow:hidden; transition:box-shadow .2s; box-shadow:var(--shadow); }
+    .day-col { background:var(--surface); border:1px solid var(--border); border-radius:16px; display:flex; flex-direction:column; min-height:560px; overflow:hidden; transition:box-shadow .2s, transform .2s; box-shadow:var(--shadow); }
     .weekend-col { display:flex; flex-direction:column; gap:8px; min-width:0; }
     .weekend-col > .day-col { flex:1 1 0; min-height:0; }
-    .day-col:hover { box-shadow:var(--shadow-md); }
+    .day-col:hover { box-shadow:var(--shadow-md); transform:translateY(-2px); }
     .day-col.is-today { border:2px solid var(--primary); box-shadow:0 0 0 4px var(--primary-l); }
     /* 주말은 헤더 글자색(빨강)으로만 표시 — 배경 틴트는 공휴일 전용 채널로 남겨
        "주말 vs 공휴일"이 한눈에 구분되고, 우선순위 배경 틴트와도 안 겹침 */
@@ -176,7 +176,7 @@
     .task-cb.checked { background:var(--green); border-color:var(--green); box-shadow:0 1px 3px rgba(16,185,129,.3); }
     .task-cb.cb-pop { animation:cbPop .25s ease; }
     .task-cb.checked::after { content:'✓'; color:#fff; font-size:10px; font-weight:700; }
-    @keyframes cbPop { 0%{transform:scale(.6)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
+    @keyframes cbPop { 0%{transform:scale(.5) rotate(-8deg)} 60%{transform:scale(1.25)} 100%{transform:scale(1)} }
 
     .task-body { flex:1; min-width:0; }
     /* 한글은 keep-all로 어절(띄어쓰기) 단위 줄바꿈 → 좁은 컬럼에서 한 글자씩 세로로 깨지지 않음.
@@ -184,8 +184,13 @@
        한 줄에 도저히 안 들어가는 긴 토큰만 예외로 끊는다 */
     .task-text { font-size:13px; line-height:1.5; word-break:keep-all; overflow-wrap:break-word; color:var(--text); flex:1 1 auto; min-width:0; }
     .task-text.done { text-decoration:line-through; color:var(--text3); transition:color .2s,opacity .2s; }
-    .task-item.just-done { animation:taskDone .35s ease; }
-    @keyframes taskDone { 0%{opacity:1} 40%{opacity:.5;transform:scale(.98)} 100%{opacity:1;transform:scale(1)} }
+    /* 완료 순간: 초록 플래시 + 살짝 튀는 스프링 */
+    .task-item.just-done { animation:taskDone .45s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes taskDone {
+      0%   { transform:scale(.97); background:color-mix(in srgb, var(--green) 22%, transparent); }
+      55%  { transform:scale(1.015); background:color-mix(in srgb, var(--green) 10%, transparent); }
+      100% { transform:scale(1); }
+    }
 
     .repeat-badge {
       display:inline-flex; align-items:center; gap:2px; font-size:10px;
@@ -627,9 +632,11 @@
     @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     .modal-box {
       background:var(--surface); border-radius:20px; padding:24px;
-      width:340px; box-shadow:var(--shadow-lg); animation:slideUp .2s;
+      width:340px; box-shadow:var(--shadow-lg);
+      animation:modalIn .28s cubic-bezier(.34,1.56,.64,1);
       border:1px solid var(--border);
     }
+    @keyframes modalIn { from { opacity:0; transform:translateY(16px) scale(.95); } to { opacity:1; transform:none; } }
     .modal-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:16px; }
     .modal-input {
       width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 12px;
@@ -703,9 +710,28 @@
       .week-ind-dot.on { background:var(--primary); color:#fff; }
     }
 
-    /* 뷰 전환 등장 애니메이션 (뷰 종류가 바뀔 때만 JS에서 부여) */
+    /* 뷰 전환 등장 애니메이션 (뷰 종류가 바뀔 때만 JS에서 부여)
+       — 컨테이너 페이드 + 요일 칸·항목이 살짝 시차를 두고 떠오르는 스태거 */
     .view-enter { animation:viewIn .18s ease; }
     @keyframes viewIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+    @keyframes riseIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+    .view-enter .calendar-grid > * { animation:riseIn .32s cubic-bezier(.22,1,.36,1) backwards; }
+    .view-enter .calendar-grid > *:nth-child(2) { animation-delay:.03s; }
+    .view-enter .calendar-grid > *:nth-child(3) { animation-delay:.06s; }
+    .view-enter .calendar-grid > *:nth-child(4) { animation-delay:.09s; }
+    .view-enter .calendar-grid > *:nth-child(5) { animation-delay:.12s; }
+    .view-enter .calendar-grid > *:nth-child(6) { animation-delay:.15s; }
+    .view-enter .task-item { animation:riseIn .26s ease backwards; }
+    .view-enter .task-item:nth-child(1) { animation-delay:.08s; }
+    .view-enter .task-item:nth-child(2) { animation-delay:.12s; }
+    .view-enter .task-item:nth-child(3) { animation-delay:.16s; }
+    .view-enter .task-item:nth-child(4) { animation-delay:.20s; }
+    .view-enter .task-item:nth-child(n+5) { animation-delay:.24s; }
+    /* 주간 이동(‹ ›): 넘기는 방향에서 슬라이드 — 종이 넘기는 느낌 */
+    .nav-next { animation:slideFromRight .24s cubic-bezier(.22,1,.36,1); }
+    .nav-prev { animation:slideFromLeft .24s cubic-bezier(.22,1,.36,1); }
+    @keyframes slideFromRight { from { opacity:.35; transform:translateX(30px); } to { opacity:1; transform:none; } }
+    @keyframes slideFromLeft  { from { opacity:.35; transform:translateX(-30px); } to { opacity:1; transform:none; } }
 
     /* ─── Mobile bottom nav ─── */
     .mobile-nav { display:none; }
@@ -717,6 +743,8 @@
     }
     .mnav-item .mnav-ico { font-size:18px; line-height:1.2; }
     .mnav-item.active { color:var(--primary); background:var(--primary-l); }
+    .mnav-item.active .mnav-ico { animation:tabPop .32s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes tabPop { 0%{transform:scale(.75)} 60%{transform:scale(1.2)} 100%{transform:scale(1)} }
     .mnav-item:active { transform:scale(.94); }
     .mnav-sheet {
       position:absolute; right:8px; bottom:calc(100% + 8px);
@@ -867,7 +895,8 @@
       padding:40px 36px; max-width:420px; width:100%; text-align:center;
       box-shadow:var(--shadow-md);
     }
-    .landing-icon { font-size:52px; margin-bottom:12px; }
+    .landing-icon { font-size:52px; margin-bottom:12px; display:inline-block; animation:floatY 3.2s ease-in-out infinite; }
+    @keyframes floatY { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-7px); } }
     .landing-title { font-size:26px; font-weight:800; color:var(--text); margin-bottom:6px; }
     .landing-sub { font-size:14px; color:var(--text2); margin-bottom:28px; }
     .landing-input-wrap { display:flex; gap:8px; margin-bottom:10px; }
@@ -938,7 +967,8 @@
       border-radius:50%; border:none; background:var(--primary); color:#fff; font-size:28px;
       line-height:1; cursor:pointer; box-shadow:0 4px 16px rgba(26,115,232,.4); transition:transform .12s, background .15s;
     }
-    .fab-add:hover { background:var(--primary-h); transform:scale(1.08); }
+    .fab-add:hover { background:var(--primary-h); transform:scale(1.1) rotate(90deg); }
+    .fab-add:active { transform:scale(.9); }
     .readonly-mode .fab-add { display:none; }
     @media print { .fab-add { display:none; } }
     /* 서브태스크 진행률 바 */
@@ -1453,11 +1483,11 @@
       background:var(--surface); border:1px solid var(--border); border-radius:12px;
       box-shadow:0 8px 24px rgba(0,0,0,.12); padding:6px; min-width:180px;
       display:flex; flex-direction:column; gap:1px;
-      animation:menuPop .15s ease;
+      animation:menuPop .2s cubic-bezier(.34,1.56,.64,1); transform-origin:top right;
       max-height:calc(100vh - 130px); overflow-y:auto; -webkit-overflow-scrolling:touch;
       overscroll-behavior:contain;
     }
-    @keyframes menuPop { from{opacity:0; transform:translateY(-4px) scale(.98)} to{opacity:1; transform:translateY(0) scale(1)} }
+    @keyframes menuPop { from{opacity:0; transform:translateY(-6px) scale(.94)} to{opacity:1; transform:translateY(0) scale(1)} }
     .more-menu.hidden { display:none; }
     .more-menu-item {
       display:flex; align-items:center; gap:8px; width:100%; text-align:left;

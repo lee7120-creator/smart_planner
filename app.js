@@ -308,6 +308,7 @@ let activeInput = null;
 let justToggledCb = null;   // 방금 토글한 체크박스만 팝 애니메이션 (재렌더 시 전체 팝 버그 방지)
 let _justDoneId = null;
 let _lastRenderedView = null;  // 뷰 종류가 바뀔 때만 전환 애니메이션 (체크 토글 재렌더엔 미적용)
+let _navDir = null;            // 'prev'|'next' — 주/월 이동 시 방향 슬라이드용 (1회성)
 let weatherByDate = {};
 let weatherStatus = 'loading';  // 'loading' | 'ok' | 'error'
 let weatherLoc = {lat:37.5665,lon:126.978,name:'서울'};
@@ -3157,6 +3158,14 @@ function render(){
     void view.offsetWidth;
     view.classList.add('view-enter');
     _lastRenderedView=currentView;
+    _navDir=null;
+  } else if(_navDir){
+    // 같은 뷰에서 이전/다음 이동 → 넘기는 방향으로 슬라이드
+    const cls='nav-'+_navDir; _navDir=null;
+    view.classList.remove('nav-prev','nav-next');
+    void view.offsetWidth;
+    view.classList.add(cls);
+    setTimeout(()=>view.classList.remove(cls),280);
   }
   // 당일 할 일 전부 완료 시 축하 (미완료→완료 전환 순간에만)
   if(!READ_ONLY) maybeCelebrate();
@@ -3170,14 +3179,14 @@ document.getElementById('prevBtn').onclick=()=>{
   else if(currentView==='month'||currentView==='timeline')monthDate.setMonth(monthDate.getMonth()-1);
   else if(currentView==='day'||currentView==='timeblock')dayDate.setDate(dayDate.getDate()-1);
   else if(currentView==='year')yearNum--;
-  render();
+  _navDir='prev'; render();
 };
 document.getElementById('nextBtn').onclick=()=>{
   if(currentView==='week')weekStart.setDate(weekStart.getDate()+7);
   else if(currentView==='month'||currentView==='timeline')monthDate.setMonth(monthDate.getMonth()+1);
   else if(currentView==='day'||currentView==='timeblock')dayDate.setDate(dayDate.getDate()+1);
   else if(currentView==='year')yearNum++;
-  render();
+  _navDir='next'; render();
 };
 document.getElementById('todayBtn').onclick=()=>{
   weekStart=getMonday(new Date()); monthDate=new Date(); monthDate.setDate(1);
