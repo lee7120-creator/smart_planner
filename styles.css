@@ -1475,6 +1475,20 @@
     }
     .cc-act:hover { background:var(--primary-l); color:var(--primary); }
     @media (max-width:768px) { .canvas-card-acts { opacity:.9; } }
+    /* 노트 색상 팔레트 팝오버 */
+    .note-palette {
+      position:absolute; top:34px; right:8px; z-index:20;
+      display:flex; align-items:center; gap:6px; padding:8px 10px;
+      background:var(--surface); border:1px solid var(--border); border-radius:10px;
+      box-shadow:var(--shadow-lg); animation:menuPop .15s ease;
+    }
+    .note-pal-dot {
+      width:20px; height:20px; border-radius:50%; border:2px solid transparent;
+      cursor:pointer; padding:0; transition:transform .12s;
+    }
+    .note-pal-dot:hover { transform:scale(1.2); }
+    .note-pal-dot.on { border-color:var(--text); }
+    .note-pal-custom { width:24px; height:24px; border:none; padding:0; background:none; cursor:pointer; }
     .canvas-line { stroke:var(--border); stroke-width:1.5; }
     .canvas-card {
       position:absolute; width:190px; background:var(--surface); border:1px solid var(--border);
