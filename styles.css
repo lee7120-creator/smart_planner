@@ -794,8 +794,9 @@
         padding:4px 6px calc(4px + env(safe-area-inset-bottom));
       }
       body { padding-bottom:calc(60px + env(safe-area-inset-bottom)); }
-      /* FAB는 더보기 탭·시트와 겹치지 않게 왼쪽 아래로 + 시트 열림 영역 회피 */
-      .fab-add { bottom:calc(74px + env(safe-area-inset-bottom)); right:14px; }
+      /* FAB를 하단 탭바 위로 — 기본 .fab-add 규칙이 소스 뒤쪽에 있어 순서로는 지므로
+         .fab-add.fab-add 로 명시도를 높여 확실히 적용 (그동안 이 규칙이 무시되고 있었음) */
+      .fab-add.fab-add { bottom:calc(74px + env(safe-area-inset-bottom)); right:14px; }
       /* 기본 .user-chip(max-width:180px)가 소스 순서상 뒤에 와서 덮어쓰므로 명시도를 높여 모바일 캡 적용 */
       .header-actions .user-chip { max-width:96px; padding:4px 8px; gap:4px; }
       .header-actions .icon-btn { width:36px; height:36px; font-size:15px; }
