@@ -3,3 +3,4 @@
 .agents/
 .firebase/
 github-deploy-key.json
+.env
