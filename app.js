@@ -6974,3 +6974,91 @@ function bulkForEach(fn) {
   const menuBtn=document.getElementById('cmdkBtn');
   if(menuBtn) menuBtn.onclick=()=>open();
 })();
+
+// ═══════════════════════════════════════
+// 🔐 Google 로그인 (보안 1단계)
+// 데이터 경로는 기존 이름 그대로 — 데이터 이동 없음(유실 위험 0).
+// 로그인은 '이 구글 계정 = 이 이름' 연결(클레임)만 기록한다.
+//  - claims/{이름} = uid : 처음 연결한 계정만 소유 (transaction이라 탈취 불가)
+//  - accounts/{uid} = {name} : 새 기기에서 로그인만 하면 자동 입장
+// 규칙 잠금은 2단계에서 claims 기반으로 적용 예정 (그 전까지 팀원 흐름 동일).
+// ═══════════════════════════════════════
+let fbAuth = null, authUser = null;
+try { fbAuth = firebase.auth(); } catch (e) { console.warn('Auth 초기화 실패:', e); }
+
+function googleLogin() {
+  if (!fbAuth) { alert('로그인 모듈을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.'); return; }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const p = isMobile ? fbAuth.signInWithRedirect(provider) : fbAuth.signInWithPopup(provider);
+  p.catch(e => {
+    if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+    if (e && e.code === 'auth/operation-not-allowed')
+      alert('Firebase 콘솔에서 Google 로그인이 아직 활성화되지 않았어요.\nAuthentication → Sign-in method → Google 사용 설정이 필요해요.');
+    else if (e && e.code === 'auth/unauthorized-domain')
+      alert('Firebase 콘솔의 승인된 도메인에 이 사이트 주소를 추가해야 해요.\nAuthentication → Settings → Authorized domains');
+    else alert('로그인에 실패했어요: ' + ((e && (e.code || e.message)) || '알 수 없는 오류'));
+  });
+}
+function googleLogout() {
+  if (!fbAuth) return;
+  if (confirm('로그아웃할까요? 캘린더 데이터는 그대로 남아요.')) fbAuth.signOut();
+}
+
+async function linkNameToAccount(user) {
+  const name = sanitizeId(myPersonalId() || USER_ID);
+  if (!name || name === 'demo' || IS_TEAM || READ_ONLY || !fbDb) return;
+  try {
+    const already = localStorage.getItem('claimedName_' + user.uid);
+    if (already === name) return; // 이미 이 기기에서 연결 완료
+    const ref = fbDb.ref('claims/' + name);
+    const r = await ref.transaction(cur => { if (cur === null) return user.uid; return undefined; });
+    const owner = r && r.snapshot ? r.snapshot.val() : null;
+    if (owner === user.uid) {
+      fbDb.ref('accounts/' + user.uid).update({ name, email: user.email || '', ts: Date.now() }).catch(() => {});
+      localStorage.setItem('claimedName_' + user.uid, name);
+      showUndoToast(`✅ 이 구글 계정에 "${name}" 캘린더를 연결했어요`);
+    } else if (owner && owner !== user.uid) {
+      showUndoToast(`⚠️ "${name}"은 이미 다른 구글 계정에 연결돼 있어요`);
+    }
+  } catch (e) { console.warn('이름 연결 실패:', e); }
+}
+
+function updateAuthUi() {
+  const b = document.getElementById('authBtn');
+  if (b) {
+    b.innerHTML = authUser
+      ? `<svg class="ic" width="16" height="16"><use href="#i-user"/></svg> <span>로그아웃 · ${(authUser.email || '').split('@')[0]}</span>`
+      : `<svg class="ic" width="16" height="16"><use href="#i-user"/></svg> <span>Google 로그인</span>`;
+  }
+}
+
+if (fbAuth) {
+  fbAuth.getRedirectResult().catch(() => {});
+  fbAuth.onAuthStateChanged(async user => {
+    authUser = user || null;
+    updateAuthUi();
+    if (!user) return;
+    if (USER_ID && !IS_TEAM && !READ_ONLY) {
+      linkNameToAccount(user);
+    } else if (!USER_ID && !localStorage.getItem('lastUser')) {
+      // 새 기기: 계정에 연결된 이름으로 자동 입장
+      try {
+        const snap = await fbDb.ref('accounts/' + user.uid + '/name').once('value');
+        const nm = snap.val();
+        if (nm) {
+          localStorage.setItem('lastUser', nm);
+          window.location.replace('?u=' + encodeURIComponent(nm));
+        } else {
+          showUndoToast('연결된 캘린더가 없어요 — 이름으로 시작한 뒤 다시 로그인하면 연결돼요');
+        }
+      } catch (e) {}
+    }
+  });
+}
+(function(){
+  const b = document.getElementById('authBtn');
+  if (b) b.onclick = () => { authUser ? googleLogout() : googleLogin(); };
+  const lb = document.getElementById('landingGoogleBtn');
+  if (lb) lb.onclick = googleLogin;
+})();
