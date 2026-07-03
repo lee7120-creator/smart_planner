@@ -181,9 +181,9 @@ function saveOffDays() {
   clearTimeout(offSaveTimer);
   offSaveTimer = setTimeout(() => {
     offSaveTimer = null;
-    ref.set(Object.keys(offDays).length ? offDays : null)
+    ref.set(Object.keys(offDays).length ? fbClean(offDays) : null)
       .then(() => { pendingOffLocal = false; _pendingCollections.delete('off'); })
-      .catch(() => { _pendingCollections.add('off'); });
+      .catch((e) => { console.warn('Firebase 저장 실패(offdays):', e); _pendingCollections.add('off'); });
   }, 300);
 }
 function initOffSync() {
@@ -363,19 +363,24 @@ function saveTasks(dk) {
     _pendingSaveFull = false; _pendingSaveDks.clear();
     let p;
     if (full || !dks.length) {
-      p = ref.set(tasks);
+      p = ref.set(fbClean(tasks));
     } else if (dks.length === 1) {
-      p = ref.child(dks[0]).set(tasks[dks[0]] || null);
+      p = ref.child(dks[0]).set(fbClean(tasks[dks[0]]));
     } else {
       // 여러 날짜를 한 번에 — 멀티패스 업데이트 (각 날짜 노드만 갱신)
       const updates = {};
-      dks.forEach(d => { updates[d] = tasks[d] || null; });
+      dks.forEach(d => { updates[d] = fbClean(tasks[d]); });
       p = ref.update(updates);
     }
     p.then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
-     .catch(() => { pendingUpload = true; setSyncStatus('offline'); });
+     .catch((e) => { console.warn('Firebase 저장 실패:', e); pendingUpload = true; setSyncStatus('offline'); });
   }, 300);
 }
+
+// Firebase는 데이터에 undefined가 하나라도 있으면 저장을 거부한다.
+// localStorage(JSON.stringify)는 undefined를 조용히 버리므로, 같은 규칙으로
+// 정리해서 보내야 "로컬은 되는데 클라우드만 실패"하는 상황을 막을 수 있다.
+function fbClean(v){ return v == null ? null : JSON.parse(JSON.stringify(v)); }
 
 function fbUpload() {
   if (READ_ONLY) return Promise.reject('read-only');
@@ -386,9 +391,9 @@ function fbUpload() {
   // 전체 업로드이므로 개별 dk 대기열은 비움 (디바운스 예약도 취소)
   clearTimeout(fbSaveTimer); fbSaveTimer = null;
   _pendingSaveFull = false; _pendingSaveDks.clear();
-  return ref.set(tasks)
+  return ref.set(fbClean(tasks))
     .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
-    .catch(e => { setSyncStatus('offline'); throw e; });
+    .catch(e => { console.warn('Firebase 저장 실패:', e); setSyncStatus('offline'); throw e; });
 }
 
 function initFirebaseSync() {
@@ -3557,7 +3562,7 @@ function saveMemos() {
   clearTimeout(memoSaveTimer2);
   memoSaveTimer2 = setTimeout(() => {
     memoSaveTimer2 = null;
-    ref.set(memos)
+    ref.set(fbClean(memos))
       .then(() => { pendingMemoLocal = false; _pendingCollections.delete('memos'); setSyncStatus('synced'); })
       .catch(() => { _pendingCollections.add('memos'); setSyncStatus('offline'); });
   }, 300);
@@ -3565,15 +3570,15 @@ function saveMemos() {
 window.addEventListener('pagehide', () => {
   if (memoSaveTimer2) {
     clearTimeout(memoSaveTimer2); memoSaveTimer2 = null;
-    const ref = memosFbRef(); if (ref) ref.set(memos);
+    const ref = memosFbRef(); if (ref) ref.set(fbClean(memos));
   }
   // 할 일도 디바운스 대기 중이면 닫기 직전에 즉시 반영 (300ms 내 편집 손실 방지)
   if (fbSaveTimer) {
     clearTimeout(fbSaveTimer); fbSaveTimer = null;
     const ref = fbRef();
     if (ref) {
-      if (_pendingSaveFull || !_pendingSaveDks.size) { ref.set(tasks); }
-      else { const u={}; _pendingSaveDks.forEach(d=>{u[d]=tasks[d]||null;}); ref.update(u); }
+      if (_pendingSaveFull || !_pendingSaveDks.size) { ref.set(fbClean(tasks)); }
+      else { const u={}; _pendingSaveDks.forEach(d=>{u[d]=fbClean(tasks[d]);}); ref.update(u); }
       _pendingSaveFull=false; _pendingSaveDks.clear();
     }
   }
@@ -4761,9 +4766,9 @@ function saveShares() {
   clearTimeout(shareSaveTimer);
   shareSaveTimer = setTimeout(() => {
     shareSaveTimer = null;
-    ref.set(Object.keys(shares).length ? shares : null)
+    ref.set(Object.keys(shares).length ? fbClean(shares) : null)
       .then(() => { pendingShareLocal = false; _pendingCollections.delete('shares'); })
-      .catch(() => { _pendingCollections.add('shares'); });
+      .catch((e) => { console.warn('Firebase 저장 실패(shares):', e); _pendingCollections.add('shares'); });
   }, 300);
 }
 function initShareSync() {
@@ -5015,7 +5020,7 @@ function saveGoals() {
   const ref = goalsFbRef(); if (!ref) return;
   pendingGoalLocal = true;
   clearTimeout(goalSaveTimer);
-  goalSaveTimer = setTimeout(() => { goalSaveTimer = null; ref.set(goals).then(()=>{pendingGoalLocal=false;_pendingCollections.delete('goals');}).catch(()=>{_pendingCollections.add('goals');}); }, 300);
+  goalSaveTimer = setTimeout(() => { goalSaveTimer = null; ref.set(fbClean(goals)).then(()=>{pendingGoalLocal=false;_pendingCollections.delete('goals');}).catch((e)=>{console.warn('Firebase 저장 실패(goals):',e);_pendingCollections.add('goals');}); }, 300);
 }
 function initGoalSync() {
   const ref = goalsFbRef(); if (!ref) return;
