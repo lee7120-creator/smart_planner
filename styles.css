@@ -860,8 +860,8 @@
       .month-pill { font-size:10px; padding:1px 4px; }
       .month-day-header { font-size:10px; }
 
-      /* Modal: full width */
-      .modal-box { width:calc(100vw - 32px); padding:20px 16px; }
+      /* Modal: full width — max-width로 인라인 width(420px 등)가 있는 모달도 화면을 못 뚫게 */
+      .modal-box { width:calc(100vw - 32px); max-width:calc(100vw - 32px); padding:20px 16px; }
       .modal-input { font-size:15px; padding:10px 12px; }
 
       /* Repeat badge */
@@ -972,7 +972,7 @@
     .month-shared { font-size:10px; color:var(--purple); font-weight:700; }
     /* 빠른추가 FAB */
     .fab-add {
-      position:fixed; right:20px; bottom:calc(20px + env(safe-area-inset-bottom)); z-index:200; width:52px; height:52px;
+      position:fixed; right:20px; bottom:calc(20px + env(safe-area-inset-bottom)); z-index:401; width:52px; height:52px;
       border-radius:50%; border:none; background:var(--primary); color:#fff; font-size:28px;
       line-height:1; cursor:pointer; box-shadow:0 4px 16px rgba(26,115,232,.4); transition:transform .12s, background .15s;
     }

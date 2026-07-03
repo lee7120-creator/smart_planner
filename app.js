@@ -2840,21 +2840,26 @@ function buildTagFilterBar(){
   const tags = allTaskTags();
   const bar = el('div', 'tag-filter-bar');
   // 상태/속성 필터 칩 (항상 표시)
-  const toggle=(key,label,val)=>{
+  const toggle=(key,label,val,icon)=>{
     const on = val!==undefined ? attrFilter[key]===val : attrFilter[key];
-    const chip = el('button', `tag-filter-chip attr-chip${on?' active':''}`, {textContent: label});
+    const chip = el('button', `tag-filter-chip attr-chip${on?' active':''}`);
+    chip.innerHTML = (icon?`<svg class="ic" width="12" height="12"><use href="#i-${icon}"/></svg> `:'') + label;
     chip.setAttribute('aria-pressed', on?'true':'false');
     chip.onclick = () => { if(val!==undefined) attrFilter[key]=(attrFilter[key]===val?null:val); else attrFilter[key]=!attrFilter[key]; render(); };
     bar.appendChild(chip);
   };
   bar.appendChild(el('span','',{textContent:'필터',style:'font-size:11px;color:var(--text3)'}));
-  toggle('incomplete','◻ 미완료');
-  toggle('done','✅ 완료');
-  toggle('starred','★ 중요');
-  toggle('prio','🔴 높음','high');
-  toggle('timed','⏰ 시간');
-  toggle('repeat','🔁 반복');
-  toggle('memo','📝 메모');
+  toggle('incomplete','미완료',undefined,'square');
+  toggle('done','완료',undefined,'check-sq');
+  toggle('starred','중요',undefined,'star');
+  const prioChip=el('button',`tag-filter-chip attr-chip${attrFilter.prio==='high'?' active':''}`);
+  prioChip.innerHTML='<span class="cf-dot" style="background:var(--red);width:9px;height:9px"></span> 높음';
+  prioChip.setAttribute('aria-pressed',attrFilter.prio==='high'?'true':'false');
+  prioChip.onclick=()=>{ attrFilter.prio=(attrFilter.prio==='high'?null:'high'); render(); };
+  bar.appendChild(prioChip);
+  toggle('timed','시간',undefined,'clock');
+  toggle('repeat','반복',undefined,'repeat');
+  toggle('memo','메모',undefined,'note');
   // 색상별 필터 (색 점)
   (typeof COLORS!=='undefined'?COLORS:[]).forEach(c=>{
     const on=attrFilter.color===c.hex;
