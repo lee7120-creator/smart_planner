@@ -5453,7 +5453,20 @@ function loadTeamDataFromFb(){
   const me=sanitizeId(myPersonalId());
   if(!fbDb || !me || me==='demo') return;
   fbDb.ref(`users/${me}/teamSubs`).once('value').then(snap=>{
-    const v=snap.val(); if(v && typeof v==='object'){ Object.keys(v).forEach(id=>{ if(!teamSubs[id]) teamSubs[id]=v[id]; }); localStorage.setItem(TEAM_SUBS_KEY, JSON.stringify(teamSubs)); if(!IS_TEAM) syncSubscribedTeams(); }
+    const v=snap.val();
+    if(v && typeof v==='object'){
+      // 원격 스냅샷 기준으로 양방향 동기화 — 추가만 병합하면 다른 기기·팀 페이지에서 한
+      // 구독취소가 영영 반영되지 않고, 미러 복사본이 고아로 남아 계속 갱신/삭제가 안 됨
+      Object.keys(teamSubs).forEach(id=>{
+        if(!v[id]){
+          delete teamSubs[id];
+          if(!IS_TEAM){ detachTeamListener(id); removeCopiedTeamTasks(id); }
+        }
+      });
+      Object.keys(v).forEach(id=>{ if(!teamSubs[id]) teamSubs[id]=v[id]; });
+      localStorage.setItem(TEAM_SUBS_KEY, JSON.stringify(teamSubs));
+      if(!IS_TEAM) syncSubscribedTeams();
+    }
   }).catch(()=>{});
   fbDb.ref(`users/${me}/myTeams`).once('value').then(snap=>{
     const v=snap.val(); if(v && typeof v==='object'){ Object.keys(v).forEach(id=>{ if(!myTeams[id]) myTeams[id]=v[id]; }); localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(myTeams)); }
