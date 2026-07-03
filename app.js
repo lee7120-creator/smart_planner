@@ -1558,15 +1558,22 @@ const GUIDE_SECTIONS=[
     ['📈','통계','최근 8주 완료율 추이를 볼 수 있어요.'],
   ]},
 ];
+// 가이드 이모지 → SVG 아이콘 매핑 (매핑 없는 것만 이모지 유지 — 색 점 🔴 등 의미 있는 것)
+const GUIDE_ICON_MAP={'👤':'user','☁️':'cloud-up','📱':'phone','📋':'calendar','📅':'columns','🗓':'grid','📆':'grid9','📊':'gantt','🎯':'target','⌨️':'keyboard','🕐':'clock','🕘':'history','🎨':'palette','🔄':'repeat','#️⃣':'hash','★':'star','🍅':'timer','✏️':'pencil','✕':'x','🖱':'mouse','＋':'plus','📝':'note','✍️':'pencil','📷':'image','🔗':'link','🌅':'sunrise','⏰':'clock','🌆':'moon','⏱':'sliders','💡':'bulb','🔎':'search','🎚':'sliders','🏷':'tag','👁':'eye','☑️':'check-sq','🗑':'trash','📤':'upload','💾':'save','📍':'pin','🔔':'bell','📑':'clipboard'};
 function renderGuide(){
   const body=document.getElementById('guideBody');
   body.innerHTML='';
   GUIDE_SECTIONS.forEach(sec=>{
     const s=el('div','guide-section');
-    s.appendChild(el('div','guide-section-title',{textContent:sec.title}));
+    // 섹션 제목 앞머리 이모지는 떼고 텍스트만 (아이콘은 항목에서 표현)
+    s.appendChild(el('div','guide-section-title',{textContent:sec.title.replace(/^[^가-힣A-Za-z0-9]+\s*/,'')}));
     sec.items.forEach(([icon,name,desc])=>{
       const row=el('div','guide-item');
-      row.appendChild(el('div','guide-icon',{textContent:icon}));
+      const iconEl=el('div','guide-icon');
+      const mapped=GUIDE_ICON_MAP[icon];
+      if(mapped) iconEl.innerHTML=`<svg class="ic" width="16" height="16" style="color:var(--text2)"><use href="#i-${mapped}"/></svg>`;
+      else iconEl.textContent=icon;
+      row.appendChild(iconEl);
       const txt=el('div','guide-text');
       txt.appendChild(el('span','guide-name',{textContent:name}));
       txt.appendChild(el('span','guide-desc',{textContent:' — '+desc}));
