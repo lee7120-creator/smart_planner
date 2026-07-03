@@ -663,7 +663,8 @@
     .btn-secondary:hover { background:var(--border); }
 
     /* ─── Shortcuts hint ─── */
-    .shortcuts-hint { position:fixed; bottom:16px; right:16px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:11px; color:var(--text3); box-shadow:var(--shadow-md); line-height:1.8; z-index:100; opacity:.7; transition:opacity .15s; }
+    /* 왼쪽 하단 고정 — 오른쪽은 + 버튼(FAB) 자리라 겹침 */
+    .shortcuts-hint { position:fixed; bottom:16px; left:16px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:11px; color:var(--text3); box-shadow:var(--shadow-md); line-height:1.8; z-index:100; opacity:.7; transition:opacity .15s; }
     .shortcuts-hint:hover { opacity:1; }
     .shortcut-key { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-family:monospace; font-size:10px; color:var(--text2); }
 
