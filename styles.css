@@ -1797,3 +1797,40 @@
   .task-item.sub > .task-star:not(.on) { display:none; }
   .task-item.sub > .task-actions .task-act-btn { width:30px; height:30px; }
 }
+
+/* 주간 업무보고 복사 */
+.report-row { display:flex; align-items:center; gap:8px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border2); }
+.report-label { flex:1; display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--text); }
+.report-week { height:32px; }
+.report-copy { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; }
+
+/* 범위 선택 대화상자 */
+.modal-desc { font-size:13px; color:var(--text2); margin-bottom:12px; line-height:1.6; }
+.scope-opt { width:100%; margin-bottom:8px; text-align:left; padding:10px 12px; }
+.scope-opt-label { font-weight:600; }
+.scope-opt-sub { font-size:11px; opacity:.8; margin-top:2px; font-weight:400; }
+.scope-cancel { width:100%; margin-top:4px; }
+
+/* 담당자·완료자 뱃지 */
+.task-assignee, .task-doneby { font-size:10px; padding:1px 6px; color:var(--text2); background:var(--surface2); border:1px solid var(--border2); }
+.task-assignee.mine { color:var(--primary); background:var(--primary-l); border-color:transparent; font-weight:700; }
+.task-doneby { color:var(--green); }
+
+/* ─── 설정 화면 ─── */
+.settings-box { width:440px; }
+.set-sec { margin-bottom:16px; }
+.set-sec-title { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--text3); margin-bottom:6px; }
+.set-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 2px; border-bottom:1px solid var(--border2); cursor:default; }
+.set-row:last-child { border-bottom:none; }
+.set-row-text { min-width:0; }
+.set-row-label { font-size:13px; color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; }
+.set-row-hint { font-size:11px; color:var(--text3); margin-top:2px; }
+.set-select { height:32px; max-width:180px; }
+.set-value { font-size:13px; color:var(--text2); }
+.set-btn { padding:6px 12px; font-size:12px; white-space:nowrap; }
+.set-btns { display:flex; flex-wrap:wrap; gap:6px; }
+.set-note { font-size:11px; color:var(--text3); line-height:1.6; margin-top:8px; padding:8px 10px; background:var(--surface2); border-radius:8px; }
+.set-switch { appearance:none; -webkit-appearance:none; width:40px; height:24px; border-radius:12px; background:var(--border); position:relative; cursor:pointer; flex-shrink:0; transition:background .15s; }
+.set-switch::after { content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:var(--shadow); transition:transform .15s; }
+.set-switch:checked { background:var(--primary); }
+.set-switch:checked::after { transform:translateX(16px); }

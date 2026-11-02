@@ -396,8 +396,57 @@ function _flushTaskSave() {
      _taskSaveRetryTimer = setTimeout(_flushTaskSave, 15000);
    });
 }
+// ── 실행 취소 기록 (Ctrl+Z / Ctrl+Shift+Z) ──
+// 저장할 때마다 '직전 상태와 달라진 날짜'의 이전 내용을 쌓아 둠. 원격 변경은 기록하지 않음.
+const _hist={undo:[],redo:[]};
+let _snap={}, _histMute=false, _lastHistAt=0;
+function _snapInit(){ _snap={}; Object.keys(tasks).forEach(dk=>{ if(tasks[dk]&&tasks[dk].length) _snap[dk]=JSON.stringify(tasks[dk]); }); }
+_snapInit();
+function _recordHistory(){
+  const changed={};
+  new Set([...Object.keys(tasks),...Object.keys(_snap)]).forEach(dk=>{
+    const cur=tasks[dk]&&tasks[dk].length?JSON.stringify(tasks[dk]):undefined;
+    if(cur!==_snap[dk]){ changed[dk]=_snap[dk]; if(cur===undefined) delete _snap[dk]; else _snap[dk]=cur; }
+  });
+  if(_histMute||!Object.keys(changed).length) return;
+  const now=Date.now(), top=_hist.undo[_hist.undo.length-1];
+  const ks=Object.keys(changed).sort().join('|');
+  // 1초 안에 같은 날짜를 연달아 저장(메모 자동저장 등)하면 한 번으로 묶음
+  if(top&&now-_lastHistAt<1000&&Object.keys(top).sort().join('|')===ks){ /* 가장 오래된 이전 상태 유지 */ }
+  else { _hist.undo.push(changed); if(_hist.undo.length>50) _hist.undo.shift(); }
+  _hist.redo=[]; _lastHistAt=now;
+}
+function _applyHistory(from,to,doneMsg,emptyMsg){
+  if(READ_ONLY) return;
+  const e=from.pop();
+  if(!e){ showUndoToast(emptyMsg); return; }
+  const back={};
+  Object.keys(e).forEach(dk=>{
+    back[dk]=_snap[dk];
+    if(e[dk]===undefined) delete tasks[dk]; else tasks[dk]=JSON.parse(e[dk]);
+  });
+  to.push(back);
+  _histMute=true;
+  try{ Object.keys(e).forEach(dk=>saveTasks(dk)); } finally { _histMute=false; }
+  render();
+  showUndoToast(doneMsg);
+}
+function historyUndo(){ _applyHistory(_hist.undo,_hist.redo,'↩ 되돌렸어요','되돌릴 작업이 없어요'); }
+function historyRedo(){ _applyHistory(_hist.redo,_hist.undo,'↪ 다시 실행했어요','다시 실행할 작업이 없어요'); }
+document.addEventListener('keydown',e=>{
+  if(!(e.ctrlKey||e.metaKey)||e.altKey) return;
+  const k=e.key.toLowerCase();
+  if(k!=='z'&&k!=='y') return;
+  const a=document.activeElement;
+  // 입력창·메모 편집 중에는 브라우저 기본 실행 취소(글자 단위)를 그대로 사용
+  if(a&&(a.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return;
+  e.preventDefault();
+  if(k==='y'||e.shiftKey) historyRedo(); else historyUndo();
+});
+
 function saveTasks(dk) {
   if (READ_ONLY) return;
+  _recordHistory();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   const ref = fbRef();
   if (!ref) return;
@@ -442,6 +491,7 @@ function _mergeRemote(remoteRaw){
   tasks = merged;
   _saveSyncBase();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  _snapInit();
   return dirty.size;
 }
 
@@ -466,6 +516,7 @@ function initFirebaseSync() {
       _syncBase = {};
       if (hasRemote) {
         tasks = normalizeTasks(remote);
+        _snapInit();
         Object.keys(tasks).forEach(dk => _setBase(dk, tasks[dk]));
         _saveSyncBase();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
@@ -829,7 +880,7 @@ function askOffDayDirection(dk, count, cb) {
 let undoAction=null, undoTimer=null;
 // 토스트: 문장 앞 이모지를 라인 아이콘 + 색 표시(성공·경고·정보)로 바꿔 보여줌.
 // 되돌릴 동작이 없으면 '실행 취소' 버튼을 숨김 (예전엔 눌러도 아무 일 없는 버튼이 떴음).
-const _TOAST_TONE={'⚠':['warn','x'],'❌':['warn','x'],'🚫':['warn','x'],'✅':['ok','check'],'👥':['info','users'],'🤝':['info','users'],'📥':['info','download'],'📤':['info','upload'],'🔄':['info','repeat'],'📋':['info','clipboard'],'⚡':['ok','zap'],'🏖':['info','calendar'],'🖼':['info','image'],'🕘':['info','history'],'📄':['info','note'],'🗑':['info','trash']};
+const _TOAST_TONE={'↩':['info','history'],'↪':['info','repeat'],'⚠':['warn','x'],'❌':['warn','x'],'🚫':['warn','x'],'✅':['ok','check'],'👥':['info','users'],'🤝':['info','users'],'📥':['info','download'],'📤':['info','upload'],'🔄':['info','repeat'],'📋':['info','clipboard'],'⚡':['ok','zap'],'🏖':['info','calendar'],'🖼':['info','image'],'🕘':['info','history'],'📄':['info','note'],'🗑':['info','trash']};
 function showUndoToast(msg,fn){
   undoAction=fn||null;
   let text=String(msg||''), tone='info', icon='';
@@ -1042,6 +1093,12 @@ function toggleTask(dk,id,subId) {
     const t = ctx.node;
     t.checked = !t.checked;
     if(t.checked){t.completedAt=Date.now();_justDoneId=t.id;} else delete t.completedAt;
+    // 팀 일정은 누가 완료했는지 기록하고, 내 캘린더의 복사본이면 팀 원본에도 반영
+    if(!ctx.parentNode&&(IS_TEAM||t.teamRef)){
+      const me=myPersonalId()||'';
+      if(t.checked&&me) t.doneBy=me; else delete t.doneBy;
+      if(t.teamRef&&!(t.repeat&&t.repeat!=='none')) teamWriteBack(t,{checked:t.checked,doneBy:t.checked&&me?me:null});
+    }
   }
   saveTasks(dk); render();
 }
@@ -1259,7 +1316,8 @@ function openEdit(dk,task,isRepeatInst,originDk) {
   const _tc=isRepeatInst?findTaskContext(tasks[originDk]||[], task.id):null;
   const targetTask=isRepeatInst?(_tc&&_tc.node):task;
   if(!targetTask)return;
-  editCtx={dk:targetDk,taskId:targetTask.id};
+  // 반복 일정의 특정 회차를 수정하는 경우: 저장할 때 '이번만/이후 전부/전체' 범위를 물어봄
+  editCtx={dk:targetDk,taskId:targetTask.id,instanceDk:(isRepeatInst&&_tc&&!_tc.parentNode)?dk:null};
   _editColor=targetTask.color; _editStarred=targetTask.starred; _editRepeat=targetTask.repeat||'none'; _editPriority=targetTask.priority||null;
   document.getElementById('editRepeatEnd').value=targetTask.repeatEnd||'';
   buildEditColors();
@@ -1283,6 +1341,13 @@ function openEdit(dk,task,isRepeatInst,originDk) {
   document.getElementById('editTimeInput').value=targetTask.time||'';
   document.getElementById('editDuration').value=targetTask.duration||'';
   document.getElementById('editInput').value=targetTask.text;
+  // 담당자: 아는 이름(나, 팀 일정 등록자, 기존 담당자, 사용자 목록)을 자동완성 후보로
+  document.getElementById('editAssignee').value=targetTask.assignee||'';
+  const names=new Set([myPersonalId()].filter(Boolean));
+  Object.values(tasks).forEach(l=>Array.isArray(l)&&l.forEach(x=>{ if(x&&x.assignee) names.add(x.assignee); if(x&&x.by) names.add(x.by); }));
+  (typeof _userDirCache!=='undefined'&&Array.isArray(_userDirCache)?_userDirCache:[]).forEach(n=>names.add(n));
+  const dl=document.getElementById('assigneeList'); dl.innerHTML='';
+  [...names].slice(0,60).forEach(n=>{ const o=document.createElement('option'); o.value=n; dl.appendChild(o); });
   document.getElementById('editModal').classList.remove('hidden');
   setTimeout(()=>{const inp=document.getElementById('editInput');inp.focus();inp.select();},50);
 }
@@ -1310,12 +1375,84 @@ document.getElementById('editSaveBtn').onclick=()=>{
   const text=document.getElementById('editInput').value.trim();
   if(!text)return;
   const ctx = findTaskContext(tasks[editCtx.dk]||[], editCtx.taskId);
-  if(ctx){
-    const t=ctx.node;
-    t.text=text;t.color=_editColor;t.starred=_editStarred;t.repeat=_editRepeat;t.priority=_editPriority;t.time=document.getElementById('editTimeInput').value||null;t.duration=document.getElementById('editDuration').value||null;t.repeatEnd=_editRepeat!=='none'?(document.getElementById('editRepeatEnd').value||null):null;if(!t.completions)t.completions={};
-  }
-  saveTasks(editCtx.dk); closeEdit(); render();
+  if(!ctx){ closeEdit(); return; }
+  const t=ctx.node;
+  const vals={text,color:_editColor,starred:_editStarred,repeat:_editRepeat,priority:_editPriority,
+    time:document.getElementById('editTimeInput').value||null,duration:document.getElementById('editDuration').value||null,
+    repeatEnd:_editRepeat!=='none'?(document.getElementById('editRepeatEnd').value||null):null,
+    assignee:(document.getElementById('editAssignee').value||'').trim().slice(0,30)||null};
+  const applyAll=()=>{ const asgChanged=(t.assignee||null)!==vals.assignee; Object.assign(t,vals); if(!t.completions)t.completions={}; if(asgChanged) teamWriteBack(t,{assignee:vals.assignee}); saveTasks(editCtx.dk); closeEdit(); render(); };
+  const instDk=editCtx.instanceDk;
+  if(!instDk||!t.repeat||t.repeat==='none'||instDk<=editCtx.dk){ applyAll(); return; }
+  const originDk=editCtx.dk;
+  askScope('반복 일정 수정','어느 범위에 적용할까요?',[
+    {key:'one',label:'이번만',sub:`${parseDk(instDk).getMonth()+1}/${parseDk(instDk).getDate()} 회차만 바꿔요 (나머지는 그대로)`,primary:true},
+    {key:'after',label:'이후 전부',sub:'이 날짜부터 앞으로의 반복을 바꿔요'},
+    {key:'all',label:'전체',sub:'지난 회차를 포함한 반복 전체를 바꿔요'},
+  ],scope=>{
+    if(scope==='all'){ applyAll(); return; }
+    if(scope==='one') editRepeatOne(originDk,t,instDk,vals);
+    else if(scope==='after') splitRepeatFrom(originDk,t,instDk,vals);
+    closeEdit(); render();
+  });
 };
+// 범위 선택 대화상자 (반복 일정 이동·수정 공용)
+function askScope(title,question,options,cb){
+  const ov=el('div','modal-overlay'); const box=el('div','modal-box'); box.style.maxWidth='340px';
+  box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); box.setAttribute('aria-label',title);
+  box.appendChild(el('div','modal-title',{innerHTML:icn('repeat',15)+' '+title}));
+  box.appendChild(el('div','modal-desc',{textContent:question}));
+  options.forEach(o=>{
+    const b=el('button',(o.primary?'btn-primary':'btn-secondary')+' scope-opt',{type:'button'});
+    b.appendChild(el('div','scope-opt-label',{textContent:o.label}));
+    if(o.sub) b.appendChild(el('div','scope-opt-sub',{textContent:o.sub}));
+    b.onclick=()=>{ov.remove();cb(o.key);};
+    box.appendChild(b);
+  });
+  const c=el('button','btn-secondary scope-cancel',{type:'button',textContent:'취소'}); c.onclick=()=>{ov.remove();cb(null);}; box.appendChild(c);
+  ov.appendChild(box); document.body.appendChild(ov); ov.onclick=e=>{ if(e.target===ov){ov.remove();cb(null);} };
+}
+// 반복 일정 '이번만' 수정: 그 회차는 건너뛰고 같은 날짜에 단발 일정으로 대체
+function editRepeatOne(originDk,t,instDk,vals){
+  if(!t.skips) t.skips={};
+  t.skips[instDk]=true;
+  const copy=Object.assign({}, fbClean(t), vals, {
+    id:uid(), repeat:'none', repeatEnd:null, checked:isRepeatChecked(t,instDk), completions:{}, skips:{},
+    subs:(Array.isArray(t.subs)?t.subs:[]).map(s=>({id:uid(),text:s.text,checked:false,starred:false,color:s.color||null,subs:[]})),
+    memoHistory:[], comments:[], movedFromRepeat:{originDk,taskId:t.id,instanceDk:instDk}
+  });
+  (tasks[instDk]=tasks[instDk]||[]).push(copy);
+  saveTasks(originDk); saveTasks(instDk);
+  showUndoToast('🔄 이번 회차만 바꿨어요',()=>{
+    const tt=(findTaskContext(tasks[originDk]||[],t.id)||{}).node; if(tt&&tt.skips) delete tt.skips[instDk];
+    tasks[instDk]=(tasks[instDk]||[]).filter(x=>x.id!==copy.id); if(!tasks[instDk].length) delete tasks[instDk];
+    saveTasks(originDk); saveTasks(instDk); render();
+  });
+}
+// 반복 일정 '이후 전부' 수정: 기존 반복은 전날까지로 끝내고, 이 날짜부터 새 반복 시작
+function splitRepeatFrom(originDk,t,instDk,vals){
+  const prevEnd=t.repeatEnd||null;
+  const dayBefore=parseDk(instDk); dayBefore.setDate(dayBefore.getDate()-1);
+  const pick=(obj,fromNew)=>{ const o={}; Object.keys(obj||{}).forEach(k=>{ if(fromNew?k>=instDk:k<instDk) o[k]=obj[k]; }); return o; };
+  const next=Object.assign({}, fbClean(t), vals, {
+    id:uid(), checked:false, completions:pick(t.completions,true), skips:pick(t.skips,true),
+    subs:(Array.isArray(t.subs)?t.subs:[]).map(s=>Object.assign({},fbClean(s),{id:uid(),completions:pick(s.completions,true)})),
+    memoHistory:[], comments:[]
+  });
+  if(vals.repeat==='none'){ next.repeat='none'; next.repeatEnd=null; }
+  else if(!vals.repeatEnd && prevEnd && prevEnd>=instDk) next.repeatEnd=prevEnd;
+  const oldCompletions=t.completions, oldSkips=t.skips;
+  t.repeatEnd=dateKey(dayBefore);
+  t.completions=pick(t.completions,false); t.skips=pick(t.skips,false);
+  (tasks[instDk]=tasks[instDk]||[]).push(next);
+  saveTasks(originDk); saveTasks(instDk);
+  showUndoToast('🔄 이 날짜부터 바꿨어요',()=>{
+    const tt=(findTaskContext(tasks[originDk]||[],t.id)||{}).node;
+    if(tt){ tt.repeatEnd=prevEnd; tt.completions=oldCompletions; tt.skips=oldSkips; }
+    tasks[instDk]=(tasks[instDk]||[]).filter(x=>x.id!==next.id); if(!tasks[instDk].length) delete tasks[instDk];
+    saveTasks(originDk); saveTasks(instDk); render();
+  });
+}
 document.getElementById('editTimeClear').onclick=()=>{document.getElementById('editTimeInput').value='';};
 document.getElementById('editRepeatEndClear').onclick=()=>{document.getElementById('editRepeatEnd').value='';};
 document.getElementById('editCancelBtn').onclick=closeEdit;
@@ -1595,7 +1732,7 @@ document.getElementById('memoHistBtn').onclick=()=>{
 const GUIDE_SECTIONS=[
   { title:'🚀 시작하기', items:[
     ['👤','내 캘린더','이름을 입력하면 나만의 URL이 만들어져요. PC·모바일 어디서든 같은 URL로 접속하면 자동 동기화돼요.'],
-    ['☁️','저장','자동 저장되지만, 바로 저장하고 싶으면 헤더의 ☁️ 버튼을 눌러 주세요.'],
+    ['☁️','저장','자동 저장돼요. 여러 기기에서 동시에 고쳐도 날짜별로 합쳐져서 서로 덮어쓰지 않아요.'],
     ['📱','앱 설치','브라우저에서 "홈 화면에 추가"를 누르면 앱처럼 쓸 수 있어요.'],
   ]},
   { title:'🗓 화면 전환', items:[
@@ -1611,7 +1748,7 @@ const GUIDE_SECTIONS=[
     ['🕐','시간 인식','"8시"→오전, "6시"→저녁으로 자동 판단해요. "오후 2시반", "14:30"도 돼요.'],
     ['🔴','중요도','🔴높음 🟡중간 🟢낮음으로 우선순위를 정할 수 있어요.'],
     ['🎨','색상','색 점을 눌러 구분해 보세요.'],
-    ['🔄','반복','매주·격주·매월·N째 요일 반복을 설정할 수 있어요.'],
+    ['🔄','반복','매주·격주·매월·N째 요일 반복을 설정할 수 있어요. 한 회차를 고칠 땐 이번만·이후 전부·전체 중에 골라요.'],
     ['#️⃣','태그','#태그를 쓰면 같은 태그끼리 모아볼 수 있어요.'],
   ]},
   { title:'✅ 할 일 관리', items:[
@@ -1638,14 +1775,20 @@ const GUIDE_SECTIONS=[
     ['💡','참고','브라우저 탭이 열려 있어야 알림이 와요.'],
   ]},
   { title:'🔍 검색', items:[
-    ['🔎','검색','제목·메모·하위 항목까지 찾아줘요.'],
+    ['🔎','검색','제목·메모·하위 항목까지 전체 기간에서 찾아줘요.'],
     ['🎚','필터','미완료·중요·메모 있는 것만 골라 볼 수 있어요.'],
     ['🏷','태그','#태그로 관련 일정을 모아볼 수 있어요.'],
+  ]},
+  { title:'🤝 팀 일정', items:[
+    ['👤','담당자','수정 화면에서 담당자를 지정하면 뱃지로 보이고, \'내 담당\' 필터로 모아볼 수 있어요.'],
+    ['☑️','완료 공유','구독한 팀 일정을 완료하면 팀 캘린더와 팀원들 캘린더에도 완료로 표시돼요.'],
   ]},
   { title:'⋯ 더보기', items:[
     ['🔗','URL 복사','내 캘린더 주소를 복사해요.'],
     ['👁','읽기전용 링크','보기만 가능한 링크를 만들어요.'],
     ['📑','템플릿','자주 쓰는 할 일을 저장해두고 한 번에 추가해요.'],
+    ['📋','주간 업무보고','이번 주 돌아보기에서 완료·진행 중·다음 주 예정을 태그별로 정리해 복사해요.'],
+    ['🎚','설정','알림 시간·테마·회사 시트 동기화·계정을 한 화면에서 바꿔요.'],
     ['☑️','여러 개 선택','한 번에 완료·삭제할 수 있어요.'],
     ['📝','메모 전체보기','모든 메모를 한눈에 볼 수 있어요.'],
     ['🗑','휴지통','삭제한 할 일을 30일 안에 복구할 수 있어요.'],
@@ -1661,6 +1804,9 @@ const GUIDE_SECTIONS=[
     ['N','새 할 일','바로 입력할 수 있어요.'],
     ['F','포커스','포커스 모드로 전환해요.'],
     ['/','검색','검색창으로 이동해요.'],
+    ['Ctrl Z','실행 취소','방금 한 작업을 되돌려요. 여러 번 누르면 계속 되돌아가요.'],
+    ['Ctrl ⇧ Z','다시 실행','되돌린 작업을 다시 적용해요.'],
+    ['Ctrl K','커맨드 팔레트','기능을 검색해 바로 실행해요.'],
     ['D','다크모드','테마를 바꿔요.'],
   ]},
   { title:'📈 대시보드', items:[
@@ -1872,8 +2018,8 @@ function attachMemoImage(file){
     // 압축 후 충분히 작으면 태스크 데이터에 함께 실어 기기 간 동기화
     // (큰 이미지는 이 기기 IndexedDB에만 — 다른 기기에선 자리표시로 표시)
     try{
-      const dataUrl=await compressImage(file);
-      if(dataUrl && dataUrl.length<120000){
+      const dataUrl=await compressForSync(file);
+      if(dataUrl){
         if(!task.memoImgData||typeof task.memoImgData!=='object') task.memoImgData={};
         task.memoImgData[id]=dataUrl;
       }
@@ -2274,6 +2420,13 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     textWrap.setAttribute('aria-label',(task.text||'할 일')+' — 수정');
   }
   body.appendChild(textWrap);
+  if(task.assignee || (task.doneBy && checked)){
+    const me=myPersonalId();
+    const aw=el('div','task-meta');
+    if(task.assignee) aw.appendChild(badge(`task-assignee${task.assignee===me?' mine':''}`,'user','담당 '+task.assignee,task.assignee===me?'내 담당':'담당자'));
+    if(task.doneBy && checked) aw.appendChild(badge('task-doneby','check',task.doneBy+' 완료','완료한 사람'));
+    body.appendChild(aw);
+  }
   if(task.by || task.fromTeam){
     const metaWrap=el('div','task-meta');
     if(task.by){ metaWrap.appendChild(badge('task-by','user',task.by,'등록: '+task.by)); }
@@ -3043,8 +3196,8 @@ function buildTimelineView(){
 
 // ── Search ──
 let tagFilter = null;
-let attrFilter = { incomplete:false, starred:false, prio:null, memo:false, timed:false, repeat:false, done:false, color:null };
-function attrFilterActive(){ return attrFilter.incomplete||attrFilter.starred||attrFilter.memo||!!attrFilter.prio||attrFilter.timed||attrFilter.repeat||attrFilter.done||!!attrFilter.color; }
+let attrFilter = { incomplete:false, starred:false, prio:null, memo:false, timed:false, repeat:false, done:false, color:null, mine:false };
+function attrFilterActive(){ return attrFilter.incomplete||attrFilter.starred||attrFilter.memo||!!attrFilter.prio||attrFilter.timed||attrFilter.repeat||attrFilter.done||!!attrFilter.color||attrFilter.mine; }
 function allTaskTags(){
   const set = new Set();
   Object.values(tasks).forEach(list => Array.isArray(list) && list.forEach(t => {
@@ -3063,6 +3216,7 @@ function matchesQuery(t){
   if(attrFilter.timed && !t.time) return false;
   if(attrFilter.repeat && !(t.repeat && t.repeat!=='none')) return false;
   if(attrFilter.color && t.color!==attrFilter.color) return false;
+  if(attrFilter.mine && t.assignee!==myPersonalId()) return false;
   if(!searchQuery) return true;
   const q=searchQuery.toLowerCase();
   return (t.text&&t.text.toLowerCase().includes(q))||(t.memo&&t.memo.toLowerCase().includes(q))||(Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q)));
@@ -3091,6 +3245,8 @@ function buildTagFilterBar(){
   toggle('timed','시간',undefined,'clock');
   toggle('repeat','반복',undefined,'repeat');
   toggle('memo','메모',undefined,'note');
+  // 담당자가 지정된 일정이 있을 때만 '내 담당' 필터 표시
+  if(Object.values(tasks).some(l=>Array.isArray(l)&&l.some(x=>x&&x.assignee))) toggle('mine','내 담당',undefined,'user');
   // 색상별 필터 (색 점)
   (typeof COLORS!=='undefined'?COLORS:[]).forEach(c=>{
     const on=attrFilter.color===c.hex;
@@ -3101,7 +3257,7 @@ function buildTagFilterBar(){
   });
   if(attrFilterActive()){
     const clr=el('button','tag-filter-chip attr-clear',{innerHTML:icn('x',11)+' 해제'});
-    clr.onclick=()=>{ attrFilter={incomplete:false,starred:false,prio:null,memo:false,timed:false,repeat:false,done:false,color:null}; render(); };
+    clr.onclick=()=>{ attrFilter={incomplete:false,starred:false,prio:null,memo:false,timed:false,repeat:false,done:false,color:null,mine:false}; render(); };
     bar.appendChild(clr);
   }
   // 태그 칩 (태그가 있을 때만)
@@ -3783,24 +3939,69 @@ function checkPendingNotifications(){
 }
 
 // 알림 시간 설정
-const _notifySettingsBtn = document.getElementById('notifySettingsBtn');
-if (_notifySettingsBtn) _notifySettingsBtn.onclick = () => {
+// ── 설정 화면 (알림 시간·테마·시트 동기화·계정·데이터) ──
+// 예전엔 알림 시간을 prompt 창 3개로 입력했음
+function openSettings(){
   document.getElementById('moreMenu').classList.add('hidden');
-  const mh = prompt('아침 요약 알림 시각 (0~23시)', NOTIFY_HOUR);
-  if (mh === null) return;
-  const eh = prompt('저녁 미완료 리마인드 시각 (0~23시)', NOTIFY_EVENING);
-  if (eh === null) return;
-  const lead = prompt('마감 몇 분 전에 알릴까요? (분)', NOTIFY_LEAD);
-  if (lead === null) return;
-  const mhi = Math.max(0, Math.min(23, parseInt(mh, 10)));
-  const ehi = Math.max(0, Math.min(23, parseInt(eh, 10)));
-  const li = Math.max(1, Math.min(1440, parseInt(lead, 10)));
-  if (!isNaN(mhi)) { NOTIFY_HOUR = mhi; localStorage.setItem('notifyMorningHour', mhi); }
-  if (!isNaN(ehi)) { NOTIFY_EVENING = ehi; localStorage.setItem('notifyEveningHour', ehi); }
-  if (!isNaN(li)) { NOTIFY_LEAD = li; localStorage.setItem('notifyLeadMin', li); }
-  savePushPrefs();   // 백그라운드 발송 서버에 시간/타임존 반영
-  alert(`알림 시간을 저장했어요.\n· 아침 ${NOTIFY_HOUR}시 · 저녁 ${NOTIFY_EVENING}시 · 마감 ${NOTIFY_LEAD}분 전`);
-};
+  const old=document.getElementById('settingsOv'); if(old) old.remove();
+  const ov=el('div','modal-overlay'); ov.id='settingsOv';
+  const box=el('div','modal-box settings-box'); box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); box.setAttribute('aria-label','설정');
+  box.appendChild(el('div','modal-title',{innerHTML:icn('sliders',15)+' 설정'}));
+  const section=(title,icon)=>{ const s=el('div','set-sec'); s.appendChild(el('div','set-sec-title',{innerHTML:icn(icon,13)+' '+title})); box.appendChild(s); return s; };
+  const row=(sec,label,control,hint)=>{ const r=el('label','set-row'); const t=el('div','set-row-text'); t.appendChild(el('div','set-row-label',{textContent:label})); if(hint) t.appendChild(el('div','set-row-hint',{textContent:hint})); r.appendChild(t); r.appendChild(control); sec.appendChild(r); return r; };
+  const sel=(opts,val,onchange)=>{ const s=el('select','mt-select set-select'); opts.forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; if(String(v)===String(val)) o.selected=true; s.appendChild(o); }); s.onchange=()=>onchange(s.value); return s; };
+  const sw=(on,onchange)=>{ const i=el('input','set-switch',{type:'checkbox'}); i.checked=!!on; i.onchange=()=>onchange(i.checked); return i; };
+  const hours=[...Array(24)].map((_,h)=>[h,`${h}시`]);
+
+  // 알림
+  const sN=section('알림','bell');
+  const notifyOn=notifyAllowed&&notifyAllowed();
+  row(sN,'알림 받기',sw(notifyOn,()=>{ document.getElementById('notifyBtn').click(); setTimeout(openSettings,400); }),'브라우저 탭이 열려 있을 때 알려줘요');
+  row(sN,'아침 요약',sel(hours,NOTIFY_HOUR,v=>{ NOTIFY_HOUR=+v; localStorage.setItem('notifyMorningHour',v); savePushPrefs(); }),'오늘 할 일을 요약해 알려줘요');
+  row(sN,'저녁 리마인드',sel(hours,NOTIFY_EVENING,v=>{ NOTIFY_EVENING=+v; localStorage.setItem('notifyEveningHour',v); savePushPrefs(); }),'아직 못 끝낸 일을 알려줘요');
+  row(sN,'마감 알림',sel([[10,'10분 전'],[15,'15분 전'],[30,'30분 전'],[60,'1시간 전'],[120,'2시간 전'],[1440,'하루 전']],NOTIFY_LEAD,v=>{ NOTIFY_LEAD=+v; localStorage.setItem('notifyLeadMin',v); savePushPrefs(); }),'시간을 지정한 할 일');
+
+  // 화면
+  const sV=section('화면','sun');
+  const curTheme=localStorage.getItem('theme')||'auto';
+  row(sV,'테마',sel([['auto','시스템 설정 따라가기'],['light','라이트'],['dark','다크']],curTheme,v=>{
+    if(v==='auto'){ localStorage.removeItem('theme'); const d=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.dataset.theme=d?'dark':'light'; }
+    else { localStorage.setItem('theme',v); document.documentElement.dataset.theme=v; }
+    const t=document.documentElement.dataset.theme;
+    document.getElementById('darkBtn').innerHTML=`<svg class="ic" width="16" height="16"><use href="#i-${t==='dark'?'sun':'moon'}"/></svg>`;
+  }));
+
+  // 회사 시트 동기화
+  if(USER_ID&&!IS_TEAM&&!READ_ONLY){
+    const sS=section('회사 일정 시트','download');
+    row(sS,'월요일 자동 가져오기',sw(sheetSyncEnabled(),on=>{ localStorage.setItem('sheetSyncOn_'+USER_ID,on?'1':'0'); }),'[전관행사] 일정을 매주 월요일에 내 캘린더로 가져와요');
+    const now=el('button','btn-secondary set-btn',{type:'button',textContent:'지금 가져오기'});
+    now.onclick=()=>{ now.disabled=true; now.textContent='가져오는 중…'; Promise.resolve(syncSheetEvents(true)).finally(()=>{ now.disabled=false; now.textContent='지금 가져오기'; }); };
+    row(sS,'수동으로 가져오기',now);
+  }
+
+  // 계정
+  const sA=section('계정','user');
+  row(sA,'내 캘린더 이름',el('span','set-value',{textContent:IS_TEAM?(_rawTeam+' (팀)'):(USER_ID||'-')}));
+  const authB=el('button','btn-secondary set-btn',{type:'button',textContent:authUser?'로그아웃':'Google 연결'});
+  authB.onclick=()=>{ ov.remove(); authUser?googleLogout():googleLogin(); };
+  row(sA,authUser?('연결됨 · '+(authUser.email||'')):'구글 계정 연결',authB,authUser?'새 기기에서 로그인만 하면 내 캘린더가 열려요':'연결해 두면 새 기기에서도 바로 열려요');
+  sA.appendChild(el('div','set-note',{textContent:'참고: 지금은 캘린더 이름을 아는 사람은 내용을 볼 수 있어요. 팀원 모두가 구글 계정을 연결하면 본인만 수정할 수 있도록 잠글 예정이에요.'}));
+
+  // 데이터
+  const sD=section('데이터','save');
+  const bWrap=el('div','set-btns');
+  [['백업하기','backupBtn'],['백업 불러오기','restoreBtn'],['휴지통','trashBtn'],['내보내기 (.ics)','icsExportBtn']].forEach(([l,id])=>{
+    const b=el('button','btn-secondary set-btn',{type:'button',textContent:l}); b.onclick=()=>{ ov.remove(); const t=document.getElementById(id); if(t) t.click(); }; bWrap.appendChild(b);
+  });
+  sD.appendChild(bWrap);
+
+  const acts=el('div','modal-actions'); const close=el('button','btn-primary',{type:'button',textContent:'닫기'}); close.onclick=()=>ov.remove(); acts.appendChild(close); box.appendChild(acts);
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick=ev=>{ if(ev.target===ov) ov.remove(); };
+}
+const _notifySettingsBtn = document.getElementById('notifySettingsBtn');
+if (_notifySettingsBtn) _notifySettingsBtn.onclick = openSettings;
 
 setInterval(checkNotificationSchedule, 60*1000);
 checkNotificationSchedule();
@@ -3955,6 +4156,8 @@ function normalizeMemos(raw) {
       color: m.color || null, pinned: !!m.pinned,
       cx: typeof m.cx === 'number' ? m.cx : null, cy: typeof m.cy === 'number' ? m.cy : null,
       hist: Array.isArray(m.hist) ? m.hist.filter(h => h && h.t).map(h => ({t: h.t, title: String(h.title||''), text: String(h.text||'')})) : [],
+      updated: typeof m.updated === 'number' ? m.updated : undefined,
+      imgData: (m.imgData && typeof m.imgData === 'object') ? m.imgData : undefined,
     };
   });
   // 부모가 삭제된 메모는 루트로 승격
@@ -4063,6 +4266,28 @@ function allNoteTags() {
 let notesTagFilter = null;
 
 // ── 이미지: 기존 plannerImages IndexedDB 재사용 (idbPutImage/idbGetImage) ──
+// 기기 간 동기화용 압축: 크기·화질을 단계적으로 낮춰 SYNC_IMG_MAX 이하로 맞춤 (실패하면 null)
+// 파일 저장소(Firebase Storage)는 무료 요금제에서 쓸 수 없어, 작게 줄인 사진을 DB에 함께 저장함
+const SYNC_IMG_MAX = 160000;
+function compressForSync(file) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const tries = [[1280,.8],[1024,.75],[900,.7],[720,.65],[600,.6],[480,.55]];
+      for (const [max,q] of tries) {
+        let w = img.width, h = img.height;
+        if (w > max || h > max) { const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r); }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        const url = cv.toDataURL('image/jpeg', q);
+        if (url.length <= SYNC_IMG_MAX) { URL.revokeObjectURL(img.src); res(url); return; }
+      }
+      URL.revokeObjectURL(img.src); res(null);
+    };
+    img.onerror = () => { URL.revokeObjectURL(img.src); res(null); };
+    img.src = URL.createObjectURL(file);
+  });
+}
 function compressImage(file) {
   return new Promise(res => {
     const img = new Image();
@@ -4277,11 +4502,14 @@ function serializeNoteEditor(editor) {
   return lines.join('\n');
 }
 // 편집기/뷰 안의 로컬 이미지 src 채우기 + 페이지링크·이미지 블록을 통째 비편집(atomic)으로
+function noteImgData(id){ for (const mm of Object.values(memos||{})) { if (mm && mm.imgData && mm.imgData[id]) return mm.imgData[id]; } return null; }
 function hydrateNoteMedia(root, editable) {
   root.querySelectorAll('img[data-img]').forEach(img => {
     idbGetImage(img.dataset.img).then(data => {
-      if (data) { const url = (typeof data === 'string') ? data : URL.createObjectURL(data); img.src = url; }
-      else { img.alt = '🖼 이미지는 첨부한 기기에서만 보여요'; img.classList.add('missing'); }
+      if (data) { const url = (typeof data === 'string') ? data : URL.createObjectURL(data); img.src = url; return; }
+      const synced = noteImgData(img.dataset.img);
+      if (synced) { img.src = synced; idbPutImage(img.dataset.img, synced).catch(()=>{}); }
+      else { img.alt = '이미지는 첨부한 기기에서만 보여요'; img.classList.add('missing'); }
     });
   });
   if (editable) {
@@ -4750,12 +4978,15 @@ async function insertImageCE(m, editor, file) {
   const dataUrl = await compressImage(file);
   if (!dataUrl) { showToast('⚠️ 이미지를 읽을 수 없어요'); return; }
   const id = uid(); await idbPutImage(id, dataUrl);
+  // 작게 줄인 사본을 메모 데이터에 실어 다른 기기에서도 보이게
+  const syncUrl = await compressForSync(file);
+  if (syncUrl) { if (!m.imgData || typeof m.imgData !== 'object') m.imgData = {}; m.imgData[id] = syncUrl; }
   editor.focus();
   document.execCommand('insertHTML', false,
     `<div class="nv-imgblock" contenteditable="false" draggable="true"><img class="nv-img" data-img="${id}" alt="" draggable="false"><span class="nv-imgmove" title="드래그해서 위치 이동">⠿</span></div><div class="nv-p"><br></div>`);
   hydrateNoteMedia(editor, true);
   m.text = serializeNoteEditor(editor); if (!READ_ONLY) saveMemos();
-  showToast('🖼 이미지 첨부됨 (이 기기에만 저장)');
+  showToast(syncUrl ? '🖼 이미지를 첨부했어요 (다른 기기에서도 보여요)' : '🖼 이미지를 첨부했어요 (용량이 커서 이 기기에만 저장)');
 }
 // WYSIWYG 서식 툴바 (contentEditable + execCommand)
 function buildNoteToolbar(editor, m) {
@@ -4885,7 +5116,11 @@ function renderNoteBody(m, bodyWrap, win, focusEdit) {
           img.src = url;
           img.onclick = ev => { ev.stopPropagation(); openLightbox(url); };
         }
-        else { img.alt = '🖼 이미지는 첨부한 기기에서만 보여요'; img.classList.add('missing'); }
+        else {
+          const synced = noteImgData(img.dataset.img);
+          if (synced) { img.src = synced; img.onclick = ev => { ev.stopPropagation(); openLightbox(synced); }; idbPutImage(img.dataset.img, synced).catch(()=>{}); }
+          else { img.alt = '이미지는 첨부한 기기에서만 보여요'; img.classList.add('missing'); }
+        }
       });
     });
     // 블록 드래그: 페이지 링크/이미지를 줄 사이로 이동 (그 외 요소의 네이티브 드래그 차단 → 이미지 복사 버그 수정)
@@ -5698,6 +5933,14 @@ function openReview() {
     ul.appendChild(r);
   });
   body.appendChild(ul);
+  const rep=el('div','report-row');
+  rep.appendChild(el('span','report-label',{innerHTML:icn('clipboard',13)+' 주간 업무보고'}));
+  const sel=el('select','mt-select report-week');
+  sel.innerHTML='<option value="0">이번 주</option><option value="-1">지난주</option>';
+  const cp=el('button','btn-secondary report-copy',{type:'button',innerHTML:icn('upload',13)+' 복사'});
+  cp.onclick=()=>copyWeeklyReport(+sel.value);
+  rep.appendChild(sel); rep.appendChild(cp);
+  body.appendChild(rep);
   document.getElementById('reviewModal').dataset.undoneCount = undone.length;
   document.getElementById('reviewModal').classList.remove('hidden');
 }
@@ -5722,6 +5965,51 @@ function carryReviewToNextWeek() {
   saveTasks(); render();
   document.getElementById('reviewModal').classList.add('hidden');
   showUndoToast(`📋 미완료 ${moved}개를 다음 주로 이월했어요`);
+}
+// ── 주간 업무보고 텍스트 (완료 / 진행 중 / 다음 주 예정, 태그별 묶음) ──
+function buildWeeklyReport(weekOffset){
+  const mon=getMonday(new Date()); mon.setDate(mon.getDate()+7*(weekOffset||0));
+  const fmt=d=>`${d.getMonth()+1}/${d.getDate()}(${DAY_NAMES[dateToDayIdx(d)]})`;
+  const sun=new Date(mon); sun.setDate(sun.getDate()+6);
+  const done=[], doing=[], next=[];
+  const subInfo=t=>Array.isArray(t.subs)&&t.subs.length?` (${t.subs.filter(s=>s&&s.checked).length}/${t.subs.length})`:'';
+  const collect=(d,bucketDone,bucketTodo)=>{
+    const dk=dateKey(d);
+    (tasks[dk]||[]).forEach(t=>{
+      if(!t||t.pending||(t.repeat&&t.repeat!=='none')) return;
+      (t.checked?bucketDone:bucketTodo).push({d,t});
+    });
+    try{ getRepeatTasksForDate(d,dateToDayIdx(d)).forEach(({task,instanceDk})=>{
+      (isRepeatChecked(task,instanceDk)?bucketDone:bucketTodo).push({d,t:task,rep:true});
+    }); }catch(e){}
+  };
+  for(let i=0;i<7;i++){ const d=new Date(mon); d.setDate(d.getDate()+i); collect(d,done,doing); }
+  const ignore=[];
+  for(let i=7;i<14;i++){ const d=new Date(mon); d.setDate(d.getDate()+i); collect(d,ignore,next); }
+  const tagOf=t=>{ const m=(t.text||'').match(/#[\w가-힣]+/); return m?m[0].slice(1):'기타'; };
+  const section=(title,items)=>{
+    if(!items.length) return `■ ${title} (0)\n - 없음\n`;
+    const groups={};
+    items.forEach(it=>{ (groups[tagOf(it.t)]=groups[tagOf(it.t)]||[]).push(it); });
+    const keys=Object.keys(groups).sort((a,b)=>a==='기타'?1:b==='기타'?-1:a.localeCompare(b));
+    let s=`■ ${title} (${items.length})\n`;
+    keys.forEach(k=>{
+      if(keys.length>1||k!=='기타') s+=`[${k}]\n`;
+      groups[k].forEach(({d,t,rep})=>{
+        const txt=(t.text||'').replace(/#[\w가-힣]+/g,'').replace(/\s{2,}/g,' ').trim();
+        s+=` - ${fmt(d)} ${txt}${subInfo(t)}${rep?' (반복)':''}\n`;
+      });
+    });
+    return s;
+  };
+  return `[주간 업무보고] ${fmt(mon)} ~ ${fmt(sun)}\n\n`+section('완료',done)+'\n'+section('진행 중 / 미완료',doing)+'\n'+section('다음 주 예정',next);
+}
+function copyWeeklyReport(weekOffset){
+  const text=buildWeeklyReport(weekOffset);
+  const done=()=>showUndoToast('✅ 주간 업무보고를 복사했어요 — 메신저나 메일에 붙여넣으세요');
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(()=>fallback());
+  else fallback();
+  function fallback(){ const ta=el('textarea'); ta.value=text; ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); done();}catch(e){ alert(text); } ta.remove(); }
 }
 document.getElementById('reviewBtn').onclick = () => { document.getElementById('moreMenu').classList.add('hidden'); openReview(); };
 document.getElementById('reviewClose').onclick = () => document.getElementById('reviewModal').classList.add('hidden');
@@ -5946,6 +6234,21 @@ function saveTeamCopied(){ localStorage.setItem(TEAM_COPIED_KEY, JSON.stringify(
 let teamSubListeners = {};
 // 팀 스냅샷을 내 캘린더에 미러: 신규 복사 / 기존 콘텐츠 갱신 / 팀 삭제분 제거.
 // 로컬 상태(완료체크·메모·하위·댓글)는 보존, 로컬에서 지운 복사본은 재추가 안 함.
+// 내 캘린더의 팀 일정(복사본)에서 완료·담당자를 바꾸면 팀 캘린더 원본에도 반영 → 팀원 모두에게 공유
+function teamWriteBack(node, patch){
+  if(!node||!node.teamRef||!fbDb||READ_ONLY||IS_TEAM) return;
+  const [tid,oDk,teamTaskId]=String(node.teamRef).split('|');
+  if(!tid||!oDk||!teamTaskId) return;
+  if('checked' in patch) node._teamChecked=!!patch.checked;
+  if('assignee' in patch) node._teamAssignee=patch.assignee||null;
+  fbDb.ref(`users/team-${sanitizeId(tid)}/tasks/${oDk}`).transaction(list=>{
+    if(!list) return list;
+    const arr=Array.isArray(list)?list:Object.values(list);
+    const it=arr.find(x=>x&&x.id===teamTaskId); if(!it) return list;
+    Object.keys(patch).forEach(k=>{ if(patch[k]===null||patch[k]===undefined) delete it[k]; else it[k]=patch[k]; });
+    return arr;
+  }).catch(e=>console.warn('팀 일정 반영 실패',e));
+}
 function applyTeamSnapshot(id, data){
   if(IS_TEAM || READ_ONLY) return;
   data = data || {};
@@ -5962,6 +6265,11 @@ function applyTeamSnapshot(id, data){
       const ex=copies[ref];
       if(ex){ // 기존: 내가 등록한 원본(selfRegistered)은 손대지 않고, 순수 미러만 콘텐츠 갱신
         const c=ex.task;
+        // 담당자·완료 상태는 팀과 공유: 팀 쪽 값이 바뀐 경우에만 반영
+        const tAsg=t.assignee||null; if((c._teamAssignee===undefined?null:c._teamAssignee)!==tAsg){ c.assignee=tAsg; c._teamAssignee=tAsg; changed=true; }
+        if(!(t.repeat&&t.repeat!=='none')){
+          const tChk=!!t.checked; if(c._teamChecked!==tChk){ c._teamChecked=tChk; if(c.checked!==tChk){ c.checked=tChk; c.doneBy=t.doneBy||null; } changed=true; }
+        }
         if(!c.selfRegistered){
           MIRROR.forEach(f=>{ const nv=(t[f]!==undefined?t[f]:null), cv=(c[f]!==undefined?c[f]:null); if(cv!==nv){ c[f]=(t[f]!==undefined?t[f]:null); changed=true; } });
           // 팀에서 '이 날짜만 삭제'(skips)한 회차는 미러에도 반영 — 단, 내가 로컬에서
@@ -7071,6 +7379,8 @@ function bulkForEach(fn) {
   let ov=null, inp=null, listEl=null, sel=0, items=[];
   const ACTIONS=[
     {k:'빠른 추가', ic:'zap', fn:()=>openQuickAdd()},
+    {k:'실행 취소 (Ctrl+Z)', ic:'history', fn:()=>historyUndo()},
+    {k:'다시 실행 (Ctrl+Shift+Z)', ic:'repeat', fn:()=>historyRedo()},
     {k:'오늘로 이동', ic:'calendar', fn:()=>document.getElementById('todayBtn').click()},
     {k:'일간 보기', ic:'calendar', fn:()=>setView('day')},
     {k:'주간 보기', ic:'columns', fn:()=>setView('week')},
@@ -7083,11 +7393,14 @@ function bulkForEach(fn) {
     {k:'템플릿', ic:'clipboard', fn:()=>document.getElementById('templateBtn').click()},
     {k:'목표 관리', ic:'flag', fn:()=>document.getElementById('goalsBtn').click()},
     {k:'이번 주 돌아보기', ic:'history', fn:()=>document.getElementById('reviewBtn').click()},
+    {k:'주간 업무보고 복사 (이번 주)', ic:'clipboard', fn:()=>copyWeeklyReport(0)},
+    {k:'주간 업무보고 복사 (지난주)', ic:'clipboard', fn:()=>copyWeeklyReport(-1)},
     {k:'메모 전체보기', ic:'note', fn:()=>document.getElementById('memoAllBtn').click()},
     {k:'휴지통', ic:'trash', fn:()=>document.getElementById('trashBtn').click()},
     {k:'백업하기', ic:'save', fn:()=>document.getElementById('backupBtn').click()},
     {k:'팀 캘린더', ic:'users', fn:()=>document.getElementById('teamBtn').click()},
     {k:'사용 가이드', ic:'help', fn:()=>document.getElementById('guideBtn').click()},
+    {k:'설정', ic:'sliders', fn:()=>openSettings()},
     {k:'인쇄하기', ic:'printer', fn:()=>document.getElementById('printBtn').click()},
   ];
   const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
