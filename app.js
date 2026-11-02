@@ -7032,10 +7032,13 @@ try { fbAuth = firebase.auth(); } catch (e) { console.warn('Auth 초기화 실�
 function googleLogin() {
   if (!fbAuth) { alert('로그인 모듈을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.'); return; }
   const provider = new firebase.auth.GoogleAuthProvider();
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const p = isMobile ? fbAuth.signInWithRedirect(provider) : fbAuth.signInWithPopup(provider);
-  p.catch(e => {
+  provider.setCustomParameters({ prompt: 'select_account' });
+  // 모바일도 팝업 사용: 리다이렉트 방식은 앱 도메인(github.io)과 인증 도메인(firebaseapp.com)이 달라
+  // 최신 크롬·사파리의 저장소 분리 정책에 막혀, 돌아와도 로그인이 저장되지 않는다.
+  // 팝업이 차단된 경우에만 리다이렉트로 대체.
+  fbAuth.signInWithPopup(provider).catch(e => {
     if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+    if (e && e.code === 'auth/popup-blocked') { fbAuth.signInWithRedirect(provider).catch(() => {}); return; }
     if (e && e.code === 'auth/operation-not-allowed')
       alert('Firebase 콘솔에서 Google 로그인이 아직 활성화되지 않았어요.\nAuthentication → Sign-in method → Google 사용 설정이 필요해요.');
     else if (e && e.code === 'auth/unauthorized-domain')
@@ -7130,7 +7133,8 @@ function maybeShowAuthNotice(){
   const later=el('button','btn-secondary',{type:'button',textContent:'나중에'});
   later.onclick=()=>{ localStorage.setItem(KEY,String(Date.now())); ov.remove(); };
   const go=el('button','btn-primary',{type:'button',textContent:'지금 연결하기'});
-  go.onclick=()=>{ ov.remove(); googleLogin(); };
+  // 연결을 시도했으면 로그인이 실패하더라도 매번 다시 띄우지 않음 (3일 뒤 재안내)
+  go.onclick=()=>{ localStorage.setItem(KEY,String(Date.now())); ov.remove(); googleLogin(); };
   acts.appendChild(later); acts.appendChild(go);
   box.appendChild(acts); ov.appendChild(box);
   document.body.appendChild(ov);
