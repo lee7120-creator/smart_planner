@@ -182,7 +182,7 @@
         <div class="more-menu-divider"></div>
         <div class="more-menu-label">알림 · 메모</div>
         <button class="more-menu-item" id="notifyBtn"><span id="notifyIcon"><svg class="ic" width="16" height="16"><use href="#i-bell-off"/></svg></span> <span>알림</span></button>
-        <button class="more-menu-item" id="notifySettingsBtn"><svg class="ic" width="16" height="16"><use href="#i-sliders"/></svg> <span>알림 설정</span></button>
+        <button class="more-menu-item" id="notifySettingsBtn"><svg class="ic" width="16" height="16"><use href="#i-sliders"/></svg> <span>설정</span></button>
         <button class="more-menu-item" id="memoAllBtn"><svg class="ic" width="16" height="16"><use href="#i-note"/></svg> <span>메모 전체보기</span></button>
         <button class="more-menu-item" id="locationBtn"><svg class="ic" width="16" height="16"><use href="#i-pin"/></svg> <span>내 위치 날씨</span></button>
         <div class="more-menu-divider"></div>
@@ -404,7 +404,7 @@
       <button class="btn-secondary" id="editRepeatEndClear" type="button" style="padding:4px 8px;font-size:11px">없음</button>
     </div>
     <div class="modal-row" id="editRepeatCapHint" style="display:none">
-      <span class="modal-hint" style="font-size:11px;color:var(--text3)">ℹ️ 종료일을 비워두면 시작일로부터 1년 뒤 자동 종료돼요.</span>
+      <span class="modal-hint" style="font-size:11px;color:var(--text3)">종료일을 비워두면 시작일로부터 1년 뒤 자동 종료돼요.</span>
     </div>
     <div class="modal-row">
       <span class="modal-label">마감시간</span>
@@ -417,6 +417,11 @@
         <option value="">미지정</option><option value="30">30분</option><option value="60">1시간</option>
         <option value="90">1시간 30분</option><option value="120">2시간</option><option value="180">3시간</option><option value="240">4시간</option>
       </select>
+    </div>
+    <div class="modal-row" id="editAssigneeRow">
+      <span class="modal-label">담당자</span>
+      <input type="text" class="time-input" id="editAssignee" list="assigneeList" placeholder="이름 (비우면 없음)" maxlength="30" style="flex:1">
+      <datalist id="assigneeList"></datalist>
     </div>
     <div class="modal-actions">
       <button class="btn-secondary" id="editSendBtn" style="margin-right:auto"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-send"/></svg> 보내기</button>
