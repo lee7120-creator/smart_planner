@@ -90,6 +90,7 @@
     <symbol id="i-square" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></symbol>
     <symbol id="i-skip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 4 10 8-10 8V4z"/><path d="M19 5v14"/></symbol>
     <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="m3 3 18 18"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
     <symbol id="i-command" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></symbol>
@@ -98,9 +99,9 @@
 
 <!-- Landing page (shown when no ?u= param) -->
 <div class="landing-overlay" id="landingOverlay" style="display:none">
-  <button class="landing-dark-btn" id="landingDarkBtn">🌙</button>
+  <button class="landing-dark-btn" id="landingDarkBtn" aria-label="다크 모드 전환"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-moon"/></svg></button>
   <div class="landing-card">
-    <div class="landing-icon">📅</div>
+    <div class="landing-icon"><img src="icon.svg" width="64" height="64" alt="" style="border-radius:16px"></div>
     <div class="landing-title">마이플래너</div>
     <div class="landing-sub">이름만 입력하면 바로 시작할 수 있어요</div>
     <div class="landing-input-wrap">
@@ -113,16 +114,16 @@
       Google로 계속하기
     </button>
     <div class="landing-hint">전에 계정을 연결해 뒀다면 내 캘린더가 자동으로 열려요</div>
-    <div class="landing-warn">⚠️ <b>이름 = 내 캘린더 열쇠</b>예요. 잊어버리면 데이터를 찾을 수 없으니 URL을 꼭 저장해 주세요.</div>
+    <div class="landing-warn"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-bulb"/></svg> <b>이름 = 내 캘린더 열쇠</b>예요. 잊어버리면 데이터를 찾을 수 없으니 URL을 꼭 저장해 주세요.</div>
     <div class="landing-features">
-      <span class="landing-feat">✅ 체크리스트</span>
-      <span class="landing-feat">🔄 주간·월간 반복</span>
-      <span class="landing-feat">📅 월간 보기</span>
-      <span class="landing-feat">🔍 검색</span>
-      <span class="landing-feat">🌤️ 날씨</span>
-      <span class="landing-feat">🌙 다크모드</span>
+      <span class="landing-feat"><svg class="ic" width="12" height="12" aria-hidden="true"><use href="#i-check-sq"/></svg> 체크리스트</span>
+      <span class="landing-feat"><svg class="ic" width="12" height="12" aria-hidden="true"><use href="#i-repeat"/></svg> 주간·월간 반복</span>
+      <span class="landing-feat"><svg class="ic" width="12" height="12" aria-hidden="true"><use href="#i-grid"/></svg> 월간 보기</span>
+      <span class="landing-feat"><svg class="ic" width="12" height="12" aria-hidden="true"><use href="#i-search"/></svg> 검색</span>
+      <span class="landing-feat"><svg class="ic" width="12" height="12" aria-hidden="true"><use href="#i-sun"/></svg> 날씨</span>
+      <span class="landing-feat"><svg class="ic" width="12" height="12" aria-hidden="true"><use href="#i-moon"/></svg> 다크모드</span>
     </div>
-    <a href="?u=demo" class="landing-demo">📋 데모 보기</a>
+    <a href="?u=demo" class="landing-demo"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-eye"/></svg> 데모 보기</a>
   </div>
 </div>
 
@@ -139,9 +140,9 @@
     <button class="view-btn" id="btnMatrix">매트릭스</button>
   </div>
   <div class="nav-group">
-    <button class="nav-btn" id="prevBtn">‹</button>
+    <button class="nav-btn" id="prevBtn" aria-label="이전">‹</button>
     <span class="week-label" id="weekLabel"></span>
-    <button class="nav-btn" id="nextBtn">›</button>
+    <button class="nav-btn" id="nextBtn" aria-label="다음">›</button>
     <button class="nav-btn today-btn" id="todayBtn">오늘</button>
   </div>
   <div class="search-wrap">
@@ -276,7 +277,7 @@
       <input class="modal-input" id="icsUrlInput" type="text" placeholder="https://calendar.google.com/.../basic.ics" style="margin-bottom:0;flex:1">
       <button class="btn-primary" id="icsUrlAdd" type="button">구독</button>
     </div>
-    <button class="more-menu-item" id="icsFileBtn" style="border:1px dashed var(--border);border-radius:8px;justify-content:center;margin-bottom:10px">📎 .ics 파일 올리기</button>
+    <button class="more-menu-item" id="icsFileBtn" style="border:1px dashed var(--border);border-radius:8px;justify-content:center;margin-bottom:10px"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-upload"/></svg> .ics 파일 올리기</button>
     <input type="file" id="icsFileInput" accept=".ics,text/calendar" style="display:none">
     <div id="icsList" style="display:flex;flex-direction:column;gap:6px;max-height:36vh;overflow-y:auto"></div>
     <div class="modal-actions"><button class="btn-secondary" id="icsClose">닫기</button></div>
@@ -307,12 +308,12 @@
 <div class="memo-overlay hidden" id="memoOverlay">
   <div class="memo-popup" id="memoPopup" role="dialog" aria-modal="true" aria-label="메모">
     <div class="memo-header" id="memoHeader" title="드래그해서 이동">
-      <span class="memo-icon">📝</span>
+      <span class="memo-icon"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-note"/></svg></span>
       <span class="memo-task-title" id="memoTitle"></span>
-      <button class="memo-attach" id="memoSubBtn" title="하위 메모 추가 (노트로 열림)">📄</button>
-      <button class="memo-attach" id="memoHistBtn" title="버전 히스토리">🕐</button>
-      <button class="memo-attach" id="memoAttachBtn" title="이미지 첨부 (붙여넣기도 가능)">📷</button>
-      <button class="memo-close" id="memoClose">✕</button>
+      <button class="memo-attach" id="memoSubBtn" title="하위 메모 추가 (노트로 열림)" aria-label="하위 메모 추가"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-plus"/></svg></button>
+      <button class="memo-attach" id="memoHistBtn" title="버전 히스토리" aria-label="버전 히스토리"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-history"/></svg></button>
+      <button class="memo-attach" id="memoAttachBtn" title="이미지 첨부 (붙여넣기도 가능)" aria-label="이미지 첨부"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-image"/></svg></button>
+      <button class="memo-close" id="memoClose" aria-label="메모 닫기"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
     <input type="file" id="memoFileInput" accept="image/*" multiple style="display:none">
     <div class="memo-toolbar" id="memoToolbar">
@@ -355,7 +356,7 @@
     <div class="memo-links" id="memoLinks"></div>
     <div class="memo-footer">
       <span class="memo-status" id="memoStatus">자동 저장됨 ✓</span>
-      <span class="memo-hint">🖼 드래그/붙여넣기로 이미지 첨부</span>
+      <span class="memo-hint"><svg class="ic" width="11" height="11" aria-hidden="true"><use href="#i-image"/></svg> 드래그/붙여넣기로 이미지 첨부</span>
       <span id="memoCharCount">0자</span>
     </div>
   </div>
@@ -372,15 +373,15 @@
     </div>
     <div class="modal-row">
       <span class="modal-label">중요</span>
-      <button class="star-toggle" id="editStarBtn" type="button">★</button>
+      <button class="star-toggle" id="editStarBtn" type="button" aria-label="중요 표시">★</button>
     </div>
     <div class="modal-row">
       <span class="modal-label">중요도</span>
       <div class="priority-selector" id="editPrioritySel" style="flex:1">
-        <button class="priority-opt" data-val="">⚪</button>
-        <button class="priority-opt" data-val="high">🔴</button>
-        <button class="priority-opt" data-val="mid">🟡</button>
-        <button class="priority-opt" data-val="low">🟢</button>
+        <button class="priority-opt" data-val="" aria-label="중요도 없음"><span class="pdot pdot-none"></span></button>
+        <button class="priority-opt" data-val="high" aria-label="중요도 높음"><span class="pdot prio-dot-high"></span></button>
+        <button class="priority-opt" data-val="mid" aria-label="중요도 보통"><span class="pdot prio-dot-mid"></span></button>
+        <button class="priority-opt" data-val="low" aria-label="중요도 낮음"><span class="pdot prio-dot-low"></span></button>
       </div>
     </div>
     <div class="modal-row">
@@ -408,7 +409,7 @@
     <div class="modal-row">
       <span class="modal-label">마감시간</span>
       <input type="time" class="time-input" id="editTimeInput">
-      <button type="button" class="time-clear-btn" id="editTimeClear" title="시간 제거">✕</button>
+      <button type="button" class="time-clear-btn" id="editTimeClear" title="시간 제거" aria-label="시간 제거"><svg class="ic" width="12" height="12" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
     <div class="modal-row">
       <span class="modal-label">소요시간</span>
@@ -418,7 +419,7 @@
       </select>
     </div>
     <div class="modal-actions">
-      <button class="btn-secondary" id="editSendBtn" style="margin-right:auto">👥 보내기</button>
+      <button class="btn-secondary" id="editSendBtn" style="margin-right:auto"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-send"/></svg> 보내기</button>
       <button class="btn-secondary" id="editCancelBtn">취소</button>
       <button class="btn-primary" id="editSaveBtn">저장</button>
     </div>
@@ -466,7 +467,7 @@
 
 <!-- Guide Modal -->
 <div class="modal-overlay hidden" id="guideModal">
-  <div class="modal-box" style="width:480px;max-height:84vh;display:flex;flex-direction:column">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="사용 가이드" style="width:480px;max-height:84vh;display:flex;flex-direction:column">
     <div class="modal-title"><svg class="ic" width="15" height="15" style="color:var(--primary);vertical-align:-0.12em"><use href="#i-book"/></svg> 사용 가이드</div>
     <div id="guideBody" style="overflow-y:auto;flex:1;margin-bottom:14px"></div>
     <div class="modal-actions">
@@ -477,7 +478,7 @@
 
 <!-- Template Modal -->
 <div class="modal-overlay hidden" id="templateModal">
-  <div class="modal-box" style="width:400px;max-height:76vh;display:flex;flex-direction:column">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="템플릿" style="width:400px;max-height:76vh;display:flex;flex-direction:column">
     <div class="modal-title"><svg class="ic" width="15" height="15" style="color:var(--primary);vertical-align:-0.12em"><use href="#i-clipboard"/></svg> 템플릿 <span style="font-weight:400;font-size:11px;color:var(--text3)">자주 쓰는 할 일을 저장해요</span></div>
     <div id="templateList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:12px">
@@ -496,7 +497,7 @@
 
 <!-- Memo All Modal -->
 <div class="modal-overlay hidden" id="memoAllModal">
-  <div class="modal-box" style="width:420px;max-height:76vh;display:flex;flex-direction:column">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="메모 전체보기" style="width:420px;max-height:76vh;display:flex;flex-direction:column">
     <div class="modal-title"><svg class="ic" width="15" height="15" style="color:var(--primary);vertical-align:-0.12em"><use href="#i-note"/></svg> 메모 전체보기</div>
     <div id="memoAllList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
     <div class="modal-actions">
@@ -507,7 +508,7 @@
 
 <!-- Trash Modal -->
 <div class="modal-overlay hidden" id="trashModal">
-  <div class="modal-box" style="width:380px;max-height:72vh;display:flex;flex-direction:column">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="휴지통" style="width:380px;max-height:72vh;display:flex;flex-direction:column">
     <div class="modal-title"><svg class="ic" width="15" height="15" style="color:var(--primary);vertical-align:-0.12em"><use href="#i-trash"/></svg> 휴지통 <span style="font-weight:400;font-size:11px;color:var(--text3)">30일 후 자동으로 사라져요</span></div>
     <div id="trashList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
     <div class="modal-actions">
@@ -531,9 +532,9 @@
 <!-- 캔버스 모드 -->
 <div class="canvas-overlay hidden" id="canvasOverlay">
   <div class="canvas-head">
-    <span style="font-weight:700;font-size:14px">🗺 메모 캔버스</span>
+    <span style="font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:6px"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-grid"/></svg> 메모 캔버스</span>
     <span style="font-size:11px;color:var(--text3)">카드 드래그: 배치 · 배경 드래그: 이동 · 더블클릭: 열기</span>
-    <button class="memo-close" id="canvasClose" aria-label="캔버스 닫기" style="margin-left:auto">✕</button>
+    <button class="memo-close" id="canvasClose" aria-label="캔버스 닫기" style="margin-left:auto"><svg class="ic" width="15" height="15" aria-hidden="true"><use href="#i-x"/></svg></button>
   </div>
   <div class="canvas-board" id="canvasBoard"></div>
 </div>
@@ -557,12 +558,13 @@
 <!-- Undo Toast -->
 <div class="bulk-bar hidden" id="bulkBar" role="toolbar" aria-label="일괄 작업">
   <span class="bulk-count" id="bulkCount">0개 선택</span>
-  <button class="bulk-act" id="bulkDoneBtn">✅ 완료</button>
-  <button class="bulk-act" id="bulkUndoneBtn">↩ 미완료</button>
-  <button class="bulk-act bulk-danger" id="bulkDeleteBtn">🗑 삭제</button>
+  <button class="bulk-act" id="bulkDoneBtn"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-check"/></svg> 완료</button>
+  <button class="bulk-act" id="bulkUndoneBtn"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-switch"/></svg> 미완료</button>
+  <button class="bulk-act bulk-danger" id="bulkDeleteBtn"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-trash"/></svg> 삭제</button>
   <button class="bulk-act bulk-exit" id="bulkExitBtn">나가기</button>
 </div>
 <div class="undo-toast hidden" id="undoToast" role="status" aria-live="polite">
+  <span class="toast-ico" id="undoIco" aria-hidden="true"></span>
   <span id="undoMsg"></span>
   <button id="undoBtn">실행 취소</button>
 </div>
@@ -573,8 +575,8 @@
 </div>
 
 <div class="pomodoro-widget" id="pomodoroWidget" style="position:fixed">
-  <button class="pomodoro-close" id="pomodoroCloseBtn">✕</button>
-  <div class="pomodoro-task" id="pomodoroTaskLabel">🍅 집중 타이머</div>
+  <button class="pomodoro-close" id="pomodoroCloseBtn" aria-label="타이머 닫기"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-x"/></svg></button>
+  <div class="pomodoro-task" id="pomodoroTaskLabel">집중 타이머</div>
   <div class="pomodoro-time" id="pomodoroTime">25:00</div>
   <div class="pomodoro-controls">
     <button class="pomodoro-ctrl-btn" id="pomodoroStartBtn">시작</button>
