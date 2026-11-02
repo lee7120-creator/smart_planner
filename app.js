@@ -132,34 +132,6 @@ function lastBizDay(year, month) {
   return d;
 }
 
-// ── Seed data ──
-const SEED_TASKS = {
-  '2026-03-30':[{id:'s001',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s001a',text:'재방_7시반 이자벨마랑&뻐두',checked:false,starred:false,color:null,subs:[]}]}],
-  '2026-03-31':[{id:'s002',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s003',text:'최종 기획전 검토',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s004',text:'전관행사 쿠폰 및 연결',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s005',text:'퇴근 전 결재',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-01':[{id:'s006',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s007',text:'웰컴 4월 문서변경',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s008',text:'전관행사 쿠폰 생성 및 연결',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s009',text:'기획전 검토',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-02':[{id:'s010',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s010a',text:'오픈예정3건',checked:false,starred:false,color:null,subs:[]}]},{id:'s011',text:'출석체크 푸쉬 취합',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-03':[{id:'s012',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s013',text:'전관행사 쿠폰 및 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s013a',text:'앨페스타',checked:true,starred:false,color:null,subs:[]}]}],
-  '2026-04-06':[{id:'s014',text:'7시반_재방_헤지스/닥스골프',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s014a',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s015',text:'5월 웰컴 쿠폰 생성>미승인',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s016',text:'웰컴>유의사항&카운트 수정',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s017',text:'앨페스타 문구 수정',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-07':[{id:'s018',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s018a',text:'7시반 본방',checked:false,starred:false,color:null,subs:[]},{id:'s018b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]}],
-  '2026-04-08':[{id:'s019',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s019a',text:'7시반 본방',checked:false,starred:false,color:null,subs:[]}]},{id:'s020',text:'레스타 알림 문자 발송 → 12시 발송',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s020a',text:'11시 결재',checked:true,starred:false,color:null,subs:[]}]},{id:'s021',text:'웰컴 디자인 요청',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s022',text:'첫구매런 할인 취합 요청 > (목)까지',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s023',text:'메일 세팅(자주 필요일까지)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s024',text:'마일리지지급_4/9일세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s025',text:'거래선코드',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-09':[{id:'s026',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s026a',text:'오픈예정3건',checked:false,starred:false,color:null,subs:[]},{id:'s026b',text:'7시반_재방',checked:false,starred:false,color:null,subs:[]}]},{id:'s027',text:'10시 웰컴 페이지 확인',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s028',text:'첫구매런 앱푸쉬 취합',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s029',text:'111214 >> LMS 지원요청',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s030',text:'기획전 오픈X',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s031',text:'AP-260402579 > 마일리지지급',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-10':[{id:'s032',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s032a',text:'11시 재방_(빈스/바쉬/뻐두)',checked:false,starred:false,color:null,subs:[]}]},{id:'s033',text:'출석체크 참여자 추출',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s034',text:'출석체크 쿠폰 생성',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s035',text:'오후) CR 쿠폰 생성',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s036',text:'오후) 첫구매_장바구니보유_SMS',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s036a',text:'모수 26,000명으로 추후 발송',checked:false,starred:false,color:null,subs:[]}]},{id:'s037',text:'오후) 출석체크 쿠폰 발급요청 > LMS 발송',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s038',text:'5월출석체크/친구초대 원스피어 세팅 완료',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-13':[{id:'s039',text:'7시반_재방',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s039a',text:'퇴근 후 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s040',text:'CR개선 1차_최용남팀장님',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s040a',text:'소문내기 참여자 추출',checked:true,starred:false,color:null,subs:[]},{id:'s040b',text:'장성우 > 파일 전달·받기',checked:true,starred:false,color:null,subs:[]}]}],
-  '2026-04-14':[{id:'s041',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s041a',text:'7시반_본방',checked:false,starred:false,color:null,subs:[]},{id:'s041b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]}],
-  '2026-04-15':[{id:'s042',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s042a',text:'7시반 본방',checked:false,starred:false,color:null,subs:[]},{id:'s042b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s043',text:'소문내기 마일리지 지급',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s043a',text:'그름발송 추가 후 결재(2시)',checked:true,starred:false,color:null,subs:[]}]},{id:'s044',text:'메일 세팅(자주 필요일까지)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s045',text:'5월 기획전 배너 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s046',text:'전관행사 쿠폰 생성 및 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-16':[{id:'s047',text:'오전) 개인화 검수 > 오픈예정3건',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s047a',text:'7시반_재방',checked:false,starred:false,color:null,subs:[]},{id:'s047b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s048',text:'익일 11시 재방 세팅 해야함',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s049',text:'전관행사 확인 후 상품세팅',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s050',text:'소문내기/친구초대 상품 변경',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s051',text:'첫구매_장바구니보유_SMS',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s051a',text:'1시쯤 결재',checked:true,starred:false,color:null,subs:[]}]}],
-  '2026-04-17':[{id:'s052',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s052a',text:'11시_재방',checked:false,starred:false,color:null,subs:[]}]},{id:'s053',text:'전시휴무',starred:false,checked:false,color:'#e53935',repeat:'none',completions:{},subs:[]}],
-  '2026-04-20':[{id:'s054',text:'연차',starred:false,checked:false,color:'#fb8c00',repeat:'none',completions:{},subs:[]}],
-  '2026-04-21':[{id:'s055',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s055a',text:'7시반본방',checked:false,starred:false,color:null,subs:[]}]}],
-  '2026-04-22':[{id:'s056',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s056a',text:'7시반본방',checked:false,starred:false,color:null,subs:[]}]},{id:'s057',text:'소문내기/친구초대 지라요청',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s058',text:'캠페인 (첫구매/친구매런)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s059',text:'웰컴 5월 공동 코드 등록요청',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s059a',text:'지라요청',checked:true,starred:false,color:null,subs:[]}]}],
-  '2026-04-23':[{id:'s060',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s060a',text:'오픈예정3건',checked:false,starred:false,color:null,subs:[]},{id:'s060b',text:'7시반본방',checked:false,starred:false,color:null,subs:[]},{id:'s060c',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s061',text:'개인화 오픈일정 안내',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-24':[{id:'s062',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s063',text:'비용품의 작성(출석체크/친구초대/상품공구)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s064',text:'CR 쿠폰생성(승인완료)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s065',text:'첫구매 리텐션 (인수인계)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s065a',text:'주문쿠폰 이달 리텐션',checked:true,starred:false,color:null,subs:[]},{id:'s065b',text:'할인쿠폰 생성 후 LMS 발송',checked:true,starred:false,color:null,subs:[]}]},{id:'s066',text:'16시 > 아울렛',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s066a',text:'15시 결재',checked:true,starred:false,color:null,subs:[]}]}],
-  '2026-04-27':[{id:'s067',text:'7시반본방 > 닥스',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s068',text:'CR개선 2차 > 9시에 새로고침',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s069',text:'10시 웰컴 기획전 확인',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s070',text:'전관행사 쿠폰 세팅',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s071',text:'메시지_전표',starred:false,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s072',text:'비용품의 작성(웰컴/CR/정기리텐션)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s073',text:'시크릿혜택 기획전 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[{id:'s073a',text:'쿠폰/마일리지/e마일리지',checked:true,starred:false,color:null,subs:[]}]}],
-  '2026-04-28':[{id:'s074',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s074a',text:'7시반본방 → 바버',checked:false,starred:false,color:null,subs:[]}]},{id:'s075',text:'메일 세팅(자주 필요일까지)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s076',text:'14시 아울렛 문자 결재 완료',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s077',text:'16시 이후 바버 고객군 중복검사',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-29':[{id:'s078',text:'첫구매런 > 앱푸쉬',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]},{id:'s079',text:'14시 설문조사 문자발송(결재완료)',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s080',text:'메시지 전표',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s081',text:'비용품의 올리기',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-04-30':[{id:'s082',text:'오전) 개인화 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[{id:'s082a',text:'7시반 재방송',checked:false,starred:false,color:null,subs:[]},{id:'s082b',text:'퇴근 전 결재',checked:false,starred:false,color:null,subs:[]}]},{id:'s083',text:'기획전 검토',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s084',text:'전관행사 10시 세팅',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]},{id:'s085',text:'첫구매 기획전 확인',starred:false,checked:true,color:null,repeat:'none',completions:{},subs:[]}],
-  '2026-05-01':[{id:'s086',text:'첫구매런 페이지 검수',starred:true,checked:false,color:null,repeat:'none',completions:{},subs:[]}]
-};
 
 // ── URL User ──
 const URL_PARAMS = new URLSearchParams(window.location.search);
@@ -323,14 +295,19 @@ let _editColor = null, _editStarred = false, _editRepeat = 'none', _editPriority
 
 // ── Persistence ──
 // Firebase는 빈 배열/객체를 저장하지 않으므로 로드 시 스키마를 복구한다 (비파괴 — 모든 필드 유지)
+// 하위 항목 배열 정리 — 중첩된 하위 항목(하위의 하위)까지 재귀로 복구
+function normalizeSubs(raw, depth) {
+  const arr = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+  // 문자열 등 손상된 subs는 통째로 버리고, 요소도 객체+text 있는 것만 (문자열이면 글자별로 쪼개지는 사고 방지)
+  return arr.filter(s => s && typeof s === 'object' && s.text != null)
+    .map(s => depth < 4 ? Object.assign({}, s, { subs: normalizeSubs(s.subs, depth + 1) }) : s);
+}
 function normalizeTasks(raw) {
   const out = {};
   Object.entries(raw || {}).forEach(([dk, list]) => {
     const arr = Array.isArray(list) ? list : Object.values(list || {});
     const clean = arr.filter(t => t && typeof t === 'object' && t.text != null).map(t => Object.assign({}, t, {
-      // 문자열 등 손상된 subs는 통째로 버리고, 요소도 객체+text 있는 것만 (문자열이면 글자별로 쪼개지는 사고 방지)
-      subs: (Array.isArray(t.subs) ? t.subs : (t.subs && typeof t.subs === 'object' ? Object.values(t.subs) : []))
-        .filter(s => s && typeof s === 'object' && s.text != null),
+      subs: normalizeSubs(t.subs, 1),
       completions: t.completions || {},
       skips: t.skips || {},
       memoImages: Array.isArray(t.memoImages) ? t.memoImages : [],
@@ -344,9 +321,6 @@ function normalizeTasks(raw) {
 function loadTasks() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    if (Object.keys(stored).length === 0) {
-      return JSON.parse(JSON.stringify(SEED_TASKS));
-    }
     return normalizeTasks(stored);
   } catch { return {}; }
 }
@@ -354,35 +328,69 @@ function loadTasks() {
 let pendingUpload = false;
 let pendingTasksLocal = false;
 let _pendingCollections = new Set();
-let _pendingSaveDks = new Set();   // 디바운스 대기 중인 날짜들 (여러 dk 저장 시 마지막 것만 쓰이는 버그 방지)
-let _pendingSaveFull = false;      // 전체 저장 요청(인자 없는 saveTasks)이 대기 중인지
+let _pendingSaveDks = new Set();   // 아직 서버에 올라가지 않은 날짜들
+
+// ── 날짜 단위 동기화 ──
+// 예전엔 재연결·주기 업로드 때 전체 트리를 ref.set으로 덮어써서, 오프라인 동안
+// 다른 기기에서 한 수정(또는 받은 일정)이 지워질 수 있었다.
+// 이제는 '마지막으로 서버와 일치했던 상태(_syncBase, 날짜별 해시)'를 기억해서
+//  · 내가 바꾼 날짜만 update()로 올리고
+//  · 원격 변경은 내가 안 바꾼 날짜에만 반영한다 (내가 바꾼 날짜는 로컬 우선).
+const SYNC_BASE_KEY = `calSyncBase_${USER_ID||''}`;
+let _syncBase = (()=>{ try{ return JSON.parse(localStorage.getItem(SYNC_BASE_KEY)||'null'); }catch{ return null; } })();
+function _saveSyncBase(){ try{ localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(_syncBase||{})); }catch{} }
+// Firebase는 빈 배열·객체를 저장하지 않으므로, 비교 전에 같은 규칙으로 정규화
+function _stripEmpty(v){
+  if(Array.isArray(v)){ const a=v.map(_stripEmpty).filter(x=>x!==undefined); return a.length?a:undefined; }
+  if(v&&typeof v==='object'){ const o={}; Object.keys(v).sort().forEach(k=>{ const x=_stripEmpty(v[k]); if(x!==undefined&&x!==null) o[k]=x; }); return Object.keys(o).length?o:undefined; }
+  return v;
+}
+function _hashDay(list){
+  const s=JSON.stringify(_stripEmpty(fbClean(list))||null);
+  let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0;
+  return s.length+':'+h;
+}
+const _EMPTY_HASH = _hashDay(null);
+function _dirtyDks(){
+  const out=new Set(_pendingSaveDks);
+  const base=_syncBase||{};
+  new Set([...Object.keys(tasks),...Object.keys(base)]).forEach(dk=>{
+    if(_hashDay(tasks[dk])!==(base[dk]||_EMPTY_HASH)) out.add(dk);
+  });
+  return out;
+}
+function _setBase(dk, list){
+  if(!_syncBase) _syncBase={};
+  const h=_hashDay(list);
+  if(h===_EMPTY_HASH) delete _syncBase[dk]; else _syncBase[dk]=h;
+}
 
 let _taskSaveRetryTimer = null;
 function _flushTaskSave() {
   const ref = fbRef();
-  if (!ref) return;
-  const full = _pendingSaveFull;
-  const dks = [..._pendingSaveDks];
-  _pendingSaveFull = false; _pendingSaveDks.clear();
-  let p;
-  if (full || !dks.length) {
-    p = ref.set(fbClean(tasks));
-  } else if (dks.length === 1) {
-    p = ref.child(dks[0]).set(fbClean(tasks[dks[0]]));
-  } else {
-    // 여러 날짜를 한 번에 — 멀티패스 업데이트 (각 날짜 노드만 갱신)
-    const updates = {};
-    dks.forEach(d => { updates[d] = fbClean(tasks[d]); });
-    p = ref.update(updates);
-  }
-  p.then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
+  if (!ref) return Promise.resolve();
+  const dks = [..._dirtyDks()];
+  if (!dks.length) { pendingTasksLocal = false; pendingUpload = false; setSyncStatus('synced'); return Promise.resolve(); }
+  const updates = {}, sent = {};
+  dks.forEach(d => { updates[d] = fbClean(tasks[d] && tasks[d].length ? tasks[d] : null); sent[d] = _hashDay(tasks[d]); });
+  setSyncStatus('syncing');
+  return ref.update(updates)
+   .then(() => {
+     dks.forEach(d => {
+       if (!_syncBase) _syncBase = {};
+       if (sent[d] === _EMPTY_HASH) delete _syncBase[d]; else _syncBase[d] = sent[d];
+       // 전송 중에 또 바뀐 날짜는 대기열에 남겨 다음 저장 때 올림
+       if (_hashDay(tasks[d]) === sent[d]) _pendingSaveDks.delete(d);
+     });
+     _saveSyncBase();
+     pendingTasksLocal = _pendingSaveDks.size > 0;
+     pendingUpload = false;
+     setSyncStatus(pendingTasksLocal ? 'syncing' : 'synced');
+     if (pendingTasksLocal) { clearTimeout(fbSaveTimer); fbSaveTimer = setTimeout(_flushTaskSave, 300); }
+   })
    .catch((e) => {
      console.warn('Firebase 저장 실패:', e);
-     // 저장 대상을 되살리고 15초 후 자동 재시도.
-     // (온라인 상태에서 난 일시 오류는 'online' 이벤트가 안 오므로 자체 재시도 필요 —
-     //  이게 없으면 pendingTasksLocal이 영원히 true로 남아 원격 수신이 전부 무시됨)
-     if (full) _pendingSaveFull = true;
-     dks.forEach(d => _pendingSaveDks.add(d));
+     // 15초 후 자동 재시도 (온라인 상태의 일시 오류는 'online' 이벤트가 오지 않음)
      pendingUpload = true; setSyncStatus('offline');
      clearTimeout(_taskSaveRetryTimer);
      _taskSaveRetryTimer = setTimeout(_flushTaskSave, 15000);
@@ -393,9 +401,9 @@ function saveTasks(dk) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   const ref = fbRef();
   if (!ref) return;
-  pendingTasksLocal = true;
-  // 대기 중인 저장 대상 누적 — clearTimeout으로 이전 예약이 취소돼도 대상은 보존됨
-  if (dk) _pendingSaveDks.add(dk); else _pendingSaveFull = true;
+  // 날짜를 지정하지 않은 저장은 서버 기준과 달라진 날짜를 계산해 그 날짜들만 올림
+  if (dk) _pendingSaveDks.add(dk); else _dirtyDks().forEach(d => _pendingSaveDks.add(d));
+  pendingTasksLocal = _pendingSaveDks.size > 0;
   if (!navigator.onLine) { pendingUpload = true; setSyncStatus('offline'); return; }
   setSyncStatus('syncing');
   clearTimeout(fbSaveTimer);
@@ -407,19 +415,34 @@ function saveTasks(dk) {
 // 정리해서 보내야 "로컬은 되는데 클라우드만 실패"하는 상황을 막을 수 있다.
 function fbClean(v){ return v == null ? null : JSON.parse(JSON.stringify(v)); }
 
+// 수동 저장·재연결·주기 백업: 달라진 날짜만 올린다 (전체 덮어쓰기 없음)
 function fbUpload() {
   if (READ_ONLY) return Promise.reject('read-only');
   const ref = fbRef();
   if (!ref) return Promise.reject('no ref');
-  pendingTasksLocal = true;
-  setSyncStatus('syncing');
-  // 전체 업로드이므로 개별 dk 대기열은 비움 (디바운스·재시도 예약도 취소)
   clearTimeout(fbSaveTimer); fbSaveTimer = null;
   clearTimeout(_taskSaveRetryTimer); _taskSaveRetryTimer = null;
-  _pendingSaveFull = false; _pendingSaveDks.clear();
-  return ref.set(fbClean(tasks))
-    .then(() => { pendingTasksLocal = false; setSyncStatus('synced'); })
-    .catch(e => { console.warn('Firebase 저장 실패:', e); setSyncStatus('offline'); throw e; });
+  _dirtyDks().forEach(d => _pendingSaveDks.add(d));
+  pendingTasksLocal = _pendingSaveDks.size > 0;
+  return _flushTaskSave().then(() => { if (pendingUpload) throw new Error('upload failed'); });
+}
+
+// 원격 스냅샷을 로컬과 날짜 단위로 병합 — 내가 바꾼(아직 안 올라간) 날짜는 로컬 유지
+function _mergeRemote(remoteRaw){
+  const remote = normalizeTasks(remoteRaw || {});
+  const dirty = _dirtyDks();
+  const merged = {};
+  new Set([...Object.keys(remote), ...Object.keys(tasks)]).forEach(dk => {
+    if (dirty.has(dk)) { if (tasks[dk] && tasks[dk].length) merged[dk] = tasks[dk]; }
+    else {
+      if (remote[dk] && remote[dk].length) merged[dk] = remote[dk];
+      _setBase(dk, remote[dk]);
+    }
+  });
+  tasks = merged;
+  _saveSyncBase();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  return dirty.size;
 }
 
 function initFirebaseSync() {
@@ -432,32 +455,36 @@ function initFirebaseSync() {
   const _mv=document.getElementById('mainView');
   if(_mv && !Object.keys(tasks).length) _mv.classList.add('skeleton-loading');
   const _clearSkeleton=()=>{ if(_mv) _mv.classList.remove('skeleton-loading'); };
-  // 1) 먼저 한 번 읽어서 Firebase 데이터 유무 확인
+  // 1) 먼저 한 번 읽어서 로컬과 병합
   ref.once('value').then(snapshot => {
     _clearSkeleton();
     const remote = snapshot.val();
-    if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
-      // Firebase에 데이터 있음 → 로컬에 덮어쓰기 (실시간 리스너와 동일하게 정규화)
-      tasks = normalizeTasks(remote);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-      render();
-      setSyncStatus('synced');
-    } else if (Object.keys(tasks).length > 0 && !READ_ONLY) {
-      // Firebase 비어있고 로컬에 데이터 있음 → Firebase로 업로드
-      fbUpload();
-    } else {
-      setSyncStatus('synced');
-    }
-    // 2) 이후 다른 기기 변경사항 실시간 반영 (단, 내 로컬 편집 업로드 중이면 건너뜀 → 덮어쓰기 방지)
-    ref.on('value', snapshot => {
-      if (pendingTasksLocal) return;
-      const remote = snapshot.val();
-      if (remote && typeof remote === 'object') {
+    const hasRemote = remote && typeof remote === 'object' && Object.keys(remote).length > 0;
+    if (!_syncBase) {
+      // 이 기기에서 처음 병합하는 경우(업데이트 직후 포함): 기존 동작처럼 서버를 기준으로 맞춤.
+      // 서버가 비어 있고 로컬에만 데이터가 있으면 로컬을 올림.
+      _syncBase = {};
+      if (hasRemote) {
         tasks = normalizeTasks(remote);
+        Object.keys(tasks).forEach(dk => _setBase(dk, tasks[dk]));
+        _saveSyncBase();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-        render();
-        if (typeof checkPendingNotifications === 'function') checkPendingNotifications();
+      } else {
+        _saveSyncBase();
+        if (Object.keys(tasks).length && !READ_ONLY) fbUpload().catch(()=>{});
       }
+    } else {
+      const dirty = _mergeRemote(remote);
+      // 오프라인 동안 이 기기에서 바꾼 날짜가 있으면 그 날짜만 올림
+      if (dirty && !READ_ONLY) fbUpload().catch(()=>{});
+    }
+    render();
+    if (!pendingTasksLocal) setSyncStatus('synced');
+    // 2) 이후 다른 기기 변경을 실시간 병합 (내가 바꾸는 중인 날짜는 건드리지 않음)
+    ref.on('value', snapshot => {
+      _mergeRemote(snapshot.val());
+      render();
+      if (typeof checkPendingNotifications === 'function') checkPendingNotifications();
     });
     // 3) 개인 트리 로드 후에 구독 팀 동기화 시작 (먼저 실행되면 복사본이 덮어쓰기로 사라질 수 있음)
     if (typeof loadTeamDataFromFb === 'function') loadTeamDataFromFb();
@@ -592,8 +619,8 @@ function toggleRepeatInst(originDk, taskId, instanceDk) {
 // 반복 인스턴스의 하위태스크 완료는 인스턴스별로 저장 (과거/이후 인스턴스와 분리)
 function toggleRepeatSub(originDk, parentId, subId, instanceDk) {
   if(READ_ONLY)return;
-  const p=(tasks[originDk]||[]).find(x=>x.id===parentId); if(!p||!Array.isArray(p.subs))return;
-  const s=p.subs.find(x=>x.id===subId); if(!s)return;
+  const ctx=findTaskContext(tasks[originDk]||[], subId); if(!ctx)return;
+  const s=ctx.node;
   if(!s.completions) s.completions={};
   s.completions[instanceDk]=!isRepeatChecked(s,instanceDk);
   saveTasks(originDk); render();
@@ -864,7 +891,8 @@ function reorderTask(dk,dragId,targetId){
 // 하위 항목 순서 변경 (같은 부모 내에서)
 function reorderSub(dk,parentId,dragId,targetId){
   if(READ_ONLY)return;
-  const parent=(tasks[dk]||[]).find(t=>t.id===parentId);
+  const pctx=findTaskContext(tasks[dk]||[], parentId);
+  const parent=pctx&&pctx.node;
   if(!parent||!Array.isArray(parent.subs))return;
   const list=parent.subs;
   const from=list.findIndex(s=>s.id===dragId);
@@ -1002,17 +1030,15 @@ function toggleTask(dk,id,subId) {
   }
   saveTasks(dk); render();
 }
-function toggleStar(dk,id){if(READ_ONLY)return;const t=(tasks[dk]||[]).find(x=>x.id===id);if(t){t.starred=!t.starred;saveTasks(dk);render();}}
+function toggleStar(dk,id){if(READ_ONLY)return;const c=findTaskContext(tasks[dk]||[],id);const t=c&&c.node;if(t){t.starred=!t.starred;saveTasks(dk);render();}}
 function deleteTask(dk,id,subId) {
   if(READ_ONLY)return;
   if(!tasks[dk])return;
   let trashId=null, deletedText='';
   if(subId){
-    const p=tasks[dk].find(x=>x.id===id);
-    if(p&&Array.isArray(p.subs)){
-      const idx=p.subs.findIndex(x=>x.id===subId);
-      if(idx>=0){const removed=p.subs.splice(idx,1)[0];deletedText=removed.text;trashId=addToTrash(dk,removed,id);}
-    }
+    // 중첩 하위 항목도 찾도록 재귀 검색 (부모 id는 실제 직속 부모로 기록해 복구 위치가 맞게)
+    const ctx=findTaskContext(tasks[dk], subId);
+    if(ctx&&ctx.parentNode){const removed=ctx.list.splice(ctx.index,1)[0];deletedText=removed.text;trashId=addToTrash(dk,removed,ctx.parentNode.id);}
   } else {
     const idx=tasks[dk].findIndex(x=>x.id===id);
     if(idx>=0){const removed=tasks[dk].splice(idx,1)[0];deletedText=removed.text;trashId=addToTrash(dk,removed,null);}
@@ -1045,7 +1071,7 @@ function restoreFromTrash(trashId){
   const item=trash[idx];
   if(!tasks[item.dk]) tasks[item.dk]=[];
   if(item.parentId){
-    const p=tasks[item.dk].find(x=>x.id===item.parentId);
+    const pc=findTaskContext(tasks[item.dk], item.parentId); const p=pc&&pc.node;
     if(p){ if(!Array.isArray(p.subs))p.subs=[]; p.subs.push(item.task); }
     else tasks[item.dk].push(item.task);
   } else {
@@ -1215,7 +1241,8 @@ function buildEditColors() {
 }
 function openEdit(dk,task,isRepeatInst,originDk) {
   const targetDk=isRepeatInst?originDk:dk;
-  const targetTask=isRepeatInst?(tasks[originDk]||[]).find(t=>t.id===task.id):task;
+  const _tc=isRepeatInst?findTaskContext(tasks[originDk]||[], task.id):null;
+  const targetTask=isRepeatInst?(_tc&&_tc.node):task;
   if(!targetTask)return;
   editCtx={dk:targetDk,taskId:targetTask.id};
   _editColor=targetTask.color; _editStarred=targetTask.starred; _editRepeat=targetTask.repeat||'none'; _editPriority=targetTask.priority||null;
@@ -1283,7 +1310,7 @@ document.getElementById('editModal').onclick=e=>{if(e.target===document.getEleme
 let memoCtx = null, memoTimer = null;
 
 function openMemo(dk, taskId, anchorEl) {
-  const task = (tasks[dk]||[]).find(t=>t.id===taskId);
+  const _mc = findTaskContext(tasks[dk]||[], taskId); const task = _mc && _mc.node;
   if (!task) return;
   memoCtx = {dk, taskId};
   document.getElementById('memoTitle').textContent = task.text;
@@ -1362,7 +1389,7 @@ function closeMemo() {
 
 function saveMemoNow() {
   if (!memoCtx || READ_ONLY) return;
-  const task = (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId);
+  const _sc = findTaskContext(tasks[memoCtx.dk]||[], memoCtx.taskId); const task = _sc && _sc.node;
   if (task) {
     const ed = document.getElementById('memoEditable');
     const v = ed.textContent.trim() === '' && !ed.querySelector('img') ? '' : sanitizeMemoHtml(ed.innerHTML);
@@ -1402,15 +1429,37 @@ function renderMemoMD(text){
 }
 // ── 메모 HTML 변환·정화 (WYSIWYG) ──
 function memoIsHtml(s){ return /<\/?(b|i|u|s|strike|em|strong|span|div|font|br|a|code|p|ul|ol|li|h[1-6]|img)\b/i.test(s); }
+// 메모 HTML 정화 — 허용 목록 방식.
+// 예전 차단 목록 방식은 'java&#x09;script:' 같은 변형 주소를 통과시켰고, 메모 데이터는
+// 다른 사람도 쓸 수 있는 DB에 있으므로 읽기전용 화면에서 클릭 시 스크립트가 실행될 수 있었다.
+const _MEMO_TAGS=new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','SPAN','DIV','P','BR','A','IMG','CODE','PRE','UL','OL','LI','H1','H2','H3','H4','H5','H6','FONT','BLOCKQUOTE','HR','SUB','SUP']);
+const _MEMO_DROP='script,style,iframe,frame,frameset,object,embed,link,meta,base,form,input,textarea,button,select,option,svg,math,template,noscript,audio,video,source,track,canvas';
+function _safeUrl(v, kind){
+  const u=String(v||'').replace(/[\u0000- \u007f-\u009f]/g,'');
+  if(kind==='img') return /^(data:image\/(png|jpe?g|gif|webp);|blob:|https:\/\/)/i.test(u);
+  return /^(https?:\/\/|mailto:|#)/i.test(u);
+}
 function sanitizeMemoHtml(html){
   const tpl=document.createElement('template'); tpl.innerHTML=html||'';
-  tpl.content.querySelectorAll('script,style,iframe,object,embed,link,meta,form,input,textarea,button,svg,math').forEach(n=>n.remove());
-  tpl.content.querySelectorAll('*').forEach(elx=>{
-    [...elx.attributes].forEach(a=>{ const n=a.name.toLowerCase();
-      if(n.startsWith('on')) elx.removeAttribute(a.name);
-      else if((n==='href'||n==='src')&&/^\s*(javascript|data|vbscript):/i.test(a.value)) elx.removeAttribute(a.name);
-      else if(n==='style'&&/url\s*\(/i.test(a.value)) elx.removeAttribute(a.name);
+  tpl.content.querySelectorAll(_MEMO_DROP).forEach(n=>n.remove());
+  // 허용하지 않은 태그는 내용(글자)만 남기고 껍데기를 벗김 — 깊은 것부터 처리
+  [...tpl.content.querySelectorAll('*')].reverse().forEach(elx=>{
+    if(!_MEMO_TAGS.has(elx.tagName)){ elx.replaceWith(...elx.childNodes); return; }
+    [...elx.attributes].forEach(a=>{
+      const n=a.name.toLowerCase(), v=a.value;
+      let ok=false;
+      if(n==='class'||n==='title'||n==='alt') ok=true;
+      else if(n==='style') ok=!/url\s*\(|expression\s*\(|@import|javascript:/i.test(v);
+      else if(n==='href') ok=elx.tagName==='A'&&_safeUrl(v,'link');
+      else if(n==='src') ok=elx.tagName==='IMG'&&_safeUrl(v,'img');
+      else if(n==='target') ok=elx.tagName==='A';
+      else if(n==='rel') ok=elx.tagName==='A';
+      else if(n==='data-note'||n==='data-img') ok=/^[a-z0-9_]+$/i.test(v);
+      else if(n==='contenteditable') ok=v==='false';
+      else if(elx.tagName==='FONT'&&(n==='color'||n==='face'||n==='size')) ok=!/[<>"'()]/.test(v);
+      if(!ok) elx.removeAttribute(a.name);
     });
+    if(elx.tagName==='A'){ elx.setAttribute('rel','noopener noreferrer'); if(elx.getAttribute('target')) elx.setAttribute('target','_blank'); }
   });
   return tpl.innerHTML;
 }
@@ -1794,7 +1843,7 @@ function idbDeleteImage(id){
 }
 function memoTask(){
   if(!memoCtx)return null;
-  return (tasks[memoCtx.dk]||[]).find(t=>t.id===memoCtx.taskId)||null;
+  const c=findTaskContext(tasks[memoCtx.dk]||[], memoCtx.taskId); return (c&&c.node)||null;
 }
 function attachMemoImage(file){
   if(!file||!file.type.startsWith('image/'))return;
@@ -2038,7 +2087,8 @@ function el(tag,cls,attrs){const e=document.createElement(tag);if(cls)e.classNam
 function addKbd(elem,handler){elem.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handler(e);}};}
 
 // ── Task item builder ──
-function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted) {
+function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,adjusted,depth) {
+  depth=depth||0; // 하위 항목 중첩 깊이 (0=최상위) — 3단계까지 표시·추가 허용
   const prioCls = (!isSub && task.priority) ? ' prio-'+task.priority : '';
   const doneCls=(!isSub&&task.id===_justDoneId)?' just-done':'';
   if(task.id===_justDoneId)_justDoneId=null;
@@ -2082,7 +2132,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
       }catch(err){}
     };
   }
-  if(!READ_ONLY&&!selectMode){
+  if(!isSub&&!READ_ONLY&&!selectMode){
     item.draggable=true;
     item.ondragstart=e=>{
       e.dataTransfer.setData('application/json',JSON.stringify({dk:isRepeatInst?originDk:dk,id:task.id,isRepeat:!!isRepeatInst,instanceDk:isRepeatInst?instanceDk:null}));
@@ -2244,7 +2294,7 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
   if(!isSub&&adjusted){
     body.appendChild(el('div','repeat-adjusted-badge',{textContent:'📅 휴일이라 다음 영업일로'}));
   }
-  if(!isSub&&Array.isArray(task.subs)&&task.subs.length){
+  if(depth<2&&Array.isArray(task.subs)&&task.subs.length){
     const subChecked=s=>isRepeatInst?isRepeatChecked(s,instanceDk):(s&&s.checked);
     const subDone=task.subs.filter(s=>s&&subChecked(s)).length;
     const subPct=Math.round(subDone/task.subs.length*100);
@@ -2255,10 +2305,10 @@ function buildTaskItem(dk,task,isSub,parentId,isRepeatInst,originDk,instanceDk,a
     bar.appendChild(fill); pbWrap.appendChild(bar);
     body.appendChild(pbWrap);
     const sl=el('div','subtask-list');
-    task.subs.forEach(s=>sl.appendChild(buildTaskItem(isRepeatInst?originDk:dk,s,true,task.id,isRepeatInst,originDk,instanceDk)));
+    task.subs.forEach(s=>sl.appendChild(buildTaskItem(isRepeatInst?originDk:dk,s,true,task.id,isRepeatInst,originDk,instanceDk,false,depth+1)));
     body.appendChild(sl);
   }
-  if(true){
+  if(depth<2){
     const addSub=el('button','add-sub-btn',{textContent:'+ 하위 항목'});
     addSub.onclick=e=>{e.stopPropagation();activeInput={dateKey:dk,dataKey:isRepeatInst?originDk:dk,parentId:task.id};render();};
     body.appendChild(addSub);
@@ -3013,7 +3063,7 @@ function buildTagFilterBar(){
   });
   if(attrFilterActive()){
     const clr=el('button','tag-filter-chip attr-clear',{textContent:'✕ 해제'});
-    clr.onclick=()=>{ attrFilter={incomplete:false,starred:false,prio:null,memo:false}; render(); };
+    clr.onclick=()=>{ attrFilter={incomplete:false,starred:false,prio:null,memo:false,timed:false,repeat:false,done:false,color:null}; render(); };
     bar.appendChild(clr);
   }
   // 태그 칩 (태그가 있을 때만)
@@ -3033,14 +3083,21 @@ function buildTagFilterBar(){
 
 function buildSearchView(query){
   const wrap=el('div','search-results-wrap');
+  const head=el('div','search-head');
+  head.appendChild(el('span','search-head-title',{textContent:`전체 기간에서 "${query.trim()}" 검색`}));
+  const clr=el('button','btn-secondary search-clear',{type:'button',textContent:'검색 닫기'});
+  clr.onclick=()=>{searchQuery='';document.getElementById('searchInput').value='';render();};
+  head.appendChild(clr);
+  wrap.appendChild(head);
   if(!query.trim()){wrap.appendChild(el('div','search-empty',{textContent:'검색어를 입력해 주세요'}));return wrap;}
   const q=query.toLowerCase();
   const results=[];
+  const subHit=(subs,d)=>Array.isArray(subs)&&d<4&&subs.some(s=>s&&((s.text&&s.text.toLowerCase().includes(q))||subHit(s.subs,d+1)));
   Object.entries(tasks).forEach(([dk,list])=>{
     if(!Array.isArray(list)) return;
     list.forEach(t=>{
       if(!t) return;
-      const subsMatch=Array.isArray(t.subs)&&t.subs.some(s=>s&&s.text&&s.text.toLowerCase().includes(q));
+      const subsMatch=subHit(t.subs,0);
       const memoMatch=t.memo&&t.memo.toLowerCase().includes(q);
       if(t.text&&t.text.toLowerCase().includes(q)||subsMatch||memoMatch)
         results.push({dk,task:t});
@@ -3231,7 +3288,10 @@ function render(){
     document.getElementById('weekLabel').textContent=`${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일`;
   }
   // main content
-  if(currentView==='focus'){
+  if(searchQuery&&searchQuery.trim()){
+    // 검색어가 있으면 현재 주만 거르지 않고 전체 기간에서 찾은 결과를 보여줌
+    view.appendChild(buildSearchView(searchQuery));
+  } else if(currentView==='focus'){
     view.appendChild(buildFocusView());
   } else if(currentView==='matrix'){
     view.appendChild(buildMatrixView());
@@ -3894,9 +3954,8 @@ window.addEventListener('pagehide', () => {
     clearTimeout(fbSaveTimer); fbSaveTimer = null;
     const ref = fbRef();
     if (ref) {
-      if (_pendingSaveFull || !_pendingSaveDks.size) { ref.set(fbClean(tasks)); }
-      else { const u={}; _pendingSaveDks.forEach(d=>{u[d]=fbClean(tasks[d]);}); ref.update(u); }
-      _pendingSaveFull=false; _pendingSaveDks.clear();
+      const u={}; _dirtyDks().forEach(d=>{u[d]=fbClean(tasks[d]&&tasks[d].length?tasks[d]:null);});
+      if (Object.keys(u).length) ref.update(u);
     }
   }
 });
@@ -5374,7 +5433,7 @@ let sendDirIds = [];         // 디렉터리 전체 id
 function openSendModal(dk, taskId){
   if (!fbDb) { showUndoToast('⚠️ 오프라인 상태예요'); return; }
   if (!USER_ID || USER_ID === 'demo') { showUndoToast('내 캘린더 URL(?u=이름)에서만 보낼 수 있어요'); return; }
-  const t = (tasks[dk] || []).find(x => x.id === taskId); if (!t) return;
+  const _c = findTaskContext(tasks[dk] || [], taskId); const t = _c && _c.node; if (!t) return;
   sendCtx = { dk, taskId };
   sendSelected = [];
   sendDirIds = [];
@@ -5428,7 +5487,7 @@ function confirmSend(){
   if (!recipients.length) { showUndoToast('받는 사람을 선택해 주세요'); return; }
   recipients.forEach(rememberUser);   // 보낸 사람 로컬 기억 → 다음에 목록에 표시
   const { dk, taskId } = sendCtx;
-  const t = (tasks[dk] || []).find(x => x.id === taskId);
+  const _sc2 = findTaskContext(tasks[dk] || [], taskId); const t = _sc2 && _sc2.node;
   if (!t) { closeSendModal(); return; }
   let done = 0, fail = 0;
   Promise.all(recipients.map(to => {
@@ -5641,9 +5700,13 @@ function openQuickAdd() {
   setTimeout(() => document.getElementById('quickInput').focus(), 60);
 }
 function quickParse(raw) {
-  let v = raw.trim(), dk = todayKey(), time = null;
+  // 링크는 날짜·시간 분석에서 제외 — 'https://x.com/p/3/15'의 3/15가 날짜로 잡혀 링크가 깨지던 문제
+  const urls = [];
+  let v = raw.trim().replace(/https?:\/\/\S+/gi, m => { urls.push(m); return `\u0001${urls.length - 1}\u0001`; });
+  let dk = todayKey(), time = null;
   const pd = parseQuickDate(v); if (pd && pd.text) { v = pd.text; dk = dateKey(pd.date); }
   const pt = parseQuickTime(v); if (pt && pt.text) { v = pt.text; time = pt.time; }
+  v = v.replace(/\u0001(\d+)\u0001/g, (_, i) => urls[+i]).replace(/\s{2,}/g, ' ').trim();
   return { text: v, dk, time };
 }
 document.getElementById('quickInput').addEventListener('input', e => {
@@ -6091,7 +6154,7 @@ if (IS_TEAM) {
 let commentCtx = null;
 function openComments(dk, taskId, isRepeatInst, originDk) {
   const tdk = isRepeatInst ? originDk : dk;
-  const t = (tasks[tdk]||[]).find(x => x.id === taskId);
+  const _c = findTaskContext(tasks[tdk]||[], taskId); const t = _c && _c.node;
   if (!t) return;
   commentCtx = { dk: tdk, taskId };
   document.getElementById('commentTaskTitle').textContent = t.text;
@@ -6101,7 +6164,7 @@ function openComments(dk, taskId, isRepeatInst, originDk) {
 }
 function renderComments() {
   if (!commentCtx) return;
-  const t = (tasks[commentCtx.dk]||[]).find(x => x.id === commentCtx.taskId);
+  const _cc = findTaskContext(tasks[commentCtx.dk]||[], commentCtx.taskId); const t = _cc && _cc.node;
   const box = document.getElementById('commentList');
   box.innerHTML = '';
   const cs = (t && t.comments) || [];
@@ -6124,7 +6187,7 @@ function renderComments() {
 }
 function deleteComment(i) {
   if (!commentCtx || READ_ONLY) return;
-  const t = (tasks[commentCtx.dk]||[]).find(x => x.id === commentCtx.taskId);
+  const _cc = findTaskContext(tasks[commentCtx.dk]||[], commentCtx.taskId); const t = _cc && _cc.node;
   if (!t || !Array.isArray(t.comments) || !t.comments[i]) return;
   if (!confirm('이 댓글을 삭제할까요?')) return;
   t.comments.splice(i, 1);
@@ -6134,7 +6197,7 @@ function addComment() {
   if (!commentCtx || READ_ONLY) return;
   const inp = document.getElementById('commentInput');
   const text = inp.value.trim(); if (!text) return;
-  const t = (tasks[commentCtx.dk]||[]).find(x => x.id === commentCtx.taskId);
+  const _cc = findTaskContext(tasks[commentCtx.dk]||[], commentCtx.taskId); const t = _cc && _cc.node;
   if (!t) return;
   if (!Array.isArray(t.comments)) t.comments = [];
   t.comments.push({ by: IS_TEAM ? (localStorage.getItem('lastUser')||'멤버') : (USER_ID||'나'), text, ts: Date.now() });
@@ -6543,7 +6606,16 @@ function buildDashCalendar(){
 // ── Google Sheet Sync ──
 const SHEET_ID  = '1wqZEZF34-4CzAsIeNxGyIWvPkjgw4zHCcw1K_exfzIk';
 const SHEET_GID = '1376643190';
-const SHEET_SYNC_KEY = 'sheetLastSync';
+const SHEET_SYNC_KEY = 'sheetLastSync_' + (USER_ID||'');
+// 회사 시트([전관행사]) 자동 동기화는 기본적으로 소유자 캘린더에서만 켜짐.
+// 다른 사람·팀·읽기전용 캘린더에 업무 일정이 섞여 들어가지 않도록. 설정 화면에서 켜고 끌 수 있음.
+const SHEET_OWNER = '이용각';
+function sheetSyncEnabled(){
+  if (IS_TEAM || READ_ONLY || !USER_ID) return false;
+  const v = localStorage.getItem('sheetSyncOn_' + USER_ID);
+  if (v === '1') return true; if (v === '0') return false;
+  return FB_UID === SHEET_OWNER;
+}
 const SHEET_COL_START = 40; // AO (0-based)
 const SHEET_COL_END   = 48; // AW (0-based)
 
@@ -6687,7 +6759,7 @@ async function syncSheetEvents(manual=false){
       }
     }
     if(added>0){ localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks)); if(fbRef())fbUpload(); render(); }
-    localStorage.setItem(SHEET_SYNC_KEY,new Date().toISOString().slice(0,10));
+    localStorage.setItem(SHEET_SYNC_KEY,dateKey(new Date()));
     if(syncBtn){ syncBtn.disabled=false; syncBtn.textContent=`✅ 동기화됨 (${added}건)`; }
     buildDashStats(); buildDashCalendar();
     const p=document.getElementById('dashCalendar'); if(p) appendSheetSyncRow(p);
@@ -6704,9 +6776,10 @@ async function syncSheetEvents(manual=false){
 }
 
 function checkMondaySync(){
+  if(!sheetSyncEnabled()) return;
   const today=new Date();
   if(today.getDay()!==1) return; // 월요일만
-  const todayStr=today.toISOString().slice(0,10);
+  const todayStr=dateKey(today); // 로컬 날짜 (toISOString은 UTC라 오전 9시 전엔 전날로 기록됐음)
   if(localStorage.getItem(SHEET_SYNC_KEY)===todayStr) return;
   syncSheetEvents();
 }
@@ -6739,12 +6812,29 @@ function renameAccount() {
   if (!nn || nn === cur) return;
   const oldSuffix = '_' + cur;
   const newSuffix = '_' + nn;
-  const keys = [];
-  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('cal') && k.endsWith(oldSuffix)) keys.push(k); }
-  keys.forEach(k => { const base = k.slice(0, k.length - oldSuffix.length); localStorage.setItem(base + newSuffix, localStorage.getItem(k)); });
-  localStorage.setItem('lastUser', nn);
-  alert(`'${nn}'(으)로 이전했어요. 새 캘린더로 이동할게요.`);
-  window.location.href = window.location.pathname + `?u=${encodeURIComponent(nn)}`;
+  const copyLocal = () => {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      // 동기화 기준(calSyncBase)은 복사하지 않음 — 새 이름의 서버 상태와 맞지 않아 데이터가 지워질 수 있음
+      if (k && k.startsWith('cal') && k.endsWith(oldSuffix) && !k.startsWith('calSyncBase')) keys.push(k);
+    }
+    keys.forEach(k => { const base = k.slice(0, k.length - oldSuffix.length); localStorage.setItem(base + newSuffix, localStorage.getItem(k)); });
+    localStorage.setItem('lastUser', nn);
+  };
+  const go = () => { alert(`'${nn}'(으)로 이전했어요. 새 캘린더로 이동할게요.`); window.location.href = window.location.pathname + `?u=${encodeURIComponent(nn)}`; };
+  const newFb = nn.replace(/[.#$\[\]\/]/g,'').trim().slice(0,40);
+  if (!fbDb || !newFb) { copyLocal(); go(); return; }
+  // 서버 쪽 데이터(할 일·휴무일·메모·공유·목표 등)도 새 이름으로 복사.
+  // 로컬만 복사하면 새 이름의 빈 서버 데이터가 휴무일·공유·목표를 덮어써 초기화됐음.
+  fbDb.ref('users/' + newFb).once('value').then(snap => {
+    if (snap.exists()) { alert(`'${nn}'은(는) 이미 사용 중인 이름이에요. 다른 이름을 골라 주세요.`); return; }
+    return fbDb.ref('users/' + FB_UID).once('value').then(src => {
+      const data = src.val() || {};
+      delete data.pushSubs; // 기기 알림 구독은 기기·이름에 묶여 있으므로 복사하지 않음
+      return fbDb.ref('users/' + newFb).set(fbClean(data));
+    }).then(() => { copyLocal(); go(); });
+  }).catch(e => alert('이름을 바꾸지 못했어요: ' + ((e && e.message) || '네트워크를 확인해 주세요')));
 }
 
 // ── 전체 백업 / 복원 ──
@@ -6905,7 +6995,7 @@ function bulkForEach(fn) {
       // 다른 앱에서 공유받은 텍스트 → 빠른 추가에 미리 채워서 열기
       openQuickAdd();
       const inp=document.getElementById('quickInput');
-      if(inp){ inp.value=sharedText.slice(0,200); inp.dispatchEvent(new Event('input')); }
+      if(inp){ inp.value=sharedText.slice(0,600); inp.dispatchEvent(new Event('input')); }
     } else if(go==='quick') openQuickAdd();
     else if(go==='focus') setView('focus');
     else if(go==='today'){ weekStart=getMonday(new Date()); setView('week'); }
@@ -6927,7 +7017,9 @@ function bulkForEach(fn) {
     rec=new SR(); rec.lang='ko-KR'; rec.interimResults=true;
     const inp=document.getElementById('quickInput');
     active=true; btn.classList.add('listening');
-    rec.onresult=e=>{ inp.value=[...e.results].map(r=>r[0].transcript).join(''); inp.dispatchEvent(new Event('input')); };
+    // 이미 입력해 둔 글 뒤에 이어 붙임 (덮어쓰지 않음)
+    const prefix=inp.value.trim()?inp.value.trim()+' ':'';
+    rec.onresult=e=>{ inp.value=prefix+[...e.results].map(r=>r[0].transcript).join(''); inp.dispatchEvent(new Event('input')); };
     rec.onend=()=>{ active=false; btn.classList.remove('listening'); inp.focus(); };
     rec.onerror=()=>{ active=false; btn.classList.remove('listening'); };
     try{ rec.start(); }catch{ active=false; btn.classList.remove('listening'); }

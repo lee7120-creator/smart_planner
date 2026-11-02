@@ -622,6 +622,9 @@
 
     /* ─── Search results ─── */
     .search-results-wrap { padding:16px; }
+    .search-head { display:flex; align-items:center; justify-content:space-between; gap:10px; max-width:760px; margin:0 auto 12px; }
+    .search-head-title { font-size:14px; font-weight:700; color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .search-clear { padding:6px 12px; font-size:12px; flex-shrink:0; }
     .search-result-group { margin-bottom:20px; }
     .search-result-date { font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--border2); }
     .search-result-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px; background:var(--surface); margin-bottom:4px; cursor:pointer; box-shadow:var(--shadow); }
